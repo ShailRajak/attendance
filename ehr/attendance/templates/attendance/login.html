@@ -1,0 +1,48 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Login - EHR Attendance System{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center" style="min-height: 55vh;">
+    <div class="col-md-6 col-lg-5 col-xl-4">
+        <div class="card-custom text-center">
+            <div class="mb-3">
+                <span class="fs-2">🔒</span>
+                <h4 class="fw-bold mt-2">Employee Login</h4>
+                <p class="text-muted small">Access your attendance tracking dashboard</p>
+            </div>
+
+            <form method="POST">
+                {% csrf_token %}
+
+                <!-- Employee ID -->
+                <div class="mb-2 text-start">
+                    <label for="employee_id" class="form-label-custom">Employee ID</label>
+                    <input type="text" id="employee_id" name="employee_id"
+                        class="form-control form-control-custom w-100" placeholder="e.g., 19101234"
+                        value="{{ employee_id|default:'' }}" required autofocus>
+                </div>
+
+                <!-- Password -->
+                <div class="mb-3 text-start">
+                    <label for="password" class="form-label-custom">Password</label>
+                    <input type="password" id="password" name="password" class="form-control form-control-custom w-100"
+                        placeholder="••••••••" required>
+                </div>
+
+                <!-- Submit -->
+                <button type="submit" class="btn btn-accent w-100 py-2.5 mb-2">
+                    Sign In
+                </button>
+            </form>
+
+            <div class="mt-2 text-muted small">
+                Don't have an account yet?
+                <div class="mt-2">
+                    <a href="{% url 'signup' %}" class="text-info fw-semibold text-decoration-none">Register Here</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
