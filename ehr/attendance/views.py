@@ -431,7 +431,7 @@ def compute_kpi_cards(attendance_records):
         total_employees_ids.add(emp_id)
 
         shift = str(record.get("Shift") or "").strip()
-        att_status = str(record.get("Attendance Status") or "").strip()
+        in_time = str(record.get("In Time") or "").strip()
         leave_type = str(record.get("Leave Type") or "").strip()
         late_min_value = record.get("Late Minutes") or 0
 
@@ -445,33 +445,52 @@ def compute_kpi_cards(attendance_records):
         if is_night_shift:
             night_shift_ids.add(emp_id)
 
-        # Determine attendance booleans
-        is_present = att_status and "Present" in att_status
-        is_absent_raw = att_status and "Absent" in att_status
+        # Determine Present / Absent based on In Time and Work Hours (same logic as table formatting)
+        has_check_in = bool(in_time) and in_time not in ("00:00", "—", "")
+        try:
+            work_time = float(record.get("Working Hours") or 0.0)
+        except (ValueError, TypeError):
+            work_time = 0.0
+
+        # Check if weekend
+        date_obj = parse_date(record.get("Date", ""))
+        is_weekend = date_obj and date_obj.weekday() in (5, 6) if date_obj else False
+
+        is_present = bool(has_check_in and work_time >= 8.0)
+        is_absent = bool(not has_check_in and not is_weekend and not leave_type)
         has_leave = bool(leave_type) and leave_type not in ("", "—", "None", "0")
+        is_rest_day = bool(is_weekend or (not has_check_in and is_weekend))
 
         # --- Present counts (per record's shift) ---
-        if is_day_shift and is_present:
-            present_day_ids.add(emp_id)
-        if is_night_shift and is_present:
-            present_night_ids.add(emp_id)
+        if is_present:
+            if is_day_shift:
+                present_day_ids.add(emp_id)
+            if is_night_shift:
+                present_night_ids.add(emp_id)
 
-        # --- Absent (exclude Leave, Weekly Off, Holiday) ---
-        is_weekoff_holiday = (
-            att_status and any(w in att_status.lower() for w in ["week", "holiday", "rest", "weekoff", "week off"])
-        )
-        if is_absent_raw and not has_leave and not is_weekoff_holiday:
+        # --- Absent (no check-in, not weekend, no leave) ---
+        if is_absent:
             absent_ids.add(emp_id)
 
         # --- On Leave (any approved leave type) ---
         if has_leave:
             on_leave_ids.add(emp_id)
 
-        # --- Late Punch (LaterMin1 / Late Minutes > 0) ---
+        # --- Late Punch (check-in after 9:15 AM) ---
         try:
             late_minutes = float(late_min_value)
         except (ValueError, TypeError):
             late_minutes = 0.0
+
+        # Also derive late from in_time if Late Minutes is not available
+        if late_minutes == 0 and has_check_in and ":" in in_time:
+            try:
+                h, m = map(int, in_time.split(":"))
+                if h * 60 + m > 9 * 60 + 15:
+                    late_minutes = (h * 60 + m) - (9 * 60 + 15)
+            except Exception:
+                pass
+
         if late_minutes > 0:
             late_punch_ids.add(emp_id)
 
@@ -622,8 +641,10 @@ def home(request):
                 query_employee_id = "" # Section overview by default for PD roles
         
         if role in ('smt_pd', 'assy_pd') and not query_employee_id:
-            end_dt = datetime.now().date()
-            start_dt = end_dt - timedelta(days=2)
+            # Section view: fetch only previous day's data
+            last_date = datetime.now().date() - timedelta(days=1)
+            start_dt = last_date
+            end_dt = last_date
         else:
             start_dt, end_dt = get_attendance_date_range()
             
@@ -715,6 +736,12 @@ def home(request):
             else:
                 status = f"CL(0.5d)"
 
+        # Determine shift label for filtering
+        shift_raw = str(record.get("Shift") or "").strip()
+        shift_label = "day"
+        if "Night" in shift_raw:
+            shift_label = "night"
+
         formatted_attendance.append({
             "date": date_display,
             "day": day_name,
@@ -726,7 +753,8 @@ def home(request):
             "raw_date": date_str,
             "employee_id": record.get("Employee ID", "—"),
             "employee_name": record.get("Employee Name", "—"),
-            "department": record.get("Day", "—")
+            "department": record.get("Day", "—"),
+            "shift_label": shift_label
         })
 
     # Period text for display
