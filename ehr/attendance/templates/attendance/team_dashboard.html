@@ -1,0 +1,315 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Team Dashboard - EHR Attendance Management{% endblock %}
+
+{% block extra_head %}
+<style>
+    .scope-card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        padding: 1.5rem 2rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+    .scope-avatar {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-accent) 0%, var(--secondary-accent) 100%);
+        color: white;
+        font-weight: 700;
+        font-size: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    }
+    .stat-card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 1.25rem;
+        min-height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .stat-card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(99, 102, 241, 0.3);
+        box-shadow: 0 12px 28px rgba(99, 102, 241, 0.12);
+    }
+    .stat-title {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .stat-number {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1.1;
+        margin-top: 0.25rem;
+        margin-bottom: 0.25rem;
+    }
+    .stat-detail {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header with Filter Toggle -->
+<div class="row align-items-center mb-4">
+    <div class="col-md-6">
+        <h2 class="fw-bold mb-0 text-white">Supervisor Dashboard</h2>
+    </div>
+    <div class="col-md-6 text-md-end mt-3 mt-md-0">
+        <button class="btn btn-outline-custom btn-sm py-2 px-3 d-inline-flex align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse" aria-expanded="false" aria-controls="filterCollapse">
+            <i class="bi bi-calendar3 me-2"></i> Adjust Period & Search
+        </button>
+    </div>
+</div>
+
+<!-- Collapsable Filter Form -->
+<div class="collapse mb-4" id="filterCollapse">
+    <div class="card-custom">
+        <h5 class="fw-semibold mb-3">Adjust Date Period</h5>
+        <form method="POST">
+            {% csrf_token %}
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label for="start_date" class="form-label-custom">Start Date</label>
+                    <input type="date" id="start_date" name="start_date" class="form-control form-control-custom w-100" value="{{ start_date }}" required>
+                </div>
+                <div class="col-md-5">
+                    <label for="end_date" class="form-label-custom">End Date</label>
+                    <input type="date" id="end_date" name="end_date" class="form-control form-control-custom w-100" value="{{ end_date }}" required>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-accent w-100 py-3">Apply</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Scope Overview Card -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="scope-card d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+            <div class="d-flex flex-column flex-sm-row align-items-start align-items-sm-center gap-3">
+                <!-- Avatar and Scope Block (Row on mobile) -->
+                <div class="d-flex align-items-center gap-3">
+                    <div class="scope-avatar">
+                        <i class="bi bi-people-fill text-white"></i>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 d-sm-none">
+                        <h4 class="fw-bold mb-0 text-white">{{ scope_name|default:"Department Scope" }}</h4>
+                        <span class="badge-onroll">Supervisor</span>
+                    </div>
+                </div>
+                <!-- Details Block (Stacks below Avatar/Scope on mobile) -->
+                <div>
+                    <div class="d-none d-sm-flex align-items-center gap-2 mb-1">
+                        <h4 class="fw-bold mb-0 text-white">{{ scope_name|default:"Department Scope" }}</h4>
+                        <span class="badge-onroll">Supervisor</span>
+                    </div>
+                    <div class="text-muted small">
+                        Sector 63 &middot; IIPL &middot; Department Overview Scope
+                    </div>
+                </div>
+            </div>
+            <!-- Period Block -->
+            <div class="text-start text-md-end">
+                <div class="text-muted small">Period</div>
+                <h5 class="fw-bold text-white mb-0">{{ period_text }}</h5>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Aggregate Stats Row -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-title">Total Employees</div>
+            <div class="stat-number text-white">{{ stats.total_employees }}</div>
+            <div class="stat-detail text-muted">active in scope</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-title">Avg Attendance %</div>
+            <div class="stat-number text-success">{{ stats.avg_attendance_pct|floatformat:1 }}%</div>
+            <div class="stat-detail text-muted">across period</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-title">Total OT Hours</div>
+            <div class="stat-number text-info">{{ stats.total_ot_hours }}h</div>
+            <div class="stat-detail text-muted">accumulated OT</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-title">Total Late Incidents</div>
+            <div class="stat-number text-danger">{{ stats.total_late_incidents }}</div>
+            <div class="stat-detail text-muted">arrivals after 09:15</div>
+        </div>
+    </div>
+</div>
+
+<!-- Employee List -->
+<div class="row">
+    <div class="col-12">
+        <div class="card-custom">
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4">
+                <h4 class="fw-bold mb-0 text-white">Employee Attendance Registry</h4>
+                
+                <!-- Client-side Search Input -->
+                <div class="w-100 w-sm-auto" style="min-width: 260px;">
+                    <div class="position-relative">
+                        <input type="text" id="employeeSearchInput" class="form-control form-control-custom w-100 ps-5" placeholder="Search by name...">
+                        <i class="bi bi-search text-muted position-absolute" style="left: 16px; top: 50%; transform: translateY(-50%); font-size: 0.9rem;"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Employee List View Container -->
+            <div id="employeeListContainer">
+                {% if employees %}
+                    <!-- Desktop Table View -->
+                    <div class="table-responsive d-none d-sm-block">
+                        <table class="table table-custom" id="employeeTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Emp No</th>
+                                    <th>Days Present</th>
+                                    <th>OT Hours</th>
+                                    <th>Late Count</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for emp in employees %}
+                                    <!-- Each row links to employee detail. 
+                                         Assumes Django route matching: /attendance/employee/<emp_no>/ exists. -->
+                                    <tr style="cursor: pointer;" onclick="window.location.href='/attendance/employee/{{ emp.emp_no }}/';" class="employee-row" data-name="{{ emp.name|lower }}">
+                                        <td>
+                                            <!-- Wire up dynamic Django URL mapping here: e.g., {% url 'employee_detail' emp.emp_no %} -->
+                                            <a href="/attendance/employee/{{ emp.emp_no }}/" class="text-decoration-none fw-bold text-white">
+                                                {{ emp.name }}
+                                            </a>
+                                        </td>
+                                        <td class="text-muted">{{ emp.emp_no }}</td>
+                                        <td class="text-success fw-semibold">{{ emp.days_present }}</td>
+                                        <td class="text-info fw-semibold">{{ emp.ot_hours }}h</td>
+                                        <td class="text-danger fw-semibold">{{ emp.late_count }}</td>
+                                        <td>
+                                            {% if emp.status == "Present" or emp.status == "Active" %}
+                                                <span class="badge badge-custom badge-active">Active</span>
+                                            {% elif emp.status == "Absent" %}
+                                                <span class="badge badge-custom badge-absent">Absent</span>
+                                            {% elif emp.status == "Rest Day" %}
+                                                <span class="badge badge-status-rest badge-custom">Rest Day</span>
+                                            {% else %}
+                                                <span class="badge badge-status-cl badge-custom">{{ emp.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Mobile Card View Fallback -->
+                    <div class="d-block d-sm-none" id="employeeCardsContainer">
+                        {% for emp in employees %}
+                            <div class="card-custom mb-3 p-3 employee-card-item" style="background: rgba(30, 41, 59, 0.4); border-radius: 12px; border: 1px solid var(--card-border); cursor: pointer;" onclick="window.location.href='/attendance/employee/{{ emp.emp_no }}/';" data-name="{{ emp.name|lower }}">
+                                <div class="d-flex justify-content-between align-items-center mb-2 pb-2" style="border-bottom: 1px solid var(--card-border);">
+                                    <div>
+                                        <strong class="text-white">{{ emp.name }}</strong>
+                                        <span class="text-muted small ms-2">({{ emp.emp_no }})</span>
+                                    </div>
+                                    <div>
+                                        {% if emp.status == "Present" or emp.status == "Active" %}
+                                            <span class="badge badge-custom badge-active">Active</span>
+                                        {% elif emp.status == "Absent" %}
+                                            <span class="badge badge-custom badge-absent">Absent</span>
+                                        {% elif emp.status == "Rest Day" %}
+                                            <span class="badge badge-status-rest badge-custom">Rest Day</span>
+                                        {% else %}
+                                            <span class="badge badge-status-cl badge-custom">{{ emp.status }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="row g-2 text-muted small">
+                                    <div class="col-4">
+                                        <span class="form-label-custom d-block mb-0">Present</span>
+                                        <span class="text-success fw-semibold">{{ emp.days_present }} days</span>
+                                    </div>
+                                    <div class="col-4">
+                                        <span class="form-label-custom d-block mb-0">OT Hours</span>
+                                        <span class="text-info fw-semibold">{{ emp.ot_hours }}h</span>
+                                    </div>
+                                    <div class="col-4">
+                                        <span class="form-label-custom d-block mb-0">Late Count</span>
+                                        <span class="text-danger fw-semibold">{{ emp.late_count }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+                        <h5 class="text-muted fw-normal">No employees found for this period.</h5>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Client-side Name Filter JS -->
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const searchInput = document.getElementById("employeeSearchInput");
+        
+        if (searchInput) {
+            searchInput.addEventListener("input", function () {
+                const query = this.value.toLowerCase().trim();
+                
+                // Filter Desktop Table Rows
+                const rows = document.querySelectorAll(".employee-row");
+                rows.forEach(row => {
+                    const name = row.getAttribute("data-name") || "";
+                    if (name.includes(query)) {
+                        row.style.setProperty("display", "", "important");
+                    } else {
+                        row.style.setProperty("display", "none", "important");
+                    }
+                });
+                
+                // Filter Mobile Card Elements
+                const cards = document.querySelectorAll(".employee-card-item");
+                cards.forEach(card => {
+                    const name = card.getAttribute("data-name") || "";
+                    if (name.includes(query)) {
+                        card.style.setProperty("display", "", "important");
+                    } else {
+                        card.style.setProperty("display", "none", "important");
+                    }
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}

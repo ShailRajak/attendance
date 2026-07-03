@@ -1,0 +1,136 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Employee Profile - {{ emp.full_name }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-4 fade-in-el">
+    {% if is_supervisor %}
+    <a href="{% url 'employee_list' %}" class="btn btn-outline-custom btn-sm py-2 px-3 mb-3">
+        <i class="bi bi-arrow-left"></i> Back to Employee Directory
+    </a>
+    {% else %}
+    <a href="{% url 'home' %}" class="btn btn-outline-custom btn-sm py-2 px-3 mb-3">
+        <i class="bi bi-arrow-left"></i> Back to Dashboard
+    </a>
+    {% endif %}
+    <h2 class="fw-bold text-white mb-1"><i class="bi bi-person-badge text-primary"></i> Employee Profile</h2>
+    <p class="text-muted">Detailed shift assignments and historical logs for team members.</p>
+</div>
+
+<!-- Employee Header Card -->
+<div class="card-custom mb-4 fade-in-el" style="background: linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(56,189,248,0.05) 100%);">
+    <div class="row align-items-center g-3">
+        <div class="col-auto">
+            <div style="width:72px; height:72px; border-radius:50%; background: linear-gradient(135deg, var(--primary-accent) 0%, var(--secondary-accent) 100%); display:flex; align-items:center; justify-content:center; font-weight:700; color:white; font-size:1.6rem;">
+                {{ emp.username|slice:":2"|upper }}
+            </div>
+        </div>
+        <div class="col">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                <h3 class="fw-bold text-white mb-0">{{ emp.full_name }}</h3>
+                <span class="badge bg-secondary text-white">{{ emp.role|upper }}</span>
+                <span class="badge badge-custom badge-active">Onroll</span>
+            </div>
+            <p class="text-muted mb-1">Employee ID: <strong class="text-info">{{ emp.username }}</strong> &middot; Section / Dept: <span class="text-white">{{ emp.section|upper }}</span></p>
+            <p class="text-muted small mb-0">
+                Joined: {{ emp.date_joined|date:"d M, Y" }} &middot;
+                Status: {% if emp.is_active %}<span class="text-success fw-semibold">Active</span>{% else %}<span class="text-danger fw-semibold">Inactive</span>{% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Request History Tabs -->
+<div class="row g-4 fade-in-el">
+    <!-- Leave History -->
+    <div class="col-12 col-lg-4">
+        <div class="card-custom h-100">
+            <h5 class="fw-bold text-white mb-3"><i class="bi bi-calendar-event text-info"></i> Leave History</h5>
+            {% if emp_leaves %}
+                <div class="d-flex flex-column gap-3">
+                {% for req in emp_leaves %}
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary">
+                    <div>
+                        <div class="text-white fw-semibold small">{{ req.get_category_display }}</div>
+                        <div class="text-muted" style="font-size:0.75rem;">{{ req.start_date }} to {{ req.end_date }}</div>
+                    </div>
+                    {% if req.status == 'approved' %}
+                        <span class="badge badge-custom badge-active">Approved</span>
+                    {% elif req.status == 'rejected' %}
+                        <span class="badge badge-custom badge-absent">Rejected</span>
+                    {% else %}
+                        <span class="badge badge-status-cl badge-custom">Pending</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-4 text-muted small">
+                    <p class="mb-0">No leave records logged.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Overtime History -->
+    <div class="col-12 col-lg-4">
+        <div class="card-custom h-100">
+            <h5 class="fw-bold text-white mb-3"><i class="bi bi-clock text-warning"></i> Overtime History</h5>
+            {% if emp_overtimes %}
+                <div class="d-flex flex-column gap-3">
+                {% for req in emp_overtimes %}
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary">
+                    <div>
+                        <div class="text-white fw-semibold small">{{ req.date }}</div>
+                        <div class="text-muted" style="font-size:0.75rem;"><span class="badge bg-secondary text-white py-0 px-1">{{ req.hours }}h</span> &middot; {{ req.reason|default:"—"|truncatechars:20 }}</div>
+                    </div>
+                    {% if req.status == 'approved' %}
+                        <span class="badge badge-custom badge-active">Approved</span>
+                    {% elif req.status == 'rejected' %}
+                        <span class="badge badge-custom badge-absent">Rejected</span>
+                    {% else %}
+                        <span class="badge badge-status-cl badge-custom">Pending</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-4 text-muted small">
+                    <p class="mb-0">No overtime records logged.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Correction History -->
+    <div class="col-12 col-lg-4">
+        <div class="card-custom h-100">
+            <h5 class="fw-bold text-white mb-3"><i class="bi bi-pencil-square text-success"></i> Correction History</h5>
+            {% if emp_corrections %}
+                <div class="d-flex flex-column gap-3">
+                {% for req in emp_corrections %}
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary">
+                    <div>
+                        <div class="text-white fw-semibold small">{{ req.date }}</div>
+                        <div class="text-muted" style="font-size:0.75rem;">{{ req.correct_in_time }} → {{ req.correct_out_time }}</div>
+                    </div>
+                    {% if req.status == 'approved' %}
+                        <span class="badge badge-custom badge-active">Approved</span>
+                    {% elif req.status == 'rejected' %}
+                        <span class="badge badge-custom badge-absent">Rejected</span>
+                    {% else %}
+                        <span class="badge badge-status-cl badge-custom">Pending</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-4 text-muted small">
+                    <p class="mb-0">No correction records logged.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

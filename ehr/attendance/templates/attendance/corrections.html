@@ -1,0 +1,92 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Punch Corrections - IIPL Enterprise eHR{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-4 fade-in-el">
+    <h2 class="fw-bold text-white mb-1"><i class="bi bi-pencil-square text-primary"></i> Punch Correction Portal</h2>
+    <p class="text-muted">Submit attendance correction requests and track their approval status.</p>
+</div>
+
+<div class="row g-4 fade-in-el">
+    <!-- Left Column: Correction Form -->
+    <div class="col-lg-5">
+        <div class="card-custom h-100">
+            <h5 class="fw-bold text-white mb-4"><i class="bi bi-calendar-plus text-info"></i> Apply Correction</h5>
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="apply_correction">
+                
+                <div class="mb-3">
+                    <label for="date" class="form-label-custom">Attendance Date</label>
+                    <input type="date" id="date" name="date" class="form-control form-control-custom w-100" required>
+                </div>
+                
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label for="correct_in_time" class="form-label-custom">Correct In-Time</label>
+                        <input type="time" id="correct_in_time" name="correct_in_time" class="form-control form-control-custom w-100" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="correct_out_time" class="form-label-custom">Correct Out-Time</label>
+                        <input type="time" id="correct_out_time" name="correct_out_time" class="form-control form-control-custom w-100" required>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="reason" class="form-label-custom">Reason for Correction</label>
+                    <textarea id="reason" name="reason" rows="4" class="form-control form-control-custom w-100" placeholder="Describe why a correction is needed..." required></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-accent w-100 py-3">
+                    Request Correction
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Right Column: Correction History -->
+    <div class="col-lg-7">
+        <div class="card-custom h-100">
+            <h5 class="fw-bold text-white mb-4"><i class="bi bi-clock-history text-warning"></i> Correction History</h5>
+            <div class="table-responsive">
+                <table class="table table-custom mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Correct In</th>
+                            <th>Correct Out</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if user_corrections %}
+                            {% for req in user_corrections %}
+                            <tr>
+                                <td><strong class="text-white">{{ req.date }}</strong></td>
+                                <td><strong class="text-success">{{ req.correct_in_time }}</strong></td>
+                                <td><strong class="text-danger">{{ req.correct_out_time }}</strong></td>
+                                <td>
+                                    {% if req.status == 'approved' %}
+                                        <span class="badge badge-custom badge-active">Approved</span>
+                                    {% elif req.status == 'rejected' %}
+                                        <span class="badge badge-custom badge-absent">Rejected</span>
+                                    {% else %}
+                                        <span class="badge badge-status-cl badge-custom">Pending</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-5 small">No correction requests found.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

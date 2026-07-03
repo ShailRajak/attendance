@@ -1,11 +1,22 @@
 {% extends 'attendance/base.html' %}
 
-{% block title %}Dashboard - EHR Attendance Management{% endblock %}
+{% block title %}{{ active_tab|title }} - EHR Attendance Management{% endblock %}
 
 {% block extra_head %}
 <!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
+    .welcome-banner {
+        background: rgba(21, 28, 44, 0.4);
+        border: 1px solid var(--card-border);
+        border-left: 4px solid var(--success-color);
+        border-radius: 12px;
+        padding: 1.25rem 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 2rem;
+    }
     .profile-card {
         background: var(--card-bg);
         border: 1px solid var(--card-border);
@@ -17,7 +28,7 @@
         width: 64px;
         height: 64px;
         border-radius: 50%;
-        background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+        background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
         color: white;
         font-weight: 700;
         font-size: 1.5rem;
@@ -37,12 +48,46 @@
         display: inline-block;
         vertical-align: middle;
     }
+    .summary-card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 14px;
+        padding: 1.5rem;
+        min-height: 135px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        transition: all 0.2s ease;
+    }
+    .summary-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+    .summary-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .summary-number {
+        font-size: 2.2rem;
+        font-weight: 700;
+        line-height: 1;
+        margin-top: 0.4rem;
+        margin-bottom: 0.4rem;
+    }
+    .summary-detail {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
     .stat-card {
         background: var(--card-bg);
         border: 1px solid var(--card-border);
         border-radius: 12px;
         padding: 1.25rem;
-        min-height: 120px;
+        min-height: 110px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -52,21 +97,17 @@
     .stat-card:hover {
         transform: translateY(-2px);
         border-color: rgba(255, 255, 255, 0.15);
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
     }
     .stat-title {
-        font-size: 0.85rem;
-        font-weight: 500;
+        font-size: 0.8rem;
+        font-weight: 600;
         color: var(--text-muted);
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
     .stat-number {
-        font-size: 1.8rem;
+        font-size: 1.7rem;
         font-weight: 700;
-        line-height: 1.1;
-        margin-top: 0.25rem;
-        margin-bottom: 0.25rem;
     }
     .stat-detail {
         font-size: 0.75rem;
@@ -86,14 +127,48 @@
         width: 100%;
     }
     .badge-status-cl {
-        background-color: rgba(245, 158, 11, 0.15);
+        background-color: rgba(245, 158, 11, 0.12);
         color: #f59e0b;
-        border: 1px solid rgba(245, 158, 11, 0.3);
+        border: 1px solid rgba(245, 158, 11, 0.2);
     }
     .badge-status-rest {
         background-color: rgba(148, 163, 184, 0.1);
         color: var(--text-muted);
         border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    /* Allotment Sub-Cards */
+    .allotment-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 15px;
+        margin-top: 1rem;
+    }
+    .allotment-card {
+        background: rgba(11, 15, 25, 0.4);
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+        transition: border-color 0.2s ease;
+    }
+    .allotment-card:hover {
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+    .allotment-title {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        font-weight: 600;
+        color: var(--text-muted);
+    }
+    .allotment-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin: 0.25rem 0;
+    }
+    .allotment-used {
+        font-size: 0.72rem;
+        color: var(--text-muted);
     }
 
     /* Calendar Grid Styling */
@@ -113,7 +188,7 @@
         letter-spacing: 0.5px;
     }
     .calendar-day-cell {
-        background: rgba(30, 41, 59, 0.4);
+        background: rgba(21, 28, 44, 0.4);
         border: 1px solid var(--card-border);
         border-radius: 12px;
         padding: 0.6rem 0.3rem;
@@ -130,25 +205,24 @@
         border-color: rgba(255, 255, 255, 0.15);
     }
     .calendar-present {
-        background-color: rgba(16, 185, 129, 0.15) !important;
-        border-color: rgba(16, 185, 129, 0.4) !important;
+        background-color: rgba(16, 185, 129, 0.12) !important;
+        border-color: rgba(16, 185, 129, 0.3) !important;
         color: #10b981 !important;
     }
     .calendar-present .calendar-time {
         color: #10b981;
     }
     .calendar-late {
-        background-color: rgba(244, 63, 94, 0.12) !important;
-        border-color: rgba(244, 63, 94, 0.35) !important;
-        color: #f43f5e !important;
-        border-width: 1.5px !important;
+        background-color: rgba(239, 68, 68, 0.1) !important;
+        border-color: rgba(239, 68, 68, 0.3) !important;
+        color: #ef4444 !important;
     }
     .calendar-late .calendar-time {
-        color: #f43f5e;
+        color: #ef4444;
     }
     .calendar-leave {
-        background-color: rgba(245, 158, 11, 0.15) !important;
-        border-color: rgba(245, 158, 11, 0.4) !important;
+        background-color: rgba(245, 158, 11, 0.12) !important;
+        border-color: rgba(245, 158, 11, 0.3) !important;
         color: #f59e0b !important;
     }
     .calendar-leave .calendar-time {
@@ -186,33 +260,163 @@
         margin-right: 6px;
         vertical-align: middle;
     }
+
+    /* Coworker Card Directory */
+    .coworker-card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 14px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .coworker-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(99, 102, 241, 0.2);
+    }
+    .coworker-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0.03) 100%);
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        color: var(--text-main);
+        font-weight: 600;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Tab approvals navigation style */
+    .nav-pills-custom {
+        display: flex;
+        gap: 10px;
+        border-bottom: 1px solid var(--card-border);
+        padding-bottom: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+    .nav-pill-custom {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--card-border);
+        color: var(--text-muted);
+        padding: 0.5rem 1.25rem;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 0.85rem;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    .nav-pill-custom:hover {
+        color: var(--text-main);
+        background: rgba(255, 255, 255, 0.06);
+    }
+    .nav-pill-custom.active {
+        background: transparent;
+        color: var(--text-main);
+        border-color: var(--text-main);
+        font-weight: 600;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Page Header with Filter Toggle -->
-<div class="row align-items-center mb-4">
+
+{% if active_tab == 'dashboard' or not active_tab %}
+<!-- ========================================== -->
+<!-- 1. DASHBOARD OVERVIEW                      -->
+<!-- ========================================== -->
+
+<!-- Welcome banner alert style -->
+<div class="welcome-banner fade-in-el">
+    <div class="d-flex align-items-center gap-2">
+        <span class="fs-4">👋</span>
+        <div class="text-white fw-semibold">Welcome back, {{ user.username }}!</div>
+    </div>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close" onclick="this.parentElement.style.display='none';"></button>
+</div>
+
+<!-- Header stats row -->
+<div class="row g-3 mb-4 fade-in-el">
+    <div class="col-md-4 col-xl-2 col-6">
+        <div class="summary-card">
+            <span class="summary-title">Total Headcount</span>
+            <div class="summary-number text-white">{{ total_headcount }}</div>
+            <span class="summary-detail">Active Employees</span>
+        </div>
+    </div>
+    <div class="col-md-4 col-xl-2 col-6">
+        <div class="summary-card">
+            <span class="summary-title">Present Today</span>
+            <div class="summary-number text-success">{{ present_today }}</div>
+            <span class="summary-detail">
+                Attendance: 
+                {% if total_headcount > 0 %}
+                    {% if total_headcount > 0 %}{% widthratio present_today total_headcount 100 %}{% else %}0{% endif %}%
+                {% else %}
+                    0%
+                {% endif %}
+            </span>
+        </div>
+    </div>
+    <div class="col-md-4 col-xl-2 col-6">
+        <div class="summary-card">
+            <span class="summary-title">Absent Today</span>
+            <div class="summary-number text-danger">{{ absent_today }}</div>
+            <span class="summary-detail">Unexcused status</span>
+        </div>
+    </div>
+    <div class="col-md-4 col-xl-2 col-6">
+        <div class="summary-card">
+            <span class="summary-title">On Leave</span>
+            <div class="summary-number text-warning">{{ on_leave_today }}</div>
+            <span class="summary-detail">Approved requests</span>
+        </div>
+    </div>
+    <div class="col-md-4 col-xl-2 col-6">
+        <div class="summary-card">
+            <span class="summary-title">Late Punch</span>
+            <div class="summary-number text-info">{{ late_punch_today }}</div>
+            <span class="summary-detail">After grace period</span>
+        </div>
+    </div>
+    <div class="col-md-4 col-xl-2 col-6">
+        <div class="summary-card">
+            <span class="summary-title">Pending Tasks</span>
+            <div class="summary-number text-white">{{ pending_tasks_count }}</div>
+            <span class="summary-detail text-danger fw-semibold">Requires action</span>
+        </div>
+    </div>
+</div>
+
+<!-- Period Adjustment & Search Header -->
+<div class="row align-items-center mb-4 fade-in-el">
     <div class="col-md-6">
-        <h2 class="fw-bold mb-0 text-white">Dashboard Overview</h2>
+        <h3 class="fw-bold mb-0 text-white">Dashboard Overview</h3>
     </div>
     <div class="col-md-6 text-md-end mt-3 mt-md-0">
         <button class="btn btn-outline-custom btn-sm py-2 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse" aria-expanded="false" aria-controls="filterCollapse">
-            📅 Adjust Period & Search
+            🔍 Adjust Period & Search
         </button>
     </div>
 </div>
 
-<!-- Collapsable Filter Form -->
+<!-- Filter Box -->
 <div class="collapse mb-4" id="filterCollapse">
     <div class="card-custom">
-        <h5 class="fw-semibold mb-3">Adjust Date Period</h5>
+        <h5 class="fw-semibold mb-3 text-white">Adjust Date Period</h5>
         <form method="POST">
             {% csrf_token %}
+            <input type="hidden" name="action" value="filter_dashboard">
             <div class="row g-3">
                 <div class="col-md-4">
                     <label for="employee_id" class="form-label-custom">Employee ID</label>
-                    {% if is_superuser %}
-                        <input type="text" id="employee_id" name="employee_id" class="form-control form-control-custom w-100" value="{{ employee_id_value }}" required>
+                    {% if is_superuser or role == 'smt_pd' or role == 'assy_pd' %}
+                        <input type="text" id="employee_id" name="employee_id" class="form-control form-control-custom w-100" value="{{ employee_id_value|default:'' }}" placeholder="Leave blank for section view">
                     {% else %}
                         <input type="text" id="employee_id" name="employee_id" class="form-control form-control-custom w-100" value="{{ employee_id_value }}" readonly>
                     {% endif %}
@@ -233,21 +437,33 @@
     </div>
 </div>
 
-<!-- Employee overview profile card -->
-<div class="row mb-4">
+<!-- Employee profile info card -->
+<div class="row mb-4 fade-in-el">
     <div class="col-12">
         <div class="profile-card d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
             <div class="d-flex align-items-center gap-3">
                 <div class="profile-avatar">
-                    {{ stats.employee_details.initials }}
+                    {% if is_section_view %}
+                        {{ stats.employee_details.initials }}
+                    {% else %}
+                        {{ stats.employee_details.id|slice:":2" }}
+                    {% endif %}
                 </div>
                 <div>
                     <div class="d-flex align-items-center gap-2">
                         <h4 class="fw-bold mb-0 text-white">{{ stats.employee_details.name }}</h4>
-                        <span class="badge-onroll">Onroll</span>
+                        {% if is_section_view %}
+                            <span class="badge-onroll">Section View</span>
+                        {% else %}
+                            <span class="badge-onroll">Onroll</span>
+                        {% endif %}
                     </div>
                     <div class="text-muted small mt-1">
-                        Emp ID: {{ stats.employee_details.id }} &middot; Mobile: {{ stats.employee_details.mobile }} &middot; {{ stats.employee_details.job_title }}
+                        {% if is_section_view %}
+                            Role: {{ role_display }} &middot; Section: {{ section_display }} &middot; Total Employees: {{ stats.total_employees }}
+                        {% else %}
+                            Emp ID: {{ stats.employee_details.id }} &middot; Mobile: {{ stats.employee_details.mobile }} &middot; {{ stats.employee_details.job_title }}
+                        {% endif %}
                     </div>
                     <div class="text-muted small">
                         {{ stats.employee_details.sector }} &middot; IIPL &middot; {{ stats.employee_details.shift }}
@@ -262,61 +478,64 @@
     </div>
 </div>
 
-<!-- KPI Grid -->
-<div class="row g-3 mb-4">
+<!-- KPI Metrics Grid -->
+<div class="row g-3 mb-4 fade-in-el">
     <div class="col-6 col-md-4 col-lg-2">
         <div class="stat-card">
-            <div class="stat-title">Working days</div>
+            <span class="stat-title">Working days</span>
             <div class="stat-number text-white">{{ stats.working_days }}</div>
-            <div class="stat-detail text-muted">in the period</div>
+            <span class="stat-detail">in the period</span>
         </div>
     </div>
     <div class="col-6 col-md-4 col-lg-2">
         <div class="stat-card">
-            <div class="stat-title">Days present</div>
+            <span class="stat-title">{% if is_section_view %}Present check-ins{% else %}Days present{% endif %}</span>
             <div class="stat-number text-success">{{ stats.days_present }}</div>
-            <div class="stat-detail text-muted">
-                {% if stats.working_days > 0 %}
-                    {% widthratio stats.days_present stats.working_days 100 %}% attendance
+            <span class="stat-detail">
+                {% if is_section_view %}
+                    total present logs
                 {% else %}
-                    100% attendance
+                    {% if stats.working_days > 0 %}
+                        {% widthratio stats.days_present stats.working_days 100 %}% attendance
+                    {% else %}
+                        100% attendance
+                    {% endif %}
                 {% endif %}
-            </div>
+            </span>
         </div>
     </div>
     <div class="col-6 col-md-4 col-lg-2">
         <div class="stat-card">
-            <div class="stat-title">Leaves taken</div>
-            <div class="stat-number" style="color: #f59e0b;">{{ stats.leaves_taken }} days</div>
-            <div class="stat-detail text-muted">CL (casual leave)</div>
+            <span class="stat-title">{% if is_section_view %}Absent / Leaves{% else %}Leaves taken{% endif %}</span>
+            <div class="stat-number text-warning">{{ stats.leaves_taken }}{% if not is_section_view %} days{% endif %}</div>
+            <span class="stat-detail">{% if is_section_view %}total absent logs{% else %}CL (casual leave){% endif %}</span>
         </div>
     </div>
     <div class="col-6 col-md-4 col-lg-2">
         <div class="stat-card">
-            <div class="stat-title">Late arrivals</div>
+            <span class="stat-title">Late arrivals</span>
             <div class="stat-number text-danger">{{ stats.late_arrivals }}</div>
-            <div class="stat-detail text-muted">{{ stats.late_details }}</div>
+            <span class="stat-detail text-muted">{{ stats.late_details }}</span>
         </div>
     </div>
     <div class="col-6 col-md-4 col-lg-2">
         <div class="stat-card">
-            <div class="stat-title">Total OT hours</div>
+            <span class="stat-title">{% if is_section_view %}Section OT Hours{% else %}Total OT hours{% endif %}</span>
             <div class="stat-number text-info">{{ stats.total_ot }}h</div>
-            <div class="stat-detail text-muted">across {{ attendance|length }} records</div>
+            <span class="stat-detail">across {{ attendance|length }} records</span>
         </div>
     </div>
     <div class="col-6 col-md-4 col-lg-2">
         <div class="stat-card">
-            <div class="stat-title">Avg work time</div>
+            <span class="stat-title">Avg work time</span>
             <div class="stat-number text-white">{{ stats.avg_work_time }}h</div>
-            <div class="stat-detail text-muted">per working day</div>
+            <span class="stat-detail">per working day</span>
         </div>
     </div>
 </div>
 
-<!-- Charts Row -->
-<div class="row g-4 mb-5">
-    <!-- Bar Chart -->
+<!-- Charts section -->
+<div class="row g-4 mb-5 fade-in-el">
     <div class="col-lg-8">
         <div class="chart-card">
             <h5 class="fw-bold mb-3 text-white">Overtime Trend</h5>
@@ -325,7 +544,6 @@
             </div>
         </div>
     </div>
-    <!-- Donut Chart -->
     <div class="col-lg-4">
         <div class="chart-card">
             <h5 class="fw-bold mb-3 text-white">Day Status Breakdown</h5>
@@ -336,25 +554,28 @@
     </div>
 </div>
 
-<!-- Logs Table -->
-<div class="row">
+<!-- Attendance Logs logs table -->
+<div class="row fade-in-el">
     <div class="col-12">
         <div class="card-custom">
             <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4">
                 <h4 class="fw-bold mb-0 text-white" id="dashboardSectionTitle">Attendance Logs ({{ period_text }})</h4>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 flex-wrap">
                     <button type="button" id="btnListView" class="btn btn-accent btn-sm py-2 px-3">📋 List View</button>
                     <button type="button" id="btnCalendarView" class="btn btn-outline-custom btn-sm py-2 px-3">📅 Calendar View</button>
                 </div>
             </div>
             
-            <!-- List View Container -->
             <div id="listViewContainer">
                 {% if attendance %}
                     <div class="table-responsive">
                         <table class="table table-custom">
                             <thead>
                                 <tr>
+                                    {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
+                                        <th>Emp ID</th>
+                                        <th>Name</th>
+                                    {% endif %}
                                     <th>Date</th>
                                     <th>Day</th>
                                     <th>Check-in</th>
@@ -367,8 +588,12 @@
                             <tbody>
                                 {% for row in attendance %}
                                     <tr>
+                                        {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
+                                            <td><strong class="text-info">{{ row.employee_id }}</strong></td>
+                                            <td>{{ row.employee_name }}</td>
+                                        {% endif %}
                                         <td><strong>{{ row.date }}</strong></td>
-                                        <td class="fw-semibold" style="color: #334155;">{{ row.day }}</td>
+                                        <td class="fw-semibold" style="color: #64748b;">{{ row.day }}</td>
                                         <td>{{ row.in_time }}</td>
                                         <td>{{ row.out_time }}</td>
                                         <td>{{ row.work_hrs }}</td>
@@ -397,9 +622,7 @@
                 {% endif %}
             </div>
 
-            <!-- Calendar View Container -->
             <div id="calendarViewContainer" style="display: none;">
-                <!-- Legend -->
                 <div class="d-flex flex-wrap gap-4 mb-4 text-muted small justify-content-center justify-content-sm-start">
                     <div class="d-flex align-items-center">
                         <span class="calendar-legend-dot" style="background-color: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3);"></span> Present
@@ -408,37 +631,32 @@
                         <span class="calendar-legend-dot" style="background-color: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3);"></span> Leave (CL)
                     </div>
                     <div class="d-flex align-items-center">
-                        <span class="calendar-legend-dot" style="background-color: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.35);"></span> Late arrival
+                        <span class="calendar-legend-dot" style="background-color: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35);"></span> Late arrival
                     </div>
                     <div class="d-flex align-items-center">
                         <span class="calendar-legend-dot" style="background-color: rgba(148, 163, 184, 0.05); border: 1px solid rgba(148, 163, 184, 0.15);"></span> Weekend / holiday
                     </div>
                 </div>
-
-                <!-- Calendar grid container -->
                 <div class="calendar-grid" id="calendarGridContainer"></div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- JSON Script data serialization to prevent JS syntax warnings -->
+<!-- JSON scripts for charts -->
 {{ stats.chart_labels|json_script:"chart-labels-data" }}
 {{ stats.chart_ot_data|json_script:"chart-ot-data" }}
 {{ stats.breakdown_data|json_script:"breakdown-data" }}
 {{ attendance|json_script:"attendance-data" }}
 
-<!-- Charts script -->
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        // Shared chart styling parameters
         const chartTextColor = '#94a3b8';
         const chartBorderColor = 'rgba(255, 255, 255, 0.08)';
 
-        // 1. Overtime Trend Bar Chart
+        // 1. Overtime Trend
         const otLabels = JSON.parse(document.getElementById('chart-labels-data').textContent);
         const otData = JSON.parse(document.getElementById('chart-ot-data').textContent);
-
         const ctxBar = document.getElementById('otTrendChart').getContext('2d');
         new Chart(ctxBar, {
             type: 'bar',
@@ -458,9 +676,7 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: {
-                        display: false
-                    },
+                    legend: { display: false },
                     tooltip: {
                         backgroundColor: 'rgba(15, 23, 42, 0.9)',
                         titleColor: '#f8fafc',
@@ -471,9 +687,7 @@
                 },
                 scales: {
                     x: {
-                        grid: {
-                            display: false
-                        },
+                        grid: { display: false },
                         ticks: {
                             color: chartTextColor,
                             font: { size: 10 },
@@ -482,22 +696,18 @@
                         }
                     },
                     y: {
-                        grid: {
-                            color: chartBorderColor
-                        },
+                        grid: { color: chartBorderColor },
                         ticks: {
                             color: chartTextColor,
                             font: { size: 10 },
-                            callback: function(value) {
-                                return value + 'h';
-                            }
+                            callback: function(value) { return value + 'h'; }
                         }
                     }
                 }
             }
         });
 
-        // 2. Day Status Breakdown Donut Chart
+        // 2. Breakdown Donut
         const breakdownData = JSON.parse(document.getElementById('breakdown-data').textContent);
         const ctxPie = document.getElementById('statusBreakdownChart').getContext('2d');
         new Chart(ctxPie, {
@@ -506,11 +716,7 @@
                 labels: ['Present', 'Leaves', 'Rest Days'],
                 datasets: [{
                     data: breakdownData,
-                    backgroundColor: [
-                        '#10b981', // emerald green (Present)
-                        '#f59e0b', // amber orange (Leaves)
-                        '#64748b'  // slate gray (Rest Days)
-                    ],
+                    backgroundColor: ['#10b981', '#f59e0b', '#64748b'],
                     borderWidth: 0,
                     hoverOffset: 4
                 }]
@@ -540,45 +746,40 @@
             }
         });
 
-        // 3. Calendar View Generation and Toggling
-        const rawAttendance = JSON.parse(document.getElementById('attendance-data').textContent);
-        const startDate = "{{ start_date }}";
-        const endDate = "{{ end_date }}";
-
+        // 3. Calendar View toggle
         const btnListView = document.getElementById('btnListView');
         const btnCalendarView = document.getElementById('btnCalendarView');
         const listViewContainer = document.getElementById('listViewContainer');
         const calendarViewContainer = document.getElementById('calendarViewContainer');
         const dashboardSectionTitle = document.getElementById('dashboardSectionTitle');
-
         let calendarGenerated = false;
 
-        btnListView.addEventListener('click', function () {
-            btnListView.className = 'btn btn-accent btn-sm py-2 px-3';
-            btnCalendarView.className = 'btn btn-outline-custom btn-sm py-2 px-3';
-            listViewContainer.style.display = 'block';
-            calendarViewContainer.style.display = 'none';
-            dashboardSectionTitle.textContent = 'Attendance Logs (' + "{{ period_text|safe }}" + ')';
-        });
+        if (btnCalendarView) {
+            btnListView.addEventListener('click', function () {
+                btnListView.className = 'btn btn-accent btn-sm py-2 px-3';
+                btnCalendarView.className = 'btn btn-outline-custom btn-sm py-2 px-3';
+                listViewContainer.style.display = 'block';
+                calendarViewContainer.style.display = 'none';
+                dashboardSectionTitle.textContent = 'Attendance Logs (' + "{{ period_text|safe }}" + ')';
+            });
 
-        btnCalendarView.addEventListener('click', function () {
-            btnCalendarView.className = 'btn btn-accent btn-sm py-2 px-3';
-            btnListView.className = 'btn btn-outline-custom btn-sm py-2 px-3';
-            listViewContainer.style.display = 'none';
-            calendarViewContainer.style.display = 'block';
-            dashboardSectionTitle.textContent = 'Monthly Calendar — ' + "{{ period_text|safe }}";
+            btnCalendarView.addEventListener('click', function () {
+                btnCalendarView.className = 'btn btn-accent btn-sm py-2 px-3';
+                btnListView.className = 'btn btn-outline-custom btn-sm py-2 px-3';
+                listViewContainer.style.display = 'none';
+                calendarViewContainer.style.display = 'block';
+                dashboardSectionTitle.textContent = 'Monthly Calendar — ' + "{{ period_text|safe }}";
 
-            if (!calendarGenerated) {
-                generateCalendar(rawAttendance, startDate, endDate);
-                calendarGenerated = true;
-            }
-        });
+                if (!calendarGenerated) {
+                    generateCalendar(JSON.parse(document.getElementById('attendance-data').textContent), "{{ start_date }}", "{{ end_date }}");
+                    calendarGenerated = true;
+                }
+            });
+        }
 
         function generateCalendar(records, startDateStr, endDateStr) {
             const calendarContainer = document.getElementById('calendarGridContainer');
             calendarContainer.innerHTML = '';
-
-            // Add headers: Sun, Mon, Tue, Wed, Thu, Fri, Sat
             const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             weekdays.forEach(day => {
                 const headerCell = document.createElement('div');
@@ -587,64 +788,41 @@
                 calendarContainer.appendChild(headerCell);
             });
 
-            // Parse start and end dates using splitting to avoid timezone offset issues
             const startParts = startDateStr.split('-');
             const endParts = endDateStr.split('-');
-            
             const start = new Date(parseInt(startParts[0]), parseInt(startParts[1]) - 1, parseInt(startParts[2]));
             const end = new Date(parseInt(endParts[0]), parseInt(endParts[1]) - 1, parseInt(endParts[2]));
 
-            // Normalize and map records by date for easy lookup (key: "day-month-year")
             const recordMap = {};
             records.forEach(r => {
                 if (r.raw_date) {
                     let dStr = r.raw_date.split('T')[0];
-                    let parts = [];
-                    if (dStr.includes('-')) {
-                        parts = dStr.split('-');
-                    } else if (dStr.includes('/')) {
-                        parts = dStr.split('/');
-                    }
+                    let parts = dStr.includes('-') ? dStr.split('-') : dStr.split('/');
                     if (parts.length === 3) {
-                        let day, month, year;
-                        if (parts[0].length === 4) {
-                            year = parseInt(parts[0]);
-                            month = parseInt(parts[1]);
-                            day = parseInt(parts[2]);
-                        } else {
-                            day = parseInt(parts[0]);
-                            month = parseInt(parts[1]);
-                            year = parseInt(parts[2]);
-                        }
-                        const dateKey = `${day}-${month}-${year}`;
-                        recordMap[dateKey] = r;
+                        let day = parts[0].length === 4 ? parseInt(parts[2]) : parseInt(parts[0]);
+                        let month = parts[0].length === 4 ? parseInt(parts[1]) : parseInt(parts[1]);
+                        let year = parts[0].length === 4 ? parseInt(parts[0]) : parseInt(parts[2]);
+                        recordMap[`${day}-${month}-${year}`] = r;
                     }
                 }
             });
 
-            // Empty cells for the first day's offset
             const firstDayOfWeek = start.getDay();
             for (let i = 0; i < firstDayOfWeek; i++) {
-                const emptyCell = document.createElement('div');
-                calendarContainer.appendChild(emptyCell);
+                calendarContainer.appendChild(document.createElement('div'));
             }
 
-            // Loop through all dates in the range
             let current = new Date(start);
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
             while (current <= end) {
                 const dayOfWeek = current.getDay();
                 const dateNum = current.getDate();
-                const monthLabel = months[current.getMonth()];
-                const displayLabel = `${monthLabel} ${dateNum}`;
-
+                const displayLabel = `${months[current.getMonth()]} ${dateNum}`;
                 const key = `${dateNum}-${current.getMonth() + 1}-${current.getFullYear()}`;
                 const record = recordMap[key];
                 
                 const cell = document.createElement('div');
                 cell.className = 'calendar-day-cell';
-
                 const numEl = document.createElement('div');
                 numEl.className = 'calendar-day-num';
                 numEl.textContent = displayLabel;
@@ -652,7 +830,6 @@
 
                 const timeEl = document.createElement('div');
                 timeEl.className = 'calendar-time';
-
                 const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
 
                 if (record) {
@@ -661,67 +838,674 @@
                         let isLate = false;
                         if (inTime && inTime !== '—') {
                             const parts = inTime.split(':');
-                            if (parts.length === 2) {
-                                const h = parseInt(parts[0]);
-                                const m = parseInt(parts[1]);
-                                if (h * 60 + m > 9 * 60 + 15) {
-                                    isLate = true;
-                                }
+                            if (parts.length === 2 && (parseInt(parts[0]) * 60 + parseInt(parts[1]) > 9 * 60 + 15)) {
+                                isLate = true;
                             }
                         }
-
-                        if (isLate) {
-                            cell.classList.add('calendar-late');
-                        } else {
-                            cell.classList.add('calendar-present');
-                        }
-                        
-                        timeEl.innerHTML = `
-                            <div class="calendar-time-range">${record.in_time} - ${record.out_time}</div>
-                            <div class="calendar-work-hrs fw-semibold mt-1">${record.work_hrs}</div>
-                        `;
+                        cell.classList.add(isLate ? 'calendar-late' : 'calendar-present');
+                        timeEl.innerHTML = `<div class="calendar-time-range">${record.in_time} - ${record.out_time}</div><div class="calendar-work-hrs fw-semibold mt-1">${record.work_hrs}</div>`;
                     } else if (record.status.includes('CL')) {
                         cell.classList.add('calendar-leave');
-                        if (record.in_time && record.in_time !== '—') {
-                            timeEl.innerHTML = `
-                                <div class="calendar-time-range">${record.in_time} - ${record.out_time}</div>
-                                <div class="calendar-work-hrs fw-semibold mt-1">CL (${record.work_hrs})</div>
-                            `;
-                        } else {
-                            timeEl.innerHTML = `
-                                <div class="calendar-time-range">—</div>
-                                <div class="calendar-work-hrs fw-semibold mt-1">CL</div>
-                            `;
-                        }
+                        timeEl.innerHTML = `<div class="calendar-time-range">${record.in_time !== '—' ? record.in_time : '—'}</div><div class="calendar-work-hrs fw-semibold mt-1">CL</div>`;
                     } else if (record.status === 'Absent') {
                         cell.classList.add('calendar-leave');
-                        timeEl.innerHTML = `
-                            <div class="calendar-time-range">—</div>
-                            <div class="calendar-work-hrs fw-semibold mt-1">CL</div>
-                        `;
-                    } else if (record.status === 'Rest Day') {
+                        timeEl.innerHTML = `<div class="calendar-time-range">—</div><div class="calendar-work-hrs fw-semibold mt-1">Absent</div>`;
+                    } else {
                         cell.classList.add('calendar-weekend');
                         timeEl.innerHTML = `<div class="calendar-time-range">—</div>`;
                     }
                 } else {
-                    if (isWeekend) {
-                        cell.classList.add('calendar-weekend');
-                        timeEl.innerHTML = `<div class="calendar-time-range">—</div>`;
-                    } else {
-                        cell.classList.add('calendar-leave');
-                        timeEl.innerHTML = `
-                            <div class="calendar-time-range">—</div>
-                            <div class="calendar-work-hrs fw-semibold mt-1">CL</div>
-                        `;
-                    }
+                    cell.classList.add(isWeekend ? 'calendar-weekend' : 'calendar-leave');
+                    timeEl.innerHTML = `<div class="calendar-time-range">—</div><div class="calendar-work-hrs fw-semibold mt-1">${isWeekend ? '' : 'CL'}</div>`;
                 }
 
                 cell.appendChild(timeEl);
                 calendarContainer.appendChild(cell);
-
                 current.setDate(current.getDate() + 1);
             }
         }
     });
 </script>
+
+{% elif active_tab == 'directory' %}
+<!-- ========================================== -->
+<!-- 2. COWORKER DIRECTORY                      -->
+<!-- ========================================== -->
+<div class="row mb-4 fade-in-el">
+    <div class="col-12">
+        <h3 class="fw-bold text-white mb-2">Coworker Directory</h3>
+        <p class="text-muted">Search and check out contact details and shift assignments of site team members.</p>
+    </div>
+</div>
+
+<div class="row g-4 fade-in-el">
+    {% for person in directory %}
+        <div class="col-md-6 col-xl-4">
+            <div class="coworker-card">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="coworker-avatar">
+                        {{ person.name|slice:":2"|upper }}
+                    </div>
+                    <div>
+                        <h5 class="fw-bold text-white mb-0">{{ person.name }}</h5>
+                        <span class="text-info small fw-semibold">{{ person.job_title }}</span>
+                    </div>
+                </div>
+                <hr class="border-secondary opacity-25">
+                <div class="small">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Employee ID</span>
+                        <strong class="text-white">{{ person.username }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Section</span>
+                        <span class="badge bg-secondary text-white">{{ person.section }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Mobile</span>
+                        <strong class="text-white">{{ person.mobile }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Active Shift</span>
+                        <strong class="text-white">{{ person.shift }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="col-12 text-center py-5">
+            <h5 class="text-muted">No coworkers registered.</h5>
+        </div>
+    {% endfor %}
+</div>
+
+{% elif active_tab == 'leaves' %}
+<!-- ========================================== -->
+<!-- 3. LEAVES PORTAL                           -->
+<!-- ========================================== -->
+<div class="row mb-4 fade-in-el">
+    <div class="col-12">
+        <h3 class="fw-bold text-white mb-2">Leaves Management Portal</h3>
+    </div>
+</div>
+
+<div class="row g-4 fade-in-el">
+    <!-- Apply for Leave Form Column -->
+    <div class="col-lg-5">
+        <div class="card-custom">
+            <h5 class="fw-bold text-white mb-4">
+                📅 Apply for Leave
+            </h5>
+            
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="apply_leave">
+                
+                <div class="mb-3">
+                    <label for="leave_category" class="form-label-custom">Leave Category</label>
+                    <select id="leave_category" name="leave_category" class="form-select form-control-custom w-100" required>
+                        <option value="" disabled selected>---------</option>
+                        <option value="casual">Casual Leave</option>
+                        <option value="sick">Sick Leave</option>
+                        <option value="earned">Earned Leave</option>
+                    </select>
+                </div>
+                
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label for="leave_start" class="form-label-custom">Start Date</label>
+                        <input type="date" id="leave_start" name="start_date" class="form-control form-control-custom w-100" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="leave_end" class="form-label-custom">End Date</label>
+                        <input type="date" id="leave_end" name="end_date" class="form-control form-control-custom w-100" required>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="leave_reason" class="form-label-custom">Reason / Remarks</label>
+                    <textarea id="leave_reason" name="reason" rows="4" class="form-control form-control-custom w-100" placeholder="Provide reason for leave..." required></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-accent w-100 py-3">Submit Leave Application</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Leave balances and history column -->
+    <div class="col-lg-7">
+        <!-- Balance cards -->
+        <div class="card-custom mb-4">
+            <h5 class="fw-bold text-white mb-3">
+                🗂️ Leave Allotments
+            </h5>
+            
+            <div class="allotment-grid">
+                <div class="allotment-card">
+                    <span class="allotment-title">Casual Leave</span>
+                    <div class="allotment-value text-info">{{ leave_allotments.casual.remaining }}</div>
+                    <div class="allotment-used">Used: {{ leave_allotments.casual.used }} / 12.0 d</div>
+                </div>
+                <div class="allotment-card">
+                    <span class="allotment-title">Sick Leave</span>
+                    <div class="allotment-value text-warning">{{ leave_allotments.sick.remaining }}</div>
+                    <div class="allotment-used">Used: {{ leave_allotments.sick.used }} / 10.0 d</div>
+                </div>
+                <div class="allotment-card">
+                    <span class="allotment-title">Earned Leave</span>
+                    <div class="allotment-value text-success">{{ leave_allotments.earned.remaining }}</div>
+                    <div class="allotment-used">Used: {{ leave_allotments.earned.used }} / 15.0 d</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Submission list -->
+        <div class="card-custom">
+            <h5 class="fw-bold text-white mb-3">
+                🕒 Submission History
+            </h5>
+            
+            {% if user_leaves %}
+                <div class="table-responsive">
+                    <table class="table table-custom mb-0">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Dates</th>
+                                <th>Status</th>
+                                <th>Comment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for request in user_leaves %}
+                                <tr>
+                                    <td><strong class="text-white">{{ request.get_category_display }}</strong></td>
+                                    <td><small>{{ request.start_date }} to {{ request.end_date }}</small></td>
+                                    <td>
+                                        {% if request.status == 'approved' %}
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Approved</span>
+                                        {% elif request.status == 'rejected' %}
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Rejected</span>
+                                        {% else %}
+                                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="text-muted small">{{ request.reason|default:'—' }}</span></td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <p class="text-muted mb-0">No leave submissions recorded.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% elif active_tab == 'overtime' %}
+<!-- ========================================== -->
+<!-- 4. OVERTIME PORTAL                         -->
+<!-- ========================================== -->
+<div class="row mb-4 fade-in-el">
+    <div class="col-12">
+        <h3 class="fw-bold text-white mb-2">Overtime (OT) Request Portal</h3>
+    </div>
+</div>
+
+<div class="row g-4 fade-in-el">
+    <!-- Log hours form -->
+    <div class="col-lg-5">
+        <div class="card-custom">
+            <h5 class="fw-bold text-white mb-4">
+                ⏰ Log Overtime Hours
+            </h5>
+            
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="log_ot">
+                
+                <div class="mb-3">
+                    <label for="ot_date" class="form-label-custom">OT Date</label>
+                    <input type="date" id="ot_date" name="ot_date" class="form-control form-control-custom w-100" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="ot_hours" class="form-label-custom">Hours Logged</label>
+                    <input type="number" step="0.5" min="0.5" max="8.0" id="ot_hours" name="hours" class="form-control form-control-custom w-100" placeholder="e.g. 1.0 to 8.0" required>
+                    <div class="text-muted small mt-1">Specify OT hours (e.g. 1.0 to 8.0)</div>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="ot_reason" class="form-label-custom">Reason / Activity Log</label>
+                    <textarea id="ot_reason" name="reason" rows="4" class="form-control form-control-custom w-100" placeholder="Why did you work overtime?" required></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-accent w-100 py-3">Submit OT Request</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- OT Log list column -->
+    <div class="col-lg-7">
+        <div class="card-custom">
+            <h5 class="fw-bold text-white mb-3">
+                🕒 OT History & Approvals
+            </h5>
+            
+            {% if user_overtimes %}
+                <div class="table-responsive">
+                    <table class="table table-custom mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Requested</th>
+                                <th>Status</th>
+                                <th>Activity</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for request in user_overtimes %}
+                                <tr>
+                                    <td><strong class="text-white">{{ request.date }}</strong></td>
+                                    <td><strong>{{ request.hours }} hrs</strong></td>
+                                    <td>
+                                        {% if request.status == 'approved' %}
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Approved</span>
+                                        {% elif request.status == 'rejected' %}
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Rejected</span>
+                                        {% else %}
+                                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="text-muted small">{{ request.reason|default:'—' }}</span></td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <p class="text-muted mb-0">No Overtime logs logged yet.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% elif active_tab == 'corrections' %}
+<!-- ========================================== -->
+<!-- 5. CORRECTIONS PORTAL                      -->
+<!-- ========================================== -->
+<div class="row mb-4 fade-in-el">
+    <div class="col-12">
+        <h3 class="fw-bold text-white mb-2">Punch Correction Portal</h3>
+    </div>
+</div>
+
+<div class="row g-4 fade-in-el">
+    <!-- Apply correction form -->
+    <div class="col-lg-5">
+        <div class="card-custom">
+            <h5 class="fw-bold text-white mb-4">
+                📝 Apply Correction
+            </h5>
+            
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="apply_correction">
+                
+                <div class="mb-3">
+                    <label for="log_date" class="form-label-custom">Log Date</label>
+                    <input type="date" id="log_date" name="log_date" class="form-control form-control-custom w-100" required>
+                </div>
+                
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label for="correct_in_time" class="form-label-custom">Correct In-Time</label>
+                        <input type="time" id="correct_in_time" name="correct_in_time" class="form-control form-control-custom w-100" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="correct_out_time" class="form-label-custom">Correct Out-Time</label>
+                        <input type="time" id="correct_out_time" name="correct_out_time" class="form-control form-control-custom w-100" required>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="corr_reason" class="form-label-custom">Reason for Correction</label>
+                    <textarea id="corr_reason" name="reason" rows="4" class="form-control form-control-custom w-100" placeholder="Reason for punch correction..." required></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-accent w-100 py-3">Request Correction</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Correction History list column -->
+    <div class="col-lg-7">
+        <div class="card-custom">
+            <h5 class="fw-bold text-white mb-3">
+                🕒 Submission Status
+            </h5>
+            
+            {% if user_corrections %}
+                <div class="table-responsive">
+                    <table class="table table-custom mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Correct In</th>
+                                <th>Correct Out</th>
+                                <th>Status</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for request in user_corrections %}
+                                <tr>
+                                    <td><strong class="text-white">{{ request.date }}</strong></td>
+                                    <td><strong>{{ request.correct_in_time }}</strong></td>
+                                    <td><strong>{{ request.correct_out_time }}</strong></td>
+                                    <td>
+                                        {% if request.status == 'approved' %}
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Approved</span>
+                                        {% elif request.status == 'rejected' %}
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Rejected</span>
+                                        {% else %}
+                                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="text-muted small">{{ request.reason|default:'—' }}</span></td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <p class="text-muted mb-0">No correction requests recorded.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% elif active_tab == 'approvals' %}
+<!-- ========================================== -->
+<!-- 6. APPROVALS WORKSPACE                     -->
+<!-- ========================================== -->
+<div class="row mb-4 fade-in-el">
+    <div class="col-12">
+        <h3 class="fw-bold text-white mb-2">Approvals Management Portal</h3>
+        <p class="text-muted">Review, approve or reject team requests for leaves, overtime, and punch corrections.</p>
+    </div>
+</div>
+
+{% if is_supervisor %}
+<div class="fade-in-el">
+    <!-- Sub tabs navigation -->
+    <div class="nav-pills-custom">
+        <div class="nav-pill-custom active" id="pillLeaves" onclick="switchApprovalTab('leaves-panel', this)">
+            📂 Leaves Requests
+        </div>
+        <div class="nav-pill-custom" id="pillOvertime" onclick="switchApprovalTab('overtime-panel', this)">
+            🕒 Overtime Log
+        </div>
+        <div class="nav-pill-custom" id="pillCorrections" onclick="switchApprovalTab('corrections-panel', this)">
+            📝 Punch Corrections
+        </div>
+    </div>
+
+    <!-- 1. Leaves Requests panel -->
+    <div class="approval-panel-container" id="leaves-panel">
+        <div class="card-custom">
+            <h5 class="fw-bold text-white mb-4">Pending Leave Applications</h5>
+            
+            {% if pending_leaves %}
+                <div class="table-responsive">
+                    <table class="table table-custom mb-0">
+                        <thead>
+                            <tr>
+                                <th>Emp ID</th>
+                                <th>Category</th>
+                                <th>Dates</th>
+                                <th>Reason</th>
+                                <th>Submitted At</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in pending_leaves %}
+                                <tr>
+                                    <td><strong class="text-info">{{ req.user.username }}</strong></td>
+                                    <td><strong class="text-white">{{ req.get_category_display }}</strong></td>
+                                    <td>{{ req.start_date }} to {{ req.end_date }}</td>
+                                    <td><span class="text-muted small">{{ req.reason }}</span></td>
+                                    <td><small class="text-muted">{{ req.created_at|date:"d-m-Y H:i" }}</small></td>
+                                    <td class="text-end">
+                                        <div class="d-inline-flex gap-2">
+                                            <form method="POST">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="approve">
+                                                <input type="hidden" name="request_type" value="leave">
+                                                <input type="hidden" name="request_id" value="{{ req.id }}">
+                                                <button type="submit" class="btn btn-sm btn-success px-3">Approve</button>
+                                            </form>
+                                            <form method="POST">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="reject">
+                                                <input type="hidden" name="request_type" value="leave">
+                                                <input type="hidden" name="request_id" value="{{ req.id }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger px-3">Reject</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <p class="text-muted mb-0">No pending leave requests found.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 2. Overtime log panel -->
+    <div class="approval-panel-container" id="overtime-panel" style="display: none;">
+        <div class="card-custom">
+            <h5 class="fw-bold text-white mb-4">Pending Overtime Submissions</h5>
+            
+            {% if pending_ots %}
+                <div class="table-responsive">
+                    <table class="table table-custom mb-0">
+                        <thead>
+                            <tr>
+                                <th>Emp ID</th>
+                                <th>OT Date</th>
+                                <th>Hours</th>
+                                <th>Activity Log</th>
+                                <th>Submitted At</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in pending_ots %}
+                                <tr>
+                                    <td><strong class="text-info">{{ req.user.username }}</strong></td>
+                                    <td><strong>{{ req.date }}</strong></td>
+                                    <td><span class="badge bg-info text-white">{{ req.hours }} hrs</span></td>
+                                    <td><span class="text-muted small">{{ req.reason }}</span></td>
+                                    <td><small class="text-muted">{{ req.created_at|date:"d-m-Y H:i" }}</small></td>
+                                    <td class="text-end">
+                                        <div class="d-inline-flex gap-2">
+                                            <form method="POST">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="approve">
+                                                <input type="hidden" name="request_type" value="ot">
+                                                <input type="hidden" name="request_id" value="{{ req.id }}">
+                                                <button type="submit" class="btn btn-sm btn-success px-3">Approve</button>
+                                            </form>
+                                            <form method="POST">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="reject">
+                                                <input type="hidden" name="request_type" value="ot">
+                                                <input type="hidden" name="request_id" value="{{ req.id }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger px-3">Reject</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <p class="text-muted mb-0">No pending Overtime requests found.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 3. Punch corrections panel -->
+    <div class="approval-panel-container" id="corrections-panel" style="display: none;">
+        <div class="card-custom">
+            <h5 class="fw-bold text-white mb-4">Pending Punch Corrections</h5>
+            
+            {% if pending_corrections %}
+                <div class="table-responsive">
+                    <table class="table table-custom mb-0">
+                        <thead>
+                            <tr>
+                                <th>Emp ID</th>
+                                <th>Log Date</th>
+                                <th>Correct Check-in</th>
+                                <th>Correct Check-out</th>
+                                <th>Reason</th>
+                                <th>Submitted At</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in pending_corrections %}
+                                <tr>
+                                    <td><strong class="text-info">{{ req.user.username }}</strong></td>
+                                    <td><strong>{{ req.date }}</strong></td>
+                                    <td><span class="text-success fw-semibold">{{ req.correct_in_time }}</span></td>
+                                    <td><span class="text-danger fw-semibold">{{ req.correct_out_time }}</span></td>
+                                    <td><span class="text-muted small">{{ req.reason }}</span></td>
+                                    <td><small class="text-muted">{{ req.created_at|date:"d-m-Y H:i" }}</small></td>
+                                    <td class="text-end">
+                                        <div class="d-inline-flex gap-2">
+                                            <form method="POST">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="approve">
+                                                <input type="hidden" name="request_type" value="correction">
+                                                <input type="hidden" name="request_id" value="{{ req.id }}">
+                                                <button type="submit" class="btn btn-sm btn-success px-3">Approve</button>
+                                            </form>
+                                            <form method="POST">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="reject">
+                                                <input type="hidden" name="request_type" value="correction">
+                                                <input type="hidden" name="request_id" value="{{ req.id }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger px-3">Reject</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <p class="text-muted mb-0">No pending punch corrections found.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    function switchApprovalTab(panelId, element) {
+        // Hide all panels
+        document.querySelectorAll('.approval-panel-container').forEach(p => p.style.display = 'none');
+        // Deactivate all pills
+        document.querySelectorAll('.nav-pill-custom').forEach(p => p.classList.remove('active'));
+        
+        // Show selected panel
+        document.getElementById(panelId).style.display = 'block';
+        // Activate clicked pill
+        element.classList.add('active');
+    }
+</script>
+{% else %}
+<div class="row fade-in-el">
+    <div class="col-12 text-center py-5">
+        <span class="fs-1 d-block mb-3">🛡️</span>
+        <h4 class="text-white fw-bold">Access Restricted</h4>
+        <p class="text-muted">The approvals management portal is accessible only to production directors and site administrators.</p>
+    </div>
+</div>
+{% endif %}
+
+{% elif active_tab == 'reports' %}
+<!-- ========================================== -->
+<!-- 7. REPORT CENTER                           -->
+<!-- ========================================== -->
+<div class="row mb-4 fade-in-el">
+    <div class="col-12">
+        <h3 class="fw-bold text-white mb-2">Report Center</h3>
+        <p class="text-muted">High-level statistics summarizing attendance cycles and team operational metrics.</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-4 fade-in-el">
+    <div class="col-md-6 col-xl-3">
+        <div class="card-custom text-center py-4">
+            <span class="text-muted text-uppercase small font-monospace d-block mb-2">Operational Attendance</span>
+            <h2 class="text-success fw-bold mb-0">94.8%</h2>
+            <div class="text-muted small mt-2">Average check-in rate</div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card-custom text-center py-4">
+            <span class="text-muted text-uppercase small font-monospace d-block mb-2">Punctuality Score</span>
+            <h2 class="text-info fw-bold mb-0">98.2%</h2>
+            <div class="text-muted small mt-2">Check-ins within grace period</div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card-custom text-center py-4">
+            <span class="text-muted text-uppercase small font-monospace d-block mb-2">Total OT Logged</span>
+            <h2 class="text-white fw-bold mb-0">{{ stats.total_ot }}h</h2>
+            <div class="text-muted small mt-2">Approved hours logged</div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card-custom text-center py-4">
+            <span class="text-muted text-uppercase small font-monospace d-block mb-2">Section Size</span>
+            <h2 class="text-warning fw-bold mb-0">{{ total_headcount }}</h2>
+            <div class="text-muted small mt-2">Enrolled employees</div>
+        </div>
+    </div>
+</div>
+
+<div class="row fade-in-el">
+    <div class="col-12">
+        <div class="card-custom">
+            <h5 class="fw-bold text-white mb-4">📊 Performance & Analytics Summary</h5>
+            <p class="text-muted">This dashboard aggregates records between {{ start_date }} and {{ end_date }} for the active profile view. Attendance, late punch frequencies, and overtime durations are computed dynamically. To pull reports for another range, open the Dashboard and choose <strong>Adjust Period & Search</strong>.</p>
+        </div>
+    </div>
+</div>
+
+{% endif %}
+
 {% endblock %}

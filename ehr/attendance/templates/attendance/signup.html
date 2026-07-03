@@ -2,9 +2,9 @@
 
 {% block title %}Register - EHR Attendance System{% endblock %}
 
-{% block content %}
-<div class="row justify-content-center align-items-center" style="min-height: 55vh;">
-    <div class="col-md-6 col-lg-5 col-xl-4">
+{% block auth_content %}
+<div class="row justify-content-center">
+    <div class="col-sm-10 col-md-7 col-lg-5 col-xl-4">
         <div class="card-custom text-center">
             <div class="mb-3">
                 <span class="fs-2">🔑</span>
@@ -23,18 +23,48 @@
                         value="{{ employee_id|default:'' }}" required autofocus>
                 </div>
 
+                <!-- Role Selector -->
+                <div class="mb-2 text-start">
+                    <label for="role" class="form-label-custom">Role</label>
+                    <select id="role" name="role" class="form-select form-control-custom w-100" required>
+                        <option value="employee" {% if role == 'employee' %}selected{% endif %}>Employee</option>
+                        <option value="smt_pd" {% if role == 'smt_pd' %}selected{% endif %}>SMT PD</option>
+                        <option value="assy_pd" {% if role == 'assy_pd' %}selected{% endif %}>ASSY PD</option>
+                    </select>
+                </div>
+
+                <!-- Section Selector -->
+                <div class="mb-3 text-start" id="section-group" style="{% if role in 'smt_pd assy_pd' %}display: block;{% else %}display: none;{% endif %}">
+                    <label for="section" class="form-label-custom">Section</label>
+                    <select id="section" name="section" class="form-select form-control-custom w-100">
+                        <option value="" disabled {% if not section %}selected{% endif %}>Select Section</option>
+                        <option value="s63" {% if section == 's63' %}selected{% endif %}>S63</option>
+                        <option value="c39" {% if section == 'c39' %}selected{% endif %}>C39 (Phase II)</option>
+                    </select>
+                </div>
+
                 <!-- Password -->
                 <div class="mb-2 text-start">
                     <label for="password" class="form-label-custom">Password</label>
-                    <input type="password" id="password" name="password" class="form-control form-control-custom w-100"
-                        placeholder="••••••••" required>
+                    <div class="position-relative">
+                        <input type="password" id="password" name="password" class="form-control form-control-custom w-100 pe-5"
+                            placeholder="••••••••" required>
+                        <button type="button" class="btn position-absolute top-50 end-0 translate-middle-y border-0 text-muted small" id="togglePassword" style="background: none; z-index: 10; padding-right: 15px;">
+                            👁️
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Confirm Password -->
-                <div class="mb-3 text-start">
+                <div class="mb-2 text-start">
                     <label for="confirm_password" class="form-label-custom">Confirm Password</label>
-                    <input type="password" id="confirm_password" name="confirm_password"
-                        class="form-control form-control-custom w-100" placeholder="••••••••" required>
+                    <div class="position-relative">
+                        <input type="password" id="confirm_password" name="confirm_password"
+                            class="form-control form-control-custom w-100 pe-5" placeholder="••••••••" required>
+                        <button type="button" class="btn position-absolute top-50 end-0 translate-middle-y border-0 text-muted small" id="toggleConfirmPassword" style="background: none; z-index: 10; padding-right: 15px;">
+                            👁️
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Submit -->
@@ -42,6 +72,44 @@
                     Create Account
                 </button>
             </form>
+
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const roleSelect = document.getElementById('role');
+                    const sectionGroup = document.getElementById('section-group');
+                    const sectionSelect = document.getElementById('section');
+
+                    function toggleSection() {
+                        if (roleSelect.value === 'employee') {
+                            sectionGroup.style.display = 'none';
+                            sectionSelect.removeAttribute('required');
+                        } else {
+                            sectionGroup.style.display = 'block';
+                            sectionSelect.setAttribute('required', 'required');
+                        }
+                    }
+
+                    roleSelect.addEventListener('change', toggleSection);
+                    toggleSection(); // Run on load
+
+                    // Password Toggle Logic
+                    const togglePassword = document.getElementById('togglePassword');
+                    const password = document.getElementById('password');
+                    togglePassword.addEventListener('click', function () {
+                        const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+                        password.setAttribute('type', type);
+                        this.textContent = type === 'password' ? '👁️' : '🙈';
+                    });
+
+                    const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
+                    const confirmPassword = document.getElementById('confirm_password');
+                    toggleConfirmPassword.addEventListener('click', function () {
+                        const type = confirmPassword.getAttribute('type') === 'password' ? 'text' : 'password';
+                        confirmPassword.setAttribute('type', type);
+                        this.textContent = type === 'password' ? '👁️' : '🙈';
+                    });
+                });
+            </script>
 
             <div class="mt-2 text-muted small">
                 Already have an account?

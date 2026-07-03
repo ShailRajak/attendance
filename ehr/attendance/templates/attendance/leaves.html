@@ -1,0 +1,185 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Leaves Portal - IIPL Enterprise eHR{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-4 fade-in-el">
+    <h2 class="fw-bold text-white mb-1"><i class="bi bi-calendar-check-fill text-primary"></i> Leaves Management Portal</h2>
+    <p class="text-muted">Apply for leave, track your balance, and view submission history.</p>
+</div>
+
+<div class="row g-4 fade-in-el">
+    <!-- Left Column: Apply Leave Form -->
+    <div class="col-lg-5">
+        <div class="card-custom h-100">
+            <h5 class="fw-bold text-white mb-4"><i class="bi bi-calendar-plus text-info"></i> Apply for Leave</h5>
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="apply_leave">
+                
+                <div class="mb-3">
+                    <label for="category" class="form-label-custom">Leave Category</label>
+                    <select id="category" name="category" class="form-select form-control-custom w-100" required>
+                        <option value="" disabled selected>Select leave type</option>
+                        <option value="casual">Casual Leave</option>
+                        <option value="sick">Sick Leave</option>
+                        <option value="earned">Earned Leave</option>
+                    </select>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label for="start_date" class="form-label-custom">Start Date</label>
+                        <input type="date" id="start_date" name="start_date" class="form-control form-control-custom w-100" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="end_date" class="form-label-custom">End Date</label>
+                        <input type="date" id="end_date" name="end_date" class="form-control form-control-custom w-100" required>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="reason" class="form-label-custom">Reason / Remarks</label>
+                    <textarea id="reason" name="reason" rows="4" class="form-control form-control-custom w-100" placeholder="Provide reason for leave..." required></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-accent w-100 py-3">
+                    Submit Leave Application
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Right Column: Balance Summary & History -->
+    <div class="col-lg-7">
+        <!-- Leave Balances -->
+        <div class="card-custom mb-4">
+            <h5 class="fw-bold text-white mb-3"><i class="bi bi-pie-chart-fill text-warning"></i> Leave Allotments</h5>
+            
+            <div class="row g-3">
+                {% if leave_allotments %}
+                    <!-- For views passing leave_allotments dict (home view) -->
+                    <div class="col-md-4">
+                        <div class="p-3 rounded text-center" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--card-border);">
+                            <div class="text-muted small fw-semibold text-uppercase mb-1">Casual Leave</div>
+                            <div class="fs-2 fw-bold text-info">{{ leave_allotments.casual.remaining }}</div>
+                            <div class="text-muted small mt-1">Used: {{ leave_allotments.casual.used }}/12d</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 rounded text-center" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--card-border);">
+                            <div class="text-muted small fw-semibold text-uppercase mb-1">Sick Leave</div>
+                            <div class="fs-2 fw-bold text-warning">{{ leave_allotments.sick.remaining }}</div>
+                            <div class="text-muted small mt-1">Used: {{ leave_allotments.sick.used }}/10d</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 rounded text-center" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--card-border);">
+                            <div class="text-muted small fw-semibold text-uppercase mb-1">Earned Leave</div>
+                            <div class="fs-2 fw-bold text-success">{{ leave_allotments.earned.remaining }}</div>
+                            <div class="text-muted small mt-1">Used: {{ leave_allotments.earned.used }}/15d</div>
+                        </div>
+                    </div>
+                {% elif balances %}
+                    <!-- For views passing balances loop (standalone view) -->
+                    {% for bal in balances %}
+                    <div class="col-md-4">
+                        <div class="p-3 rounded text-center" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--card-border);">
+                            <div class="text-muted small fw-semibold text-uppercase mb-1">{{ bal.get_leave_type_display }}</div>
+                            <div class="fs-2 fw-bold {% if bal.leave_type == 'casual' %}text-info{% elif bal.leave_type == 'sick' %}text-warning{% else %}text-success{% endif %}">{{ bal.remaining }}</div>
+                            <div class="text-muted small mt-1">Used: {{ bal.used }}/{{ bal.allocated }}d</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <!-- Default fallback allotments -->
+                    <div class="col-md-4">
+                        <div class="p-3 rounded text-center" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--card-border);">
+                            <div class="text-muted small fw-semibold text-uppercase mb-1">Casual Leave</div>
+                            <div class="fs-2 fw-bold text-info">12.0</div>
+                            <div class="text-muted small mt-1">Used: 0.0/12d</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 rounded text-center" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--card-border);">
+                            <div class="text-muted small fw-semibold text-uppercase mb-1">Sick Leave</div>
+                            <div class="fs-2 fw-bold text-warning">10.0</div>
+                            <div class="text-muted small mt-1">Used: 0.0/10d</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 rounded text-center" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--card-border);">
+                            <div class="text-muted small fw-semibold text-uppercase mb-1">Earned Leave</div>
+                            <div class="fs-2 fw-bold text-success">15.0</div>
+                            <div class="text-muted small mt-1">Used: 0.0/15d</div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- History -->
+        <div class="card-custom">
+            <h5 class="fw-bold text-white mb-4"><i class="bi bi-clock-history text-success"></i> Submission History</h5>
+            
+            <div class="table-responsive">
+                <table class="table table-custom mb-0">
+                    <thead>
+                        <tr>
+                            <th>Leave Type</th>
+                            <th>Date</th>
+                            <th>Days</th>
+                            <th>Status</th>
+                            <th>Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if user_leaves %}
+                            {% for req in user_leaves %}
+                            <tr>
+                                <td><strong>{{ req.get_category_display }}</strong></td>
+                                <td class="small">{{ req.start_date }} to {{ req.end_date }}</td>
+                                <td>{{ req.duration_days|default:"—" }}</td>
+                                <td>
+                                    {% if req.status == 'approved' %}
+                                        <span class="badge badge-custom badge-active">Approved</span>
+                                    {% elif req.status == 'rejected' %}
+                                        <span class="badge badge-custom badge-absent">Rejected</span>
+                                    {% else %}
+                                        <span class="badge badge-status-cl badge-custom">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted small">{{ req.reason|default:"—"|truncatechars:35 }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% elif requests %}
+                            {% for req in requests %}
+                            <tr>
+                                <td><strong>{{ req.get_leave_type_display }}</strong></td>
+                                <td class="small">{{ req.start_date }} to {{ req.end_date }}</td>
+                                <td>{{ req.duration_days }}d</td>
+                                <td>
+                                    {% if req.status == 'Approved' %}
+                                        <span class="badge badge-custom badge-active">Approved</span>
+                                    {% elif req.status == 'Rejected' %}
+                                        <span class="badge badge-custom badge-absent">Rejected</span>
+                                    {% else %}
+                                        <span class="badge badge-status-cl badge-custom">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted small">{{ req.reason|default:"—"|truncatechars:35 }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4 small">No leave submissions recorded.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
