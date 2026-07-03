@@ -384,6 +384,109 @@ def calculate_section_dashboard_stats(attendance_records, role_display, section_
     }
 
 
+def compute_kpi_cards(attendance_records):
+    """
+    Computes 8 enterprise HRMS KPI values from the attendance dataset.
+
+    CALCULATION RULES (DISTINCT EmployeeID):
+      - Total Employees: COUNT(DISTINCT EmployeeID)
+      - Total Day Shift: COUNT(DISTINCT EmployeeID WHERE Shift is Day type)
+      - Present Day Shift: COUNT(DISTINCT EmployeeID WHERE Shift=Day AND Status=Present)
+      - Total Night Shift: COUNT(DISTINCT EmployeeID WHERE Shift=Night)
+      - Present Night Shift: COUNT(DISTINCT EmployeeID WHERE Shift=Night AND Status=Present)
+      - Absent: COUNT(DISTINCT EmployeeID WHERE Status=Absent) [Excludes Leave, Weekly Off, Holiday]
+      - On Leave: COUNT(DISTINCT EmployeeID WHERE LeaveType IS NOT NULL)
+      - Late Punch: COUNT(DISTINCT EmployeeID WHERE LateMinutes > 0)
+    """
+    if not attendance_records:
+        return {
+            "kpi_total_employees": 0,
+            "kpi_total_day_shift": 0,
+            "kpi_present_day_shift": 0,
+            "kpi_total_night_shift": 0,
+            "kpi_present_night_shift": 0,
+            "kpi_absent": 0,
+            "kpi_on_leave": 0,
+            "kpi_late_punch": 0,
+        }
+
+    # Shift names that qualify as "Day Shift"
+    DAY_SHIFT_NAMES = {"General Day Shift", "Day Shift", "Morning Shift", "General Day"}
+
+    # Set of employee IDs with their computed attributes
+    total_employees_ids = set()
+    day_shift_ids = set()
+    night_shift_ids = set()
+    present_day_ids = set()
+    present_night_ids = set()
+    absent_ids = set()
+    on_leave_ids = set()
+    late_punch_ids = set()
+
+    for record in attendance_records:
+        emp_id = str(record.get("Employee ID") or "").strip()
+        if not emp_id:
+            continue
+
+        total_employees_ids.add(emp_id)
+
+        shift = str(record.get("Shift") or "").strip()
+        att_status = str(record.get("Attendance Status") or "").strip()
+        leave_type = str(record.get("Leave Type") or "").strip()
+        late_min_value = record.get("Late Minutes") or 0
+
+        # Determine shift type
+        is_day_shift = shift in DAY_SHIFT_NAMES
+        is_night_shift = bool(shift) and "Night" in shift
+
+        # --- Day / Night Shift counts (per record's shift) ---
+        if is_day_shift:
+            day_shift_ids.add(emp_id)
+        if is_night_shift:
+            night_shift_ids.add(emp_id)
+
+        # Determine attendance booleans
+        is_present = att_status and "Present" in att_status
+        is_absent_raw = att_status and "Absent" in att_status
+        has_leave = bool(leave_type) and leave_type not in ("", "—", "None", "0")
+
+        # --- Present counts (per record's shift) ---
+        if is_day_shift and is_present:
+            present_day_ids.add(emp_id)
+        if is_night_shift and is_present:
+            present_night_ids.add(emp_id)
+
+        # --- Absent (exclude Leave, Weekly Off, Holiday) ---
+        is_weekoff_holiday = (
+            att_status and any(w in att_status.lower() for w in ["week", "holiday", "rest", "weekoff", "week off"])
+        )
+        if is_absent_raw and not has_leave and not is_weekoff_holiday:
+            absent_ids.add(emp_id)
+
+        # --- On Leave (any approved leave type) ---
+        if has_leave:
+            on_leave_ids.add(emp_id)
+
+        # --- Late Punch (LaterMin1 / Late Minutes > 0) ---
+        try:
+            late_minutes = float(late_min_value)
+        except (ValueError, TypeError):
+            late_minutes = 0.0
+        if late_minutes > 0:
+            late_punch_ids.add(emp_id)
+
+    return {
+        "kpi_total_employees": len(total_employees_ids),
+        "kpi_total_day_shift": len(day_shift_ids),
+        "kpi_present_day_shift": len(present_day_ids),
+        "kpi_total_night_shift": len(night_shift_ids),
+        "kpi_present_night_shift": len(present_night_ids),
+        "kpi_absent": len(absent_ids),
+        "kpi_on_leave": len(on_leave_ids),
+        "kpi_late_punch": len(late_punch_ids),
+    }
+
+
 @login_required
 def home(request):
     """
@@ -769,6 +872,9 @@ def home(request):
             pending_ots_list = OvertimeRequest.objects.filter(status='pending', user__profile__section=section).order_by('-created_at')
             pending_corrections_list = CorrectionRequest.objects.filter(status='pending', user__profile__section=section).order_by('-created_at')
 
+    # Compute enterprise KPI cards from raw attendance (before formatting for table)
+    kpi_data = compute_kpi_cards(attendance)
+
     # Build the context
     context = {
         "active_tab": active_tab,
@@ -792,6 +898,16 @@ def home(request):
         "on_leave_today": on_leave_today,
         "late_punch_today": late_punch_today,
         "pending_tasks_count": pending_tasks_count,
+        
+        # Enterprise KPI cards
+        "kpi_total_employees": kpi_data["kpi_total_employees"],
+        "kpi_total_day_shift": kpi_data["kpi_total_day_shift"],
+        "kpi_present_day_shift": kpi_data["kpi_present_day_shift"],
+        "kpi_total_night_shift": kpi_data["kpi_total_night_shift"],
+        "kpi_present_night_shift": kpi_data["kpi_present_night_shift"],
+        "kpi_absent": kpi_data["kpi_absent"],
+        "kpi_on_leave": kpi_data["kpi_on_leave"],
+        "kpi_late_punch": kpi_data["kpi_late_punch"],
         
         # Coworkers directory
         "directory": directory,

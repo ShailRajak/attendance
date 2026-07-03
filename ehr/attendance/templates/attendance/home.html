@@ -340,55 +340,62 @@
     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close" onclick="this.parentElement.style.display='none';"></button>
 </div>
 
-<!-- Header stats row -->
-<div class="row g-3 mb-4 fade-in-el">
-    <div class="col-md-4 col-xl-2 col-6">
-        <div class="summary-card">
-            <span class="summary-title">Total Headcount</span>
-            <div class="summary-number text-white">{{ total_headcount }}</div>
+<!-- Enterprise KPI Cards Row -->
+<div class="row row-cols-2 row-cols-sm-2 row-cols-md-4 row-cols-lg-4 row-cols-xl-5 g-2 g-md-3 mb-4 fade-in-el">
+    <div class="col">
+        <div class="summary-card h-100">
+            <span class="summary-title">👥 Total Employees</span>
+            <div class="summary-number text-white">{{ kpi_total_employees }}</div>
             <span class="summary-detail">Active Employees</span>
         </div>
     </div>
-    <div class="col-md-4 col-xl-2 col-6">
-        <div class="summary-card">
-            <span class="summary-title">Present Today</span>
-            <div class="summary-number text-success">{{ present_today }}</div>
-            <span class="summary-detail">
-                Attendance: 
-                {% if total_headcount > 0 %}
-                    {% if total_headcount > 0 %}{% widthratio present_today total_headcount 100 %}{% else %}0{% endif %}%
-                {% else %}
-                    0%
-                {% endif %}
-            </span>
+    <div class="col">
+        <div class="summary-card h-100">
+            <span class="summary-title">☀️ Day Shift</span>
+            <div class="summary-number text-info">{{ kpi_total_day_shift }}</div>
+            <span class="summary-detail">Day Shift Employees</span>
         </div>
     </div>
-    <div class="col-md-4 col-xl-2 col-6">
-        <div class="summary-card">
-            <span class="summary-title">Absent Today</span>
-            <div class="summary-number text-danger">{{ absent_today }}</div>
-            <span class="summary-detail">Unexcused status</span>
+    <div class="col">
+        <div class="summary-card h-100">
+            <span class="summary-title">✅ Present Day</span>
+            <div class="summary-number text-success">{{ kpi_present_day_shift }}</div>
+            <span class="summary-detail">Day Shift Present</span>
         </div>
     </div>
-    <div class="col-md-4 col-xl-2 col-6">
-        <div class="summary-card">
-            <span class="summary-title">On Leave</span>
-            <div class="summary-number text-warning">{{ on_leave_today }}</div>
-            <span class="summary-detail">Approved requests</span>
+    <div class="col">
+        <div class="summary-card h-100">
+            <span class="summary-title">🌙 Night Shift</span>
+            <div class="summary-number text-white">{{ kpi_total_night_shift }}</div>
+            <span class="summary-detail">Night Shift Employees</span>
         </div>
     </div>
-    <div class="col-md-4 col-xl-2 col-6">
-        <div class="summary-card">
-            <span class="summary-title">Late Punch</span>
-            <div class="summary-number text-info">{{ late_punch_today }}</div>
+    <div class="col">
+        <div class="summary-card h-100">
+            <span class="summary-title">🌙 Present Night</span>
+            <div class="summary-number text-success">{{ kpi_present_night_shift }}</div>
+            <span class="summary-detail">Night Shift Present</span>
+        </div>
+    </div>
+    <div class="col">
+        <div class="summary-card h-100">
+            <span class="summary-title">❌ Absent</span>
+            <div class="summary-number text-danger">{{ kpi_absent }}</div>
+            <span class="summary-detail">Unexcused absence</span>
+        </div>
+    </div>
+    <div class="col">
+        <div class="summary-card h-100">
+            <span class="summary-title">🏖️ On Leave</span>
+            <div class="summary-number text-warning">{{ kpi_on_leave }}</div>
+            <span class="summary-detail">Approved leaves</span>
+        </div>
+    </div>
+    <div class="col">
+        <div class="summary-card h-100">
+            <span class="summary-title">⏰ Late Punch</span>
+            <div class="summary-number text-danger">{{ kpi_late_punch }}</div>
             <span class="summary-detail">After grace period</span>
-        </div>
-    </div>
-    <div class="col-md-4 col-xl-2 col-6">
-        <div class="summary-card">
-            <span class="summary-title">Pending Tasks</span>
-            <div class="summary-number text-white">{{ pending_tasks_count }}</div>
-            <span class="summary-detail text-danger fw-semibold">Requires action</span>
         </div>
     </div>
 </div>
@@ -568,8 +575,8 @@
             
             <div id="listViewContainer">
                 {% if attendance %}
-                    <div class="table-responsive">
-                        <table class="table table-custom">
+                    <div class="table-responsive" style="max-height: 480px; overflow-y: auto; overflow-x: auto; border-radius: 10px;">
+                        <table class="table table-custom" style="white-space: nowrap;">
                             <thead>
                                 <tr>
                                     {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}

@@ -24,6 +24,8 @@ REQUIRED_COLUMNS = {
     "WorkTypeName": "Attendance Status",
     "WTTypeName": "Shift",
     "Mobile": "Mobile",
+    "LaterMin1": "Late Minutes",
+    "LeaveTypeName": "Leave Type",
 }
 
 
