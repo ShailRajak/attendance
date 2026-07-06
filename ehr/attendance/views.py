@@ -5,15 +5,29 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from datetime import datetime, timedelta
+import re
+
+def extract_initials(name):
+    if not name:
+        return "EE"
+    parts = re.findall(r'[A-Za-z]+', name)
+    if len(parts) > 1:
+        return "".join([p[0].upper() for p in parts if p])[:2]
+    uppers = [c for c in name if c.isupper()]
+    if len(uppers) >= 2:
+        return "".join(uppers[:2])
+    elif len(name) >= 2:
+        return name[:2].upper()
+    return (name * 2)[:2].upper()
 
 # pyrefly: ignore [missing-import]
 from .services.attendance_api import fetch_attendance
 # pyrefly: ignore [missing-import]
+from .services.overtime_service import get_cycle_bounds, get_week_bounds, get_all_weeks_in_year, get_all_cycles_in_year
+# pyrefly: ignore [missing-import]
 from .utils.date_helpers import get_attendance_date_range
 # pyrefly: ignore [missing-import]
-from .models import UserProfile, LeaveRequest, OvertimeRequest, CorrectionRequest
-
-
+from .models import UserProfile
 
 
 def parse_date(date_str):
@@ -41,7 +55,7 @@ def parse_date(date_str):
         return None
 
 
-def calculate_dashboard_stats(attendance_records, employee_id):
+def calculate_dashboard_stats(attendance_records, employee_id, start_date=None, end_date=None):
     """
     Calculates statistics and chart data from the filtered attendance records.
     """
@@ -49,13 +63,15 @@ def calculate_dashboard_stats(attendance_records, employee_id):
         return {
             "working_days": 0,
             "days_present": 0,
-            "leaves_taken": 0,
+            "leaves_taken": 0.0,
             "late_arrivals": 0,
             "late_details": "No late arrivals",
-            "total_ot": 0,
-            "avg_work_time": 0,
+            "mispunches": 0,
+            "mispunch_details": "No mispunches",
+            "total_ot": 0.0,
+            "avg_work_time": 0.0,
             "chart_labels": [],
-            "chart_ot_data": [],
+            "chart_worktime_data": [],
             "breakdown_data": [0, 0, 0],
             "employee_details": {
                 "name": "Employee",
@@ -101,97 +117,149 @@ def calculate_dashboard_stats(attendance_records, employee_id):
         "job_title": job_title,
         "sector": sector,
         "shift": shift,
-        "initials": "".join([part[0] for part in name.split() if part])[:2].upper()
+        "initials": extract_initials(name)
     }
 
     working_days = 0
-    days_present = 0
+    days_present = 0.0
     leaves_taken = 0.0
     late_arrivals = 0
     total_ot = 0.0
     total_work_time = 0.0
     max_late_minutes = 0
     max_late_date = ""
+    mispunches = 0
+    last_mispunch_date = ""
 
     chart_labels = []
-    chart_ot_data = []
+    chart_worktime_data = []
     
-    status_present = 0
+    status_present = 0.0
     status_leave = 0.0
     status_rest = 0
 
-    sorted_records = sorted(
-        attendance_records,
-        key=lambda x: parse_date(x.get("Date", "")) or datetime.min
-    )
+    record_map = {}
+    for r in attendance_records:
+        d = parse_date(r.get("Date"))
+        if d:
+            record_map[d.date()] = r
 
-    for record in sorted_records:
-        raw_date_str = record.get("Date", "")
-        date_obj = parse_date(raw_date_str)
-        if date_obj:
+    # Determine start and end dates
+    if start_date and end_date:
+        start_dt = parse_date(start_date)
+        end_dt = parse_date(end_date)
+    else:
+        # Fallback to sorting
+        sorted_records = sorted(
+            attendance_records,
+            key=lambda x: parse_date(x.get("Date", "")) or datetime(1900, 1, 1)
+        )
+        dates = [parse_date(r.get("Date")) for r in sorted_records if r.get("Date")]
+        dates = [d for d in dates if d]
+        if dates:
+            start_dt = min(dates)
+            end_dt = max(dates)
+        else:
+            start_dt = None
+            end_dt = None
+
+    if start_dt and end_dt:
+        current_dt = start_dt
+        while current_dt <= end_dt:
+            date_obj = current_dt
             chart_date = date_obj.strftime("%m-%d")
-        else:
-            chart_date = raw_date_str
-        
-        chart_labels.append(chart_date)
-
-        # Working hours
-        try:
-            work_time = float(record.get("Working Hours") or 0.0)
-        except Exception:
-            work_time = 0.0
-
-        # Overtime
-        try:
-            ot = float(record.get("Total OT") or 0.0)
-        except Exception:
-            ot = 0.0
-        
-        total_ot += ot
-        chart_ot_data.append(ot)
-
-        # Check-in time
-        in_time_str = record.get("In Time", "").strip()
-        
-        is_weekend = False
-        try:
-            if date_obj:
-                is_weekend = date_obj.weekday() in (5, 6)
-        except Exception:
-            pass
-
-        if not in_time_str or in_time_str in ("00:00", "—", ""):
-            if is_weekend:
-                status_rest += 1
-            else:
-                leaves_taken += 1.0
-                status_leave += 1.0
-        else:
-            if work_time >= 8.0:
-                working_days += 1
-                days_present += 1
-                status_present += 1
-                total_work_time += work_time
-            else:
-                leaves_taken += 0.5
-                status_leave += 0.5
+            chart_labels.append(chart_date)
             
-            if in_time_str and ":" in in_time_str:
+            record = record_map.get(date_obj.date())
+            is_weekend = date_obj.weekday() == 6
+            
+            if record:
+                # Working hours
                 try:
-                    h, m = map(int, in_time_str.split(":"))
-                    check_in_minutes = h * 60 + m
-                    shift_start_minutes = 9 * 60
-                    
-                    if check_in_minutes > shift_start_minutes + 15 and work_time >= 8.0:
-                        late_arrivals += 1
-                        late_minutes = check_in_minutes - shift_start_minutes
-                        if late_minutes > max_late_minutes:
-                            max_late_minutes = late_minutes
-                            max_late_date = chart_date
+                    work_time = float(record.get("Working Hours") or 0.0)
                 except Exception:
-                    pass
+                    work_time = 0.0
 
-    avg_work_time = round(total_work_time / working_days, 1) if working_days > 0 else 0.0
+                # Overtime
+                try:
+                    ot = float(record.get("Card Punch OT") or 0.0)
+                except Exception:
+                    ot = 0.0
+                
+                total_ot += ot
+                chart_worktime_data.append(work_time)
+
+                # Check-in time
+                in_time_str = record.get("In Time", "").strip()
+                out_time_str = record.get("Out Time", "").strip()
+                has_check_in = bool(in_time_str) and in_time_str not in ("00:00", "—", "")
+                has_check_out = bool(out_time_str) and out_time_str not in ("00:00", "—", "")
+
+                if (has_check_in and not has_check_out) or (has_check_out and not has_check_in):
+                    mispunches += 1
+                    last_mispunch_date = chart_date
+
+                if not has_check_in:
+                    if is_weekend:
+                        status_rest += 1
+                    else:
+                        working_days += 1
+                        leaves_taken += 1.0
+                        status_leave += 1.0
+                else:
+                    if is_weekend:
+                        if work_time >= 8.0:
+                            working_days += 1
+                            days_present += 1.0
+                            status_present += 1.0
+                            total_work_time += work_time
+                        else:
+                            status_rest += 1
+                            total_work_time += work_time
+                    else:
+                        working_days += 1
+                        if work_time >= 8.0:
+                            days_present += 1.0
+                            status_present += 1.0
+                            total_work_time += work_time
+                        else:
+                            days_present += 0.5
+                            leaves_taken += 0.5
+                            status_leave += 0.5
+                            status_present += 0.5
+                            total_work_time += work_time
+                    
+                    if in_time_str and ":" in in_time_str:
+                        try:
+                            h, m = map(int, in_time_str.split(":"))
+                            check_in_minutes = h * 60 + m
+                            
+                            shift_name = record.get("Shift", "")
+                            if "Night" in shift_name:
+                                shift_start_minutes = 20 * 60
+                            else:
+                                shift_start_minutes = 9 * 60
+                            
+                            if check_in_minutes > shift_start_minutes + 15:
+                                late_arrivals += 1
+                                late_minutes = check_in_minutes - shift_start_minutes
+                                if late_minutes > max_late_minutes:
+                                    max_late_minutes = late_minutes
+                                    max_late_date = chart_date
+                        except Exception:
+                            pass
+            else:
+                chart_worktime_data.append(0.0)
+                if is_weekend:
+                    status_rest += 1
+                else:
+                    working_days += 1
+                    leaves_taken += 1.0
+                    status_leave += 1.0
+            
+            current_dt += timedelta(days=1)
+
+    avg_work_time = round(total_work_time / days_present, 1) if days_present > 0 else 0.0
     total_ot = round(total_ot, 1)
     
     if max_late_minutes > 0:
@@ -199,27 +267,22 @@ def calculate_dashboard_stats(attendance_records, employee_id):
     else:
         late_details = "No late arrivals"
 
-    # Specific overrides for demo user to match screenshots exactly
-    if employee_id == "19105203":
-        working_days = 22
-        days_present = 22
-        leaves_taken = 3.5
-        late_arrivals = 1
-        late_details = "42 min late (Mar 23)"
-        total_ot = 54.5
-        avg_work_time = 9.1
+    days_present_val = int(days_present) if days_present.is_integer() else days_present
+    status_present_val = int(status_present) if status_present.is_integer() else status_present
 
     return {
         "working_days": working_days,
-        "days_present": days_present,
-        "leaves_taken": leaves_taken,
+        "days_present": days_present_val,
+        "leaves_taken": int(leaves_taken) if leaves_taken.is_integer() else leaves_taken,
         "late_arrivals": late_arrivals,
         "late_details": late_details,
+        "mispunches": mispunches,
+        "mispunch_details": f"{mispunches} records" if mispunches > 0 else "No mispunches",
         "total_ot": total_ot,
         "avg_work_time": avg_work_time,
         "chart_labels": chart_labels,
-        "chart_ot_data": chart_ot_data,
-        "breakdown_data": [status_present, int(status_leave) if status_leave.is_integer() else status_leave, status_rest],
+        "chart_worktime_data": chart_worktime_data,
+        "breakdown_data": [status_present_val, int(status_leave) if status_leave.is_integer() else status_leave, status_rest],
         "employee_details": employee_details
     }
 
@@ -250,6 +313,8 @@ def calculate_section_dashboard_stats(attendance_records, role_display, section_
             "leaves_taken": 0,
             "late_arrivals": 0,
             "late_details": "No late arrivals",
+            "mispunches": 0,
+            "mispunch_details": "No mispunches",
             "total_ot": 0,
             "avg_work_time": 0,
             "chart_labels": [],
@@ -281,6 +346,7 @@ def calculate_section_dashboard_stats(attendance_records, role_display, section_
     total_ot = 0.0
     total_work_time = 0.0
     work_time_records_count = 0
+    total_mispunches = 0
 
     # For charts, we can aggregate by Date
     date_aggregates = {}
@@ -289,11 +355,11 @@ def calculate_section_dashboard_stats(attendance_records, role_display, section_
         if not dt:
             continue
         if dt not in date_aggregates:
-            date_aggregates[dt] = {"ot": 0.0, "present": 0, "leave": 0.0, "late": 0}
+            date_aggregates[dt] = {"ot": 0.0, "present": 0, "leave": 0.0, "late": 0, "work_time": 0.0, "count": 0}
         
         # OT
         try:
-            ot = float(r.get("Total OT") or 0.0)
+            ot = float(r.get("Card Punch OT") or 0.0)
         except Exception:
             ot = 0.0
         date_aggregates[dt]["ot"] += ot
@@ -307,14 +373,21 @@ def calculate_section_dashboard_stats(attendance_records, role_display, section_
         if work_time > 0:
             total_work_time += work_time
             work_time_records_count += 1
+            date_aggregates[dt]["work_time"] += work_time
+            date_aggregates[dt]["count"] += 1
 
         # Check-in time / status
         in_time_str = r.get("In Time", "").strip()
+        out_time_str = r.get("Out Time", "").strip()
+        has_in = bool(in_time_str) and in_time_str not in ("00:00", "—", "")
+        has_out = bool(out_time_str) and out_time_str not in ("00:00", "—", "")
+        if (has_in and not has_out) or (has_out and not has_in):
+            total_mispunches += 1
         
         # We can also parse date to check if it's weekend
         date_obj = parse_date(dt)
         is_weekend = False
-        if date_obj and date_obj.weekday() in (5, 6):
+        if date_obj and date_obj.weekday() == 6:
             is_weekend = True
 
         if not in_time_str or in_time_str in ("00:00", "—", ""):
@@ -345,13 +418,15 @@ def calculate_section_dashboard_stats(attendance_records, role_display, section_
     # Sort dates to build trend labels and data
     sorted_dates = sorted(date_aggregates.keys(), key=parse_date)
     chart_labels = []
-    chart_ot_data = []
+    chart_worktime_data = []
     
     for dt in sorted_dates:
         date_obj = parse_date(dt)
         label = date_obj.strftime("%m-%d") if date_obj else dt
         chart_labels.append(label)
-        chart_ot_data.append(round(date_aggregates[dt]["ot"], 1))
+        count = date_aggregates[dt]["count"]
+        avg_wt = date_aggregates[dt]["work_time"] / count if count > 0 else 0.0
+        chart_worktime_data.append(round(avg_wt, 1))
 
     status_present = total_present
     status_leave = int(total_leaves) if total_leaves.is_integer() else total_leaves
@@ -366,10 +441,12 @@ def calculate_section_dashboard_stats(attendance_records, role_display, section_
         "leaves_taken": status_leave,
         "late_arrivals": total_late,
         "late_details": f"{total_late} late check-ins",
+        "mispunches": total_mispunches,
+        "mispunch_details": f"{total_mispunches} records" if total_mispunches > 0 else "No mispunches",
         "total_ot": total_ot,
         "avg_work_time": avg_work_time,
         "chart_labels": chart_labels,
-        "chart_ot_data": chart_ot_data,
+        "chart_worktime_data": chart_worktime_data,
         "breakdown_data": [status_present, status_leave, status_rest],
         "is_section": True,
         "employee_details": {
@@ -454,7 +531,7 @@ def compute_kpi_cards(attendance_records):
 
         # Check if weekend
         date_obj = parse_date(record.get("Date", ""))
-        is_weekend = date_obj and date_obj.weekday() in (5, 6) if date_obj else False
+        is_weekend = date_obj and date_obj.weekday() == 6 if date_obj else False
 
         is_present = bool(has_check_in and work_time >= 8.0)
         is_absent = bool(not has_check_in and not is_weekend and not leave_type)
@@ -532,93 +609,11 @@ def home(request):
     # Determine active tab
     active_tab = request.GET.get("tab", "dashboard")
 
-    # Handle POST Submissions (Forms / Approvals)
+    # Handle POST Submissions (Dashboard Filter)
     if request.method == "POST":
         action = request.POST.get("action")
         
-        if action == "apply_leave":
-            category = request.POST.get("leave_category")
-            start_date_str = request.POST.get("start_date")
-            end_date_str = request.POST.get("end_date")
-            reason = request.POST.get("reason", "")
-            try:
-                LeaveRequest.objects.create(
-                    user=request.user,
-                    category=category,
-                    start_date=start_date_str,
-                    end_date=end_date_str,
-                    reason=reason,
-                    status='pending'
-                )
-                messages.success(request, "Leave application submitted successfully!")
-            except Exception as e:
-                messages.error(request, f"Error submitting leave application: {str(e)}")
-            return redirect("/?tab=leaves")
-            
-        elif action == "log_ot":
-            date_str = request.POST.get("ot_date")
-            hours = request.POST.get("hours")
-            reason = request.POST.get("reason", "")
-            try:
-                OvertimeRequest.objects.create(
-                    user=request.user,
-                    date=date_str,
-                    hours=hours,
-                    reason=reason,
-                    status='pending'
-                )
-                messages.success(request, "Overtime log submitted successfully!")
-            except Exception as e:
-                messages.error(request, f"Error logging overtime: {str(e)}")
-            return redirect("/?tab=overtime")
-            
-        elif action == "apply_correction":
-            date_str = request.POST.get("log_date")
-            in_time = request.POST.get("correct_in_time")
-            out_time = request.POST.get("correct_out_time")
-            reason = request.POST.get("reason", "")
-            try:
-                CorrectionRequest.objects.create(
-                    user=request.user,
-                    date=date_str,
-                    correct_in_time=in_time,
-                    correct_out_time=out_time,
-                    reason=reason,
-                    status='pending'
-                )
-                messages.success(request, "Punch correction request submitted successfully!")
-            except Exception as e:
-                messages.error(request, f"Error requesting punch correction: {str(e)}")
-            return redirect("/?tab=corrections")
-            
-        elif action in ("approve", "reject"):
-            req_type = request.POST.get("request_type")
-            req_id = request.POST.get("request_id")
-            new_status = 'approved' if action == 'approve' else 'rejected'
-            
-            if not is_supervisor:
-                messages.error(request, "Unauthorized action.")
-                return redirect("/?tab=approvals")
-                
-            try:
-                if req_type == "leave":
-                    req = LeaveRequest.objects.get(id=req_id)
-                    req.status = new_status
-                    req.save()
-                elif req_type == "ot":
-                    req = OvertimeRequest.objects.get(id=req_id)
-                    req.status = new_status
-                    req.save()
-                elif req_type == "correction":
-                    req = CorrectionRequest.objects.get(id=req_id)
-                    req.status = new_status
-                    req.save()
-                messages.success(request, f"Request {action}d successfully!")
-            except Exception as e:
-                messages.error(request, f"Error performing action: {str(e)}")
-            return redirect("/?tab=approvals")
-            
-        elif action == "filter_dashboard":
+        if action == "filter_dashboard":
             query_employee_id = request.POST.get("employee_id", "").strip()
             start_date = request.POST.get("start_date")
             end_date = request.POST.get("end_date")
@@ -673,7 +668,7 @@ def home(request):
     if is_section_view:
         dashboard_stats = calculate_section_dashboard_stats(attendance, role_display, section_display)
     else:
-        dashboard_stats = calculate_dashboard_stats(attendance, query_employee_id or request.user.username)
+        dashboard_stats = calculate_dashboard_stats(attendance, query_employee_id or request.user.username, start_date, end_date)
 
     # Format the attendance log items
     formatted_attendance = []
@@ -703,7 +698,7 @@ def home(request):
         else:
             work_hrs = "—"
 
-        ot_str = record.get("Total OT", "0.0")
+        ot_str = record.get("Card Punch OT", "0.0")
         try:
             ot = float(ot_str or 0.0)
         except Exception:
@@ -719,7 +714,7 @@ def home(request):
         if date_obj:
             date_display = date_obj.strftime("%d/%m/%Y")
             day_name = date_obj.strftime("%A")
-            is_weekend = date_obj.weekday() in (5, 6)
+            is_weekend = date_obj.weekday() == 6
         else:
             date_display = date_str
             day_name = "—"
@@ -809,99 +804,19 @@ def home(request):
         on_leave_today = 0
         late_punch_today = 0
 
-    # Calculate pending tasks counts
-    if is_superuser:
-        pending_tasks_count = (
-            LeaveRequest.objects.filter(status='pending').count() +
-            OvertimeRequest.objects.filter(status='pending').count() +
-            CorrectionRequest.objects.filter(status='pending').count()
-        )
-    elif role in ('smt_pd', 'assy_pd'):
-        pending_tasks_count = (
-            LeaveRequest.objects.filter(status='pending', user__profile__section=section).count() +
-            OvertimeRequest.objects.filter(status='pending', user__profile__section=section).count() +
-            CorrectionRequest.objects.filter(status='pending', user__profile__section=section).count()
-        )
-    else:
-        pending_tasks_count = (
-            LeaveRequest.objects.filter(user=request.user, status='pending').count() +
-            OvertimeRequest.objects.filter(user=request.user, status='pending').count() +
-            CorrectionRequest.objects.filter(user=request.user, status='pending').count()
-        )
-
-    # Coworker Directory List
-    directory = []
-    profiles = UserProfile.objects.select_related('user').all()
-    for p in profiles:
-        fullname = f"{p.user.first_name} {p.user.last_name}".strip()
-        if not fullname:
-            fullname = p.user.username
-        
-        job_title = "Associate"
-        if p.role == 'smt_pd':
-            job_title = "SMT Production Director"
-        elif p.role == 'assy_pd':
-            job_title = "Assembly Production Director"
-        elif p.user.is_superuser:
-            job_title = "System Administrator"
-            
-        sector = "Sector 63 - Marketing"
-        if p.role == 'smt_pd':
-            sector = "SMT Production"
-        elif p.role == 'assy_pd':
-            sector = "Assembly Production"
-        
-        mobile_mapping = {
-            "19105203": "+91 98765 43210",
-            "19105639": "+91 89825 15122",
-            "19105540": "+91 99999 88888"
-        }
-        mobile = mobile_mapping.get(p.user.username, "+91 98765 00000")
-        
-        directory.append({
-            "username": p.user.username,
-            "name": fullname,
-            "role": p.get_role_display(),
-            "section": p.get_section_display() if p.section else "N/A",
-            "job_title": job_title,
-            "sector": sector,
-            "mobile": mobile,
-            "shift": "General Day Shift (09:00-18:00)"
-        })
-
-    # Leave allotments logic
-    approved_cl = sum((l.end_date - l.start_date).days + 1 for l in LeaveRequest.objects.filter(user=request.user, category='casual', status='approved'))
-    approved_sl = sum((l.end_date - l.start_date).days + 1 for l in LeaveRequest.objects.filter(user=request.user, category='sick', status='approved'))
-    approved_el = sum((l.end_date - l.start_date).days + 1 for l in LeaveRequest.objects.filter(user=request.user, category='earned', status='approved'))
+    # Compute enterprise KPI cards from raw attendance (before formatting for table)
+    kpi_data = compute_kpi_cards(attendance)
     
-    leave_allotments = {
-        "casual": {"total": 12.0, "used": float(approved_cl), "remaining": 12.0 - float(approved_cl)},
-        "sick": {"total": 10.0, "used": float(approved_sl), "remaining": 10.0 - float(approved_sl)},
-        "earned": {"total": 15.0, "used": float(approved_el), "remaining": 15.0 - float(approved_el)},
-    }
-
-    # Fetch user requests history
-    user_leaves = LeaveRequest.objects.filter(user=request.user).order_by('-created_at')
-    user_overtimes = OvertimeRequest.objects.filter(user=request.user).order_by('-created_at')
-    user_corrections = CorrectionRequest.objects.filter(user=request.user).order_by('-created_at')
-
-    # Fetch pending approvals lists
+    # Set default values for removed features
+    pending_tasks_count = 0
+    directory = []
+    leave_allotments = {"casual": {"total": 12.0, "used": 0.0, "remaining": 12.0}, "sick": {"total": 10.0, "used": 0.0, "remaining": 10.0}, "earned": {"total": 15.0, "used": 0.0, "remaining": 15.0}}
+    user_leaves = []
+    user_overtimes = []
+    user_corrections = []
     pending_leaves_list = []
     pending_ots_list = []
     pending_corrections_list = []
-    
-    if is_supervisor:
-        if is_superuser:
-            pending_leaves_list = LeaveRequest.objects.filter(status='pending').order_by('-created_at')
-            pending_ots_list = OvertimeRequest.objects.filter(status='pending').order_by('-created_at')
-            pending_corrections_list = CorrectionRequest.objects.filter(status='pending').order_by('-created_at')
-        else:
-            pending_leaves_list = LeaveRequest.objects.filter(status='pending', user__profile__section=section).order_by('-created_at')
-            pending_ots_list = OvertimeRequest.objects.filter(status='pending', user__profile__section=section).order_by('-created_at')
-            pending_corrections_list = CorrectionRequest.objects.filter(status='pending', user__profile__section=section).order_by('-created_at')
-
-    # Compute enterprise KPI cards from raw attendance (before formatting for table)
-    kpi_data = compute_kpi_cards(attendance)
 
     # Build the context
     context = {
@@ -937,16 +852,12 @@ def home(request):
         "kpi_on_leave": kpi_data["kpi_on_leave"],
         "kpi_late_punch": kpi_data["kpi_late_punch"],
         
-        # Coworkers directory
+        # Keep context variables for template compatibility (empty/default values)
         "directory": directory,
-        
-        # Forms history lists
         "leave_allotments": leave_allotments,
         "user_leaves": user_leaves,
         "user_overtimes": user_overtimes,
         "user_corrections": user_corrections,
-        
-        # Approvals lists
         "pending_leaves": pending_leaves_list,
         "pending_ots": pending_ots_list,
         "pending_corrections": pending_corrections_list,
@@ -1067,6 +978,171 @@ def logout_view(request):
     return redirect("login")
 
 
+def overtime_dashboard(request):
+    """
+    Overtime Dashboard - Shows overtime analytics with period toggle (Daily/Weekly/Monthly)
+    """
+    if not request.user.is_authenticated:
+        return redirect("login")
+        
+    # pyrefly: ignore [missing-import]
+    from .services.overtime_service import get_overtime_summary, get_scope_overtime_summary, get_all_weeks_in_year, get_all_cycles_in_year
+    
+    # Get user profile
+    is_superuser = request.user.is_superuser
+    role = 'employee'
+    section = None
+    if not is_superuser:
+        try:
+            profile = request.user.profile
+            role = profile.role
+            section = profile.section
+        except Exception:
+            pass
+    
+    is_supervisor = is_superuser or (role in ('smt_pd', 'assy_pd'))
+    
+    # Read period from query param
+    period = request.GET.get("period", "weekly")
+    if period not in ("daily", "weekly", "monthly"):
+        period = "weekly"
+    
+    # Check for custom date range from date picker
+    custom_start = request.GET.get("custom_start")
+    custom_end = request.GET.get("custom_end")
+    
+    # Check for specific week or cycle selection
+    week_num = request.GET.get("week_num")
+    cycle_num = request.GET.get("cycle_num")
+    
+    # Compute start/end dates based on period or custom dates
+    today = datetime.now().date()
+    start_date = today
+    end_date = today
+    
+    if custom_start and custom_end:
+        # Use custom date range from date picker
+        try:
+            start_date = datetime.strptime(custom_start, "%Y-%m-%d").date()
+            end_date = datetime.strptime(custom_end, "%Y-%m-%d").date()
+            period = "custom"  # Mark as custom period
+        except (ValueError, TypeError):
+            # Fall back to default period if dates are invalid
+            custom_start = None
+            custom_end = None
+    
+    if not custom_start or not custom_end:
+        # Use preset period
+        if period == "daily":
+            yesterday = today - timedelta(days=1)
+            start_date = yesterday
+            end_date = yesterday
+        elif period == "weekly":
+            # Check if specific week is selected
+            if week_num:
+                try:
+                    year = int(request.GET.get("year", today.year))
+                    start_date, end_date = get_week_bounds(int(week_num), year)
+                except (ValueError, TypeError):
+                    # Fall back to current week
+                    start_date = today - timedelta(days=today.weekday())
+                    end_date = start_date + timedelta(days=6)
+            else:
+                # Default to current week
+                start_date = today - timedelta(days=today.weekday())
+                end_date = start_date + timedelta(days=6)
+        else:  # monthly
+            # Check if specific cycle is selected
+            if cycle_num:
+                try:
+                    year = int(request.GET.get("year", today.year))
+                    cycles = get_all_cycles_in_year(year)
+                    cycle_idx = int(cycle_num) - 1
+                    if 0 <= cycle_idx < len(cycles):
+                        start_date = cycles[cycle_idx]["start"]
+                        end_date = cycles[cycle_idx]["end"]
+                    else:
+                        # Fall back to current cycle
+                        start_date, end_date = get_cycle_bounds(today)
+                except (ValueError, TypeError, IndexError):
+                    # Fall back to current cycle
+                    start_date, end_date = get_cycle_bounds(today)
+            else:
+                # Default to current cycle
+                start_date, end_date = get_cycle_bounds(today)
+    
+    # Convert to string format for API
+    start_date_str = start_date.strftime("%Y-%m-%d")
+    end_date_str = end_date.strftime("%Y-%m-%d")
+    
+    # Get employee ID
+    if role == 'employee' and not is_superuser:
+        emp_id = request.user.username
+    else:
+        emp_id = request.GET.get("employee_id", request.user.username)
+    
+    # Fetch overtime summary
+    summary = get_overtime_summary(emp_id, start_date_str, end_date_str)
+    
+    # If supervisor, also get scope rollup
+    scope_summary = None
+    if is_supervisor:
+        expected_dtname4 = get_expected_dtname4(role, section)
+        if expected_dtname4:
+            scope_summary = get_scope_overtime_summary(expected_dtname4, start_date_str, end_date_str)
+    
+    # Period text for display
+    try:
+        start_obj = datetime.strptime(start_date_str, "%Y-%m-%d")
+        end_obj = datetime.strptime(end_date_str, "%Y-%m-%d")
+        if period == "daily":
+            period_text = f"Daily — {start_obj.strftime('%b %d, %Y')}"
+        elif period == "weekly":
+            if week_num:
+                period_text = f"Week {week_num} — {start_obj.strftime('%b %d')} to {end_obj.strftime('%b %d, %Y')}"
+            else:
+                period_text = f"Weekly — {start_obj.strftime('%b %d')} to {end_obj.strftime('%b %d, %Y')}"
+        elif period == "monthly":
+            if cycle_num:
+                period_text = f"Cycle {cycle_num} — {start_obj.strftime('%b %d')} to {end_obj.strftime('%b %d, %Y')}"
+            else:
+                period_text = f"Monthly (21-20) — {start_obj.strftime('%b %d')} to {end_obj.strftime('%b %d, %Y')}"
+        else:  # custom
+            period_text = f"Custom — {start_obj.strftime('%b %d, %Y')} to {end_obj.strftime('%b %d, %Y')}"
+    except Exception:
+        period_text = f"{start_date_str} to {end_date_str}"
+    
+    # Get all weeks and cycles for dropdowns
+    current_year = today.year
+    all_weeks = get_all_weeks_in_year(current_year)
+    all_cycles = get_all_cycles_in_year(current_year)
+    
+    context = {
+        "active_tab": "overtime",
+        "summary": summary,
+        "period": period,
+        "start_date": start_date_str,
+        "end_date": end_date_str,
+        "period_text": period_text,
+        "scope_summary": scope_summary,
+        "is_supervisor": is_supervisor,
+        "is_superuser": is_superuser,
+        "role": role,
+        "section": section,
+        "role_display": dict(UserProfile.ROLE_CHOICES).get(role, role.upper()) if role != 'admin' else "Admin",
+        "section_display": dict(UserProfile.SECTION_CHOICES).get(section, section.upper()) if section else "",
+        "custom_start": custom_start,
+        "custom_end": custom_end,
+        "all_weeks": all_weeks,
+        "all_cycles": all_cycles,
+        "selected_week": week_num,
+        "selected_cycle": cycle_num,
+        "current_year": current_year,
+    }
+    
+    return render(request, "attendance/overtime.html", context)
+
+
 def attendance_api(request):
     """
     JSON API - Secured and RBAC filtered
@@ -1121,467 +1197,166 @@ def attendance_api(request):
     })
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Employee Directory Views
-# ─────────────────────────────────────────────────────────────────────────────
-
-@login_required(login_url="login")
-def employee_list(request):
+@login_required
+def mispunch_dashboard(request):
     """
-    Employee Directory – lists all registered portal users.
-    Supervisors (smt_pd / assy_pd) see only employees in their section.
-    HR admins / superusers see everyone.
+    Mispunch Dashboard - Shows Mispunches, Short Leaves, Half Days, and Full Days
     """
     is_superuser = request.user.is_superuser
-    role = "employee"
+    role = 'employee'
     section = None
-    try:
-        profile = request.user.profile
-        role = profile.role
-        section = profile.section
-    except Exception:
-        pass
-
-    is_supervisor = is_superuser or role in ("smt_pd", "assy_pd")
-
-    # Build base queryset
-    from django.contrib.auth.models import User as DjangoUser
-    if is_superuser:
-        users_qs = DjangoUser.objects.select_related("profile").exclude(is_superuser=True)
-    elif role in ("smt_pd", "assy_pd"):
-        users_qs = DjangoUser.objects.select_related("profile").filter(profile__section=section)
-    else:
-        # Regular employees only see themselves
-        users_qs = DjangoUser.objects.select_related("profile").filter(pk=request.user.pk)
-
-    # Build employee-like objects the template expects
-    class EmpProxy:
-        def __init__(self, user):
-            self.user = user
-            self.employee_id = user.username
-            try:
-                p = user.profile
-                self.role = p.role
-                self.section = p.section or "—"
-            except Exception:
-                self.role = "employee"
-                self.section = "—"
-            self.department = type("D", (), {"name": self.section})()
-            self.designation = type("D", (), {"name": self.get_role_display()})()
-            self.phone = "—"
-            self.status = "active"
-
-        def get_role_display(self):
-            labels = {"employee": "Employee", "smt_pd": "SMT PD", "assy_pd": "ASSY PD"}
-            return labels.get(self.role, self.role.title())
-
-    employees = [EmpProxy(u) for u in users_qs]
-
-    # Search filter
-    search_query = request.GET.get("search", "").strip().lower()
-    selected_status = request.GET.get("status", "")
-    if search_query:
-        employees = [e for e in employees if search_query in e.employee_id.lower()
-                     or search_query in (e.user.get_full_name() or "").lower()]
-
-    context = {
-        "employees": employees,
-        "search_query": request.GET.get("search", ""),
-        "selected_status": selected_status,
-        "departments": [],
-        "is_supervisor": is_supervisor,
-        "active_tab": "directory",
-        "role_display": {"employee": "Employee", "smt_pd": "SMT PD", "assy_pd": "ASSY PD"}.get(role, role.title()),
-        "section_display": section or "",
-    }
-    return render(request, "attendance/employees.html", context)
-
-
-@login_required(login_url="login")
-def employee_detail(request, employee_id):
-    """
-    Employee Detail / Profile page.
-    """
-    from django.contrib.auth.models import User as DjangoUser
-    from django.shortcuts import get_object_or_404
-
-    is_superuser = request.user.is_superuser
-    role = "employee"
-    section = None
-    try:
-        profile = request.user.profile
-        role = profile.role
-        section = profile.section
-    except Exception:
-        pass
-
-    is_supervisor = is_superuser or role in ("smt_pd", "assy_pd")
-
-    # Access control: regular employees can only view themselves
-    if not is_supervisor and request.user.username != employee_id:
-        messages.error(request, "You do not have permission to view this profile.")
-        return redirect("home")
-
-    target_user = get_object_or_404(DjangoUser, username=employee_id)
-    try:
-        target_profile = target_user.profile
-        target_role = target_profile.role
-        target_section = target_profile.section or "—"
-    except Exception:
-        target_role = "employee"
-        target_section = "—"
-
-    role_labels = {"employee": "Employee", "smt_pd": "SMT PD", "assy_pd": "ASSY PD"}
-
-    emp_data = {
-        "username": target_user.username,
-        "full_name": target_user.get_full_name() or target_user.username,
-        "role": role_labels.get(target_role, target_role.title()),
-        "section": target_section,
-        "date_joined": target_user.date_joined,
-        "is_active": target_user.is_active,
-    }
-
-    # Fetch this employee's request history
-    emp_leaves = LeaveRequest.objects.filter(user=target_user).order_by("-created_at")[:10]
-    emp_overtimes = OvertimeRequest.objects.filter(user=target_user).order_by("-created_at")[:10]
-    emp_corrections = CorrectionRequest.objects.filter(user=target_user).order_by("-created_at")[:10]
-
-    context = {
-        "emp": emp_data,
-        "emp_leaves": emp_leaves,
-        "emp_overtimes": emp_overtimes,
-        "emp_corrections": emp_corrections,
-        "active_tab": "directory",
-        "is_supervisor": is_supervisor,
-        "role_display": role_labels.get(role, role.title()),
-        "section_display": section or "",
-    }
-    return render(request, "attendance/employee_detail.html", context)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Request Portal Views
-# ─────────────────────────────────────────────────────────────────────────────
-
-@login_required(login_url="login")
-def leave_portal(request):
-    """
-    Leave Request Portal – submit and view leave requests.
-    """
-    role = "employee"
-    section = None
-    try:
-        profile = request.user.profile
-        role = profile.role
-        section = profile.section
-    except Exception:
-        pass
-
-    if request.method == "POST":
-        category = request.POST.get("category", "casual")
-        start_date = request.POST.get("start_date", "")
-        end_date = request.POST.get("end_date", "")
-        reason = request.POST.get("reason", "").strip()
-
-        if not start_date or not end_date:
-            messages.error(request, "Start date and end date are required.")
-        else:
-            LeaveRequest.objects.create(
-                user=request.user,
-                category=category,
-                start_date=start_date,
-                end_date=end_date,
-                reason=reason,
-            )
-            messages.success(request, "Leave request submitted successfully!")
-            return redirect("leave_portal")
-
-    user_leaves = LeaveRequest.objects.filter(user=request.user).order_by("-created_at")
-    context = {
-        "user_leaves": user_leaves,
-        "active_tab": "leaves",
-        "role_display": {"employee": "Employee", "smt_pd": "SMT PD", "assy_pd": "ASSY PD"}.get(role, role.title()),
-        "section_display": section or "",
-    }
-    return render(request, "attendance/leaves.html", context)
-
-
-@login_required(login_url="login")
-def overtime_portal(request):
-    """
-    Overtime Request Portal – submit and view overtime requests.
-    """
-    role = "employee"
-    section = None
-    try:
-        profile = request.user.profile
-        role = profile.role
-        section = profile.section
-    except Exception:
-        pass
-
-    if request.method == "POST":
-        date = request.POST.get("date", "")
-        hours = request.POST.get("hours", "")
-        reason = request.POST.get("reason", "").strip()
-
-        if not date or not hours:
-            messages.error(request, "Date and hours are required.")
-        else:
-            try:
-                OvertimeRequest.objects.create(
-                    user=request.user,
-                    date=date,
-                    hours=float(hours),
-                    reason=reason,
-                )
-                messages.success(request, "Overtime request submitted successfully!")
-                return redirect("overtime_portal")
-            except Exception as e:
-                messages.error(request, f"Error submitting request: {e}")
-
-    user_overtimes = OvertimeRequest.objects.filter(user=request.user).order_by("-created_at")
-    context = {
-        "user_overtimes": user_overtimes,
-        "active_tab": "overtime",
-        "role_display": {"employee": "Employee", "smt_pd": "SMT PD", "assy_pd": "ASSY PD"}.get(role, role.title()),
-        "section_display": section or "",
-    }
-    return render(request, "attendance/overtime.html", context)
-
-
-@login_required(login_url="login")
-def correction_portal(request):
-    """
-    Attendance Correction Portal – submit and view correction requests.
-    """
-    role = "employee"
-    section = None
-    try:
-        profile = request.user.profile
-        role = profile.role
-        section = profile.section
-    except Exception:
-        pass
-
-    if request.method == "POST":
-        date = request.POST.get("date", "")
-        correct_in_time = request.POST.get("correct_in_time", "").strip()
-        correct_out_time = request.POST.get("correct_out_time", "").strip()
-        reason = request.POST.get("reason", "").strip()
-
-        if not date or not correct_in_time or not correct_out_time:
-            messages.error(request, "Date, In-time, and Out-time are required.")
-        else:
-            CorrectionRequest.objects.create(
-                user=request.user,
-                date=date,
-                correct_in_time=correct_in_time,
-                correct_out_time=correct_out_time,
-                reason=reason,
-            )
-            messages.success(request, "Correction request submitted successfully!")
-            return redirect("correction_portal")
-
-    user_corrections = CorrectionRequest.objects.filter(user=request.user).order_by("-created_at")
-    context = {
-        "user_corrections": user_corrections,
-        "active_tab": "corrections",
-        "role_display": {"employee": "Employee", "smt_pd": "SMT PD", "assy_pd": "ASSY PD"}.get(role, role.title()),
-        "section_display": section or "",
-    }
-    return render(request, "attendance/corrections.html", context)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Approval Portal View
-# ─────────────────────────────────────────────────────────────────────────────
-
-@login_required(login_url="login")
-def approval_portal(request):
-    """
-    Approval Portal – for supervisors (smt_pd, assy_pd) and superusers.
-    Handles approve/reject actions via POST.
-    """
-    is_superuser = request.user.is_superuser
-    role = "employee"
-    section = None
-    try:
-        profile = request.user.profile
-        role = profile.role
-        section = profile.section
-    except Exception:
-        pass
-
-    is_supervisor = is_superuser or role in ("smt_pd", "assy_pd")
-    if not is_supervisor:
-        messages.error(request, "You do not have permission to access the Approvals portal.")
-        return redirect("home")
-
-    # Handle approve/reject actions
-    if request.method == "POST":
-        action = request.POST.get("action")          # 'approve' or 'reject'
-        req_type = request.POST.get("req_type")      # 'leave', 'overtime', 'correction'
-        req_id = request.POST.get("req_id")
-        new_status = "approved" if action == "approve" else "rejected"
-
+    if not is_superuser:
         try:
-            if req_type == "leave":
-                obj = LeaveRequest.objects.get(pk=req_id)
-            elif req_type == "overtime":
-                obj = OvertimeRequest.objects.get(pk=req_id)
-            elif req_type == "correction":
-                obj = CorrectionRequest.objects.get(pk=req_id)
+            profile = request.user.profile
+            role = profile.role
+            section = profile.section
+        except Exception:
+            pass
+
+    # Cycle selection
+    # pyrefly: ignore [missing-import]
+    from .services.overtime_service import get_cycle_bounds, get_all_cycles_in_year
+    today = datetime.now().date()
+    current_year = today.year
+    cycle_num = request.GET.get("cycle_num")
+    
+    try:
+        year = int(request.GET.get("year", current_year))
+    except (ValueError, TypeError):
+        year = current_year
+        
+    all_cycles = get_all_cycles_in_year(year)
+    
+    if cycle_num:
+        try:
+            cycle_idx = int(cycle_num) - 1
+            if 0 <= cycle_idx < len(all_cycles):
+                start_date = all_cycles[cycle_idx]["start"]
+                end_date = all_cycles[cycle_idx]["end"]
             else:
-                raise ValueError("Unknown request type")
-
-            obj.status = new_status
-            obj.save()
-            messages.success(request, f"Request {new_status} successfully.")
-        except Exception as e:
-            messages.error(request, f"Could not update request: {e}")
-
-        return redirect("approval_portal")
-
-    # Fetch pending requests based on role
-    if is_superuser:
-        pending_leaves = LeaveRequest.objects.filter(status="pending").select_related("user").order_by("-created_at")
-        pending_ots = OvertimeRequest.objects.filter(status="pending").select_related("user").order_by("-created_at")
-        pending_corrections = CorrectionRequest.objects.filter(status="pending").select_related("user").order_by("-created_at")
+                start_date, end_date = get_cycle_bounds(today)
+        except (ValueError, TypeError, IndexError):
+            start_date, end_date = get_cycle_bounds(today)
     else:
-        pending_leaves = LeaveRequest.objects.filter(status="pending", user__profile__section=section).select_related("user").order_by("-created_at")
-        pending_ots = OvertimeRequest.objects.filter(status="pending", user__profile__section=section).select_related("user").order_by("-created_at")
-        pending_corrections = CorrectionRequest.objects.filter(status="pending", user__profile__section=section).select_related("user").order_by("-created_at")
+        start_date, end_date = get_cycle_bounds(today)
+    
+    start_str = start_date.strftime("%Y-%m-%d")
+    end_str = end_date.strftime("%Y-%m-%d")
+
+    employee_id = request.user.username if (role == 'employee' and not is_superuser) else request.GET.get("employee_id", request.user.username)
+
+    attendance = fetch_attendance(
+        employee_id=employee_id,
+        start_date=start_str,
+        end_date=end_str
+    )
+
+    expected_dtname4 = get_expected_dtname4(role, section)
+    if expected_dtname4 and not is_superuser:
+        attendance = [r for r in attendance if r.get("Day") == expected_dtname4]
+
+    records = []
+    stats = {
+        "mispunch": 0,
+        "leave": 0,
+        "short_leave": 0,
+        "half_day": 0,
+        "full_day": 0
+    }
+
+    for record in attendance:
+        go1 = record.get("In Time", "").strip()
+        out1 = record.get("Out Time", "").strip()
+        
+        # Determine if it's a Sunday (weekday == 6)
+        date_obj = parse_date(record.get("Date", ""))
+        is_sunday = date_obj.weekday() == 6 if date_obj else False
+        
+        # Treat "00:00" and "—" as blank
+        if go1 in ("00:00", "—"): go1 = ""
+        if out1 in ("00:00", "—"): out1 = ""
+        
+        category = ""
+        try:
+            work_hrs = float(record.get("Working Hours", 0) or 0)
+        except (ValueError, TypeError):
+            work_hrs = 0.0
+
+        if not go1 and not out1:
+            if not is_sunday and not record.get("Leave Type"):
+                category = "Leave"
+                stats["leave"] += 1
+        elif not go1 or not out1:
+            if not is_sunday and not record.get("Leave Type"):
+                category = "Mispunch"
+                stats["mispunch"] += 1
+        else:
+            # Check shift timings to validate short leave
+            shift_str = str(record.get("Shift") or "")
+            import re
+            
+            # Default to 09:00 - 18:00 if no match
+            shift_in, shift_out = 9*60, 18*60 
+            match = re.search(r'(\d{2}):(\d{2})\s*-\s*(\d{2}):(\d{2})', shift_str)
+            if match:
+                sh, sm, eh, em = map(int, match.groups())
+                shift_in = sh * 60 + sm
+                shift_out = eh * 60 + em
+                
+            def to_mins(t_str):
+                try:
+                    h, m = map(int, t_str.split(':'))
+                    return h * 60 + m
+                except:
+                    return 0
+                    
+            actual_in = to_mins(go1)
+            actual_out = to_mins(out1)
+            
+            late_mins = actual_in - shift_in if actual_in >= shift_in else 0
+            early_mins = shift_out - actual_out if shift_out >= actual_out else 0
+            
+            # Validate short leave: missing ~2 hours at start OR ~2 hours at end (90 to 180 mins)
+            is_valid_short_leave = (90 <= late_mins <= 180) or (90 <= early_mins <= 180)
+            
+            if work_hrs >= 8.5:
+                category = "Full Day"
+                stats["full_day"] += 1
+            elif work_hrs >= 5.5 and is_valid_short_leave:
+                # Validated 2-hour absence at the start or end of the shift
+                category = "Short Leave"
+                stats["short_leave"] += 1
+            else:
+                # Default to Half Day if it doesn't meet Full Day or Valid Short Leave criteria
+                category = "Half Day"
+                stats["half_day"] += 1
+                
+        if category:
+            records.append({
+                "date": date_obj.strftime("%d/%m/%Y") if date_obj else record.get("Date", ""),
+                "day": date_obj.strftime("%A") if date_obj else "",
+                "in_time": go1 or "—",
+                "out_time": out1 or "—",
+                "working_hours": f"{work_hrs}h",
+                "category": category,
+                "employee_name": record.get("Employee Name", "—"),
+                "department": record.get("Day", "—")
+            })
+
+    # Sort records by date descending
+    records.sort(key=lambda x: parse_date(x["date"]) or datetime.min, reverse=True)
 
     context = {
-        "pending_leaves": pending_leaves,
-        "pending_ots": pending_ots,
-        "pending_corrections": pending_corrections,
-        "is_supervisor": is_supervisor,
-        "active_tab": "approvals",
-        "role_display": {"employee": "Employee", "smt_pd": "SMT PD", "assy_pd": "ASSY PD"}.get(role, role.title()),
-        "section_display": section or "",
+        "active_tab": "leaves",
+        "records": records,
+        "stats": stats,
+        "start_date": start_str,
+        "end_date": end_str,
+        "role_display": dict(UserProfile.ROLE_CHOICES).get(role, role.upper()) if role != 'admin' else "Admin",
+        "all_cycles": all_cycles,
+        "selected_cycle": cycle_num,
+        "current_year": current_year,
     }
-    return render(request, "attendance/approvals.html", context)
+    return render(request, "attendance/mispunch.html", context)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Reports & Export Views
-# ─────────────────────────────────────────────────────────────────────────────
-
-@login_required(login_url="login")
-def reports_portal(request):
-    """
-    Reports Portal – summary stats for supervisors/admins.
-    """
-    is_superuser = request.user.is_superuser
-    role = "employee"
-    section = None
-    try:
-        profile = request.user.profile
-        role = profile.role
-        section = profile.section
-    except Exception:
-        pass
-
-    is_supervisor = is_superuser or role in ("smt_pd", "assy_pd")
-
-    # Summary statistics
-    if is_superuser:
-        total_leave = LeaveRequest.objects.count()
-        approved_leave = LeaveRequest.objects.filter(status="approved").count()
-        pending_leave = LeaveRequest.objects.filter(status="pending").count()
-        total_ot = OvertimeRequest.objects.count()
-        approved_ot = OvertimeRequest.objects.filter(status="approved").count()
-        total_corrections = CorrectionRequest.objects.count()
-        approved_corrections = CorrectionRequest.objects.filter(status="approved").count()
-    elif role in ("smt_pd", "assy_pd"):
-        total_leave = LeaveRequest.objects.filter(user__profile__section=section).count()
-        approved_leave = LeaveRequest.objects.filter(status="approved", user__profile__section=section).count()
-        pending_leave = LeaveRequest.objects.filter(status="pending", user__profile__section=section).count()
-        total_ot = OvertimeRequest.objects.filter(user__profile__section=section).count()
-        approved_ot = OvertimeRequest.objects.filter(status="approved", user__profile__section=section).count()
-        total_corrections = CorrectionRequest.objects.filter(user__profile__section=section).count()
-        approved_corrections = CorrectionRequest.objects.filter(status="approved", user__profile__section=section).count()
-    else:
-        total_leave = LeaveRequest.objects.filter(user=request.user).count()
-        approved_leave = LeaveRequest.objects.filter(user=request.user, status="approved").count()
-        pending_leave = LeaveRequest.objects.filter(user=request.user, status="pending").count()
-        total_ot = OvertimeRequest.objects.filter(user=request.user).count()
-        approved_ot = OvertimeRequest.objects.filter(user=request.user, status="approved").count()
-        total_corrections = CorrectionRequest.objects.filter(user=request.user).count()
-        approved_corrections = CorrectionRequest.objects.filter(user=request.user, status="approved").count()
-
-    context = {
-        "total_leave": total_leave,
-        "approved_leave": approved_leave,
-        "pending_leave": pending_leave,
-        "total_ot": total_ot,
-        "approved_ot": approved_ot,
-        "total_corrections": total_corrections,
-        "approved_corrections": approved_corrections,
-        "is_supervisor": is_supervisor,
-        "active_tab": "reports",
-        "role_display": {"employee": "Employee", "smt_pd": "SMT PD", "assy_pd": "ASSY PD"}.get(role, role.title()),
-        "section_display": section or "",
-    }
-    return render(request, "attendance/reports.html", context)
-
-
-@login_required(login_url="login")
-def export_report(request):
-    """
-    CSV Export – downloads a report of leave/OT/correction data.
-    """
-    import csv
-    from django.http import HttpResponse
-
-    is_superuser = request.user.is_superuser
-    role = "employee"
-    section = None
-    try:
-        profile = request.user.profile
-        role = profile.role
-        section = profile.section
-    except Exception:
-        pass
-
-    report_type = request.GET.get("type", "leave")  # leave | overtime | correction
-
-    response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = f'attachment; filename="{report_type}_report.csv"'
-
-    writer = csv.writer(response)
-
-    if report_type == "leave":
-        writer.writerow(["Employee ID", "Category", "Start Date", "End Date", "Reason", "Status", "Submitted At"])
-        qs = LeaveRequest.objects.select_related("user").order_by("-created_at")
-        if not is_superuser and role not in ("smt_pd", "assy_pd"):
-            qs = qs.filter(user=request.user)
-        elif role in ("smt_pd", "assy_pd") and not is_superuser:
-            qs = qs.filter(user__profile__section=section)
-        for obj in qs:
-            writer.writerow([obj.user.username, obj.get_category_display(), obj.start_date, obj.end_date, obj.reason or "", obj.status, obj.created_at.strftime("%Y-%m-%d %H:%M")])
-
-    elif report_type == "overtime":
-        writer.writerow(["Employee ID", "Date", "Hours", "Reason", "Status", "Submitted At"])
-        qs = OvertimeRequest.objects.select_related("user").order_by("-created_at")
-        if not is_superuser and role not in ("smt_pd", "assy_pd"):
-            qs = qs.filter(user=request.user)
-        elif role in ("smt_pd", "assy_pd") and not is_superuser:
-            qs = qs.filter(user__profile__section=section)
-        for obj in qs:
-            writer.writerow([obj.user.username, obj.date, obj.hours, obj.reason or "", obj.status, obj.created_at.strftime("%Y-%m-%d %H:%M")])
-
-    elif report_type == "correction":
-        writer.writerow(["Employee ID", "Date", "Correct In", "Correct Out", "Reason", "Status", "Submitted At"])
-        qs = CorrectionRequest.objects.select_related("user").order_by("-created_at")
-        if not is_superuser and role not in ("smt_pd", "assy_pd"):
-            qs = qs.filter(user=request.user)
-        elif role in ("smt_pd", "assy_pd") and not is_superuser:
-            qs = qs.filter(user__profile__section=section)
-        for obj in qs:
-            writer.writerow([obj.user.username, obj.date, obj.correct_in_time, obj.correct_out_time, obj.reason or "", obj.status, obj.created_at.strftime("%Y-%m-%d %H:%M")])
-
-    return response

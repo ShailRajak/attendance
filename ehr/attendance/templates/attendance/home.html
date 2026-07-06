@@ -326,7 +326,6 @@
 
 {% block content %}
 
-{% if active_tab == 'dashboard' or not active_tab %}
 <!-- ========================================== -->
 <!-- 1. DASHBOARD OVERVIEW                      -->
 <!-- ========================================== -->
@@ -452,11 +451,7 @@
         <div class="profile-card d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
             <div class="d-flex align-items-center gap-3">
                 <div class="profile-avatar">
-                    {% if is_section_view %}
-                        {{ stats.employee_details.initials }}
-                    {% else %}
-                        {{ stats.employee_details.id|slice:":2" }}
-                    {% endif %}
+                    {{ stats.employee_details.initials }}
                 </div>
                 <div>
                     <div class="d-flex align-items-center gap-2">
@@ -516,7 +511,7 @@
     <div class="col-6 col-md-4 col-lg-2">
         <div class="stat-card">
             <span class="stat-title">{% if is_section_view %}Absent / Leaves{% else %}Leaves taken{% endif %}</span>
-            <div class="stat-number text-warning">{{ stats.leaves_taken }}{% if not is_section_view %} days{% endif %}</div>
+            <div class="stat-number text-warning">{{ stats.leaves_taken }}</div>
             <span class="stat-detail">{% if is_section_view %}total absent logs{% else %}CL (casual leave){% endif %}</span>
         </div>
     </div>
@@ -529,9 +524,9 @@
     </div>
     <div class="col-6 col-md-4 col-lg-2">
         <div class="stat-card">
-            <span class="stat-title">{% if is_section_view %}Section OT Hours{% else %}Total OT hours{% endif %}</span>
-            <div class="stat-number text-info">{{ stats.total_ot }}h</div>
-            <span class="stat-detail">across {{ attendance|length }} records</span>
+            <span class="stat-title">{% if is_section_view %}Section Mispunches{% else %}Mispunch{% endif %}</span>
+            <div class="stat-number text-info">{{ stats.mispunches }}</div>
+            <span class="stat-detail text-muted">{{ stats.mispunch_details }}</span>
         </div>
     </div>
     <div class="col-6 col-md-4 col-lg-2">
@@ -547,9 +542,9 @@
 <div class="row g-4 mb-5 fade-in-el">
     <div class="col-lg-8">
         <div class="chart-card">
-            <h5 class="fw-bold mb-3 text-white">Overtime Trend</h5>
+            <h5 class="fw-bold mb-3 text-white">Worktime Trend</h5>
             <div class="chart-container">
-                <canvas id="otTrendChart"></canvas>
+                <canvas id="worktimeTrendChart"></canvas>
             </div>
         </div>
     </div>
@@ -659,7 +654,7 @@
 
 <!-- JSON scripts for charts -->
 {{ stats.chart_labels|json_script:"chart-labels-data" }}
-{{ stats.chart_ot_data|json_script:"chart-ot-data" }}
+{{ stats.chart_worktime_data|json_script:"chart-worktime-data" }}
 {{ stats.breakdown_data|json_script:"breakdown-data" }}
 {{ attendance|json_script:"attendance-data" }}
 
@@ -668,19 +663,19 @@
         const chartTextColor = '#94a3b8';
         const chartBorderColor = 'rgba(255, 255, 255, 0.08)';
 
-        // 1. Overtime Trend
-        const otLabels = JSON.parse(document.getElementById('chart-labels-data').textContent);
-        const otData = JSON.parse(document.getElementById('chart-ot-data').textContent);
-        const ctxBar = document.getElementById('otTrendChart').getContext('2d');
+        // 1. Worktime Trend
+        const wtLabels = JSON.parse(document.getElementById('chart-labels-data').textContent);
+        const wtData = JSON.parse(document.getElementById('chart-worktime-data').textContent);
+        const ctxBar = document.getElementById('worktimeTrendChart').getContext('2d');
         new Chart(ctxBar, {
             type: 'bar',
             data: {
-                labels: otLabels,
+                labels: wtLabels,
                 datasets: [{
-                    label: 'OT Hours',
-                    data: otData,
-                    backgroundColor: '#3b82f6',
-                    borderColor: '#2563eb',
+                    label: 'Work Hours',
+                    data: wtData,
+                    backgroundColor: '#6366f1',
+                    borderColor: '#4f46e5',
                     borderWidth: 1,
                     borderRadius: 4,
                     barPercentage: 0.6
@@ -777,7 +772,7 @@
                 });
                 btnDayShift.className = shift === 'day' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
                 btnNightShift.className = shift === 'night' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
-                document.getElementById('dashboardSectionTitle').textContent = (shift === 'day' ? '☀️ Day Shift' : '🌙 Night Shift') + ' — ' + "{{ period_text|safe }}";
+                document.getElementById('dashboardSectionTitle').textContent = (shift === 'day' ? '☀️ Day Shift' : '🌙 Night Shift') + ' — ' + "{{ period_text|escapejs }}";
             }
 
             btnDayShift.addEventListener('click', function () { filterByShift('day'); });
@@ -788,7 +783,7 @@
         }
 
         // 4. Calendar View toggle (employee only)
-        const isManagement = {{ is_superuser|yesno:"true,false" }} || ("{{ role }}" === 'smt_pd' || "{{ role }}" === 'assy_pd');
+        const isManagement = ("{{ is_superuser }}" === "True") || ("{{ role }}" === 'smt_pd' || "{{ role }}" === 'assy_pd');
         const btnListView = document.getElementById('btnListView');
         const btnCalendarView = document.getElementById('btnCalendarView');
         const listViewContainer = document.getElementById('listViewContainer');
@@ -807,7 +802,7 @@
                 btnCalendarView.className = 'btn btn-outline-custom btn-sm py-2 px-3';
                 listViewContainer.style.display = 'block';
                 calendarViewContainer.style.display = 'none';
-                dashboardSectionTitle.textContent = 'Attendance Logs (' + "{{ period_text|safe }}" + ')';
+                dashboardSectionTitle.textContent = 'Attendance Logs (' + "{{ period_text|escapejs }}" + ')';
             });
 
             btnCalendarView.addEventListener('click', function () {
@@ -815,11 +810,16 @@
                 btnListView.className = 'btn btn-outline-custom btn-sm py-2 px-3';
                 listViewContainer.style.display = 'none';
                 calendarViewContainer.style.display = 'block';
-                dashboardSectionTitle.textContent = 'Monthly Calendar — ' + "{{ period_text|safe }}";
+                dashboardSectionTitle.textContent = 'Monthly Calendar — ' + "{{ period_text|escapejs }}";
 
                 if (!calendarGenerated) {
-                    generateCalendar(JSON.parse(document.getElementById('attendance-data').textContent), "{{ start_date }}", "{{ end_date }}");
-                    calendarGenerated = true;
+                    try {
+                        const attendanceData = JSON.parse(document.getElementById('attendance-data').textContent);
+                        generateCalendar(attendanceData, "{{ start_date }}", "{{ end_date }}");
+                        calendarGenerated = true;
+                    } catch (e) {
+                        console.error('Error generating calendar:', e);
+                    }
                 }
             });
         }
@@ -877,7 +877,7 @@
 
                 const timeEl = document.createElement('div');
                 timeEl.className = 'calendar-time';
-                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                const isWeekend = (dayOfWeek === 0);
 
                 if (record) {
                     if (record.status === 'Present') {
@@ -885,8 +885,12 @@
                         let isLate = false;
                         if (inTime && inTime !== '—') {
                             const parts = inTime.split(':');
-                            if (parts.length === 2 && (parseInt(parts[0]) * 60 + parseInt(parts[1]) > 9 * 60 + 15)) {
-                                isLate = true;
+                            if (parts.length === 2) {
+                                const checkInMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+                                const shiftStartMin = (record.shift_label === 'night') ? 20 * 60 : 9 * 60;
+                                if (checkInMin > shiftStartMin + 15) {
+                                    isLate = true;
+                                }
                             }
                         }
                         cell.classList.add(isLate ? 'calendar-late' : 'calendar-present');
@@ -914,645 +918,6 @@
     });
 </script>
 
-{% elif active_tab == 'directory' %}
-<!-- ========================================== -->
-<!-- 2. COWORKER DIRECTORY                      -->
-<!-- ========================================== -->
-<div class="row mb-4 fade-in-el">
-    <div class="col-12">
-        <h3 class="fw-bold text-white mb-2">Coworker Directory</h3>
-        <p class="text-muted">Search and check out contact details and shift assignments of site team members.</p>
-    </div>
-</div>
 
-<div class="row g-4 fade-in-el">
-    {% for person in directory %}
-        <div class="col-md-6 col-xl-4">
-            <div class="coworker-card">
-                <div class="d-flex align-items-center gap-3 mb-3">
-                    <div class="coworker-avatar">
-                        {{ person.name|slice:":2"|upper }}
-                    </div>
-                    <div>
-                        <h5 class="fw-bold text-white mb-0">{{ person.name }}</h5>
-                        <span class="text-info small fw-semibold">{{ person.job_title }}</span>
-                    </div>
-                </div>
-                <hr class="border-secondary opacity-25">
-                <div class="small">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Employee ID</span>
-                        <strong class="text-white">{{ person.username }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Section</span>
-                        <span class="badge bg-secondary text-white">{{ person.section }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Mobile</span>
-                        <strong class="text-white">{{ person.mobile }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted">Active Shift</span>
-                        <strong class="text-white">{{ person.shift }}</strong>
-                    </div>
-                </div>
-            </div>
-        </div>
-    {% empty %}
-        <div class="col-12 text-center py-5">
-            <h5 class="text-muted">No coworkers registered.</h5>
-        </div>
-    {% endfor %}
-</div>
-
-{% elif active_tab == 'leaves' %}
-<!-- ========================================== -->
-<!-- 3. LEAVES PORTAL                           -->
-<!-- ========================================== -->
-<div class="row mb-4 fade-in-el">
-    <div class="col-12">
-        <h3 class="fw-bold text-white mb-2">Leaves Management Portal</h3>
-    </div>
-</div>
-
-<div class="row g-4 fade-in-el">
-    <!-- Apply for Leave Form Column -->
-    <div class="col-lg-5">
-        <div class="card-custom">
-            <h5 class="fw-bold text-white mb-4">
-                📅 Apply for Leave
-            </h5>
-            
-            <form method="POST">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="apply_leave">
-                
-                <div class="mb-3">
-                    <label for="leave_category" class="form-label-custom">Leave Category</label>
-                    <select id="leave_category" name="leave_category" class="form-select form-control-custom w-100" required>
-                        <option value="" disabled selected>---------</option>
-                        <option value="casual">Casual Leave</option>
-                        <option value="sick">Sick Leave</option>
-                        <option value="earned">Earned Leave</option>
-                    </select>
-                </div>
-                
-                <div class="row g-3 mb-3">
-                    <div class="col-6">
-                        <label for="leave_start" class="form-label-custom">Start Date</label>
-                        <input type="date" id="leave_start" name="start_date" class="form-control form-control-custom w-100" required>
-                    </div>
-                    <div class="col-6">
-                        <label for="leave_end" class="form-label-custom">End Date</label>
-                        <input type="date" id="leave_end" name="end_date" class="form-control form-control-custom w-100" required>
-                    </div>
-                </div>
-                
-                <div class="mb-4">
-                    <label for="leave_reason" class="form-label-custom">Reason / Remarks</label>
-                    <textarea id="leave_reason" name="reason" rows="4" class="form-control form-control-custom w-100" placeholder="Provide reason for leave..." required></textarea>
-                </div>
-                
-                <button type="submit" class="btn btn-accent w-100 py-3">Submit Leave Application</button>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Leave balances and history column -->
-    <div class="col-lg-7">
-        <!-- Balance cards -->
-        <div class="card-custom mb-4">
-            <h5 class="fw-bold text-white mb-3">
-                🗂️ Leave Allotments
-            </h5>
-            
-            <div class="allotment-grid">
-                <div class="allotment-card">
-                    <span class="allotment-title">Casual Leave</span>
-                    <div class="allotment-value text-info">{{ leave_allotments.casual.remaining }}</div>
-                    <div class="allotment-used">Used: {{ leave_allotments.casual.used }} / 12.0 d</div>
-                </div>
-                <div class="allotment-card">
-                    <span class="allotment-title">Sick Leave</span>
-                    <div class="allotment-value text-warning">{{ leave_allotments.sick.remaining }}</div>
-                    <div class="allotment-used">Used: {{ leave_allotments.sick.used }} / 10.0 d</div>
-                </div>
-                <div class="allotment-card">
-                    <span class="allotment-title">Earned Leave</span>
-                    <div class="allotment-value text-success">{{ leave_allotments.earned.remaining }}</div>
-                    <div class="allotment-used">Used: {{ leave_allotments.earned.used }} / 15.0 d</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Submission list -->
-        <div class="card-custom">
-            <h5 class="fw-bold text-white mb-3">
-                🕒 Submission History
-            </h5>
-            
-            {% if user_leaves %}
-                <div class="table-responsive">
-                    <table class="table table-custom mb-0">
-                        <thead>
-                            <tr>
-                                <th>Type</th>
-                                <th>Dates</th>
-                                <th>Status</th>
-                                <th>Comment</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for request in user_leaves %}
-                                <tr>
-                                    <td><strong class="text-white">{{ request.get_category_display }}</strong></td>
-                                    <td><small>{{ request.start_date }} to {{ request.end_date }}</small></td>
-                                    <td>
-                                        {% if request.status == 'approved' %}
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Approved</span>
-                                        {% elif request.status == 'rejected' %}
-                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Rejected</span>
-                                        {% else %}
-                                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Pending</span>
-                                        {% endif %}
-                                    </td>
-                                    <td><span class="text-muted small">{{ request.reason|default:'—' }}</span></td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="text-center py-5">
-                    <p class="text-muted mb-0">No leave submissions recorded.</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-{% elif active_tab == 'overtime' %}
-<!-- ========================================== -->
-<!-- 4. OVERTIME PORTAL                         -->
-<!-- ========================================== -->
-<div class="row mb-4 fade-in-el">
-    <div class="col-12">
-        <h3 class="fw-bold text-white mb-2">Overtime (OT) Request Portal</h3>
-    </div>
-</div>
-
-<div class="row g-4 fade-in-el">
-    <!-- Log hours form -->
-    <div class="col-lg-5">
-        <div class="card-custom">
-            <h5 class="fw-bold text-white mb-4">
-                ⏰ Log Overtime Hours
-            </h5>
-            
-            <form method="POST">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="log_ot">
-                
-                <div class="mb-3">
-                    <label for="ot_date" class="form-label-custom">OT Date</label>
-                    <input type="date" id="ot_date" name="ot_date" class="form-control form-control-custom w-100" required>
-                </div>
-                
-                <div class="mb-3">
-                    <label for="ot_hours" class="form-label-custom">Hours Logged</label>
-                    <input type="number" step="0.5" min="0.5" max="8.0" id="ot_hours" name="hours" class="form-control form-control-custom w-100" placeholder="e.g. 1.0 to 8.0" required>
-                    <div class="text-muted small mt-1">Specify OT hours (e.g. 1.0 to 8.0)</div>
-                </div>
-                
-                <div class="mb-4">
-                    <label for="ot_reason" class="form-label-custom">Reason / Activity Log</label>
-                    <textarea id="ot_reason" name="reason" rows="4" class="form-control form-control-custom w-100" placeholder="Why did you work overtime?" required></textarea>
-                </div>
-                
-                <button type="submit" class="btn btn-accent w-100 py-3">Submit OT Request</button>
-            </form>
-        </div>
-    </div>
-    
-    <!-- OT Log list column -->
-    <div class="col-lg-7">
-        <div class="card-custom">
-            <h5 class="fw-bold text-white mb-3">
-                🕒 OT History & Approvals
-            </h5>
-            
-            {% if user_overtimes %}
-                <div class="table-responsive">
-                    <table class="table table-custom mb-0">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Requested</th>
-                                <th>Status</th>
-                                <th>Activity</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for request in user_overtimes %}
-                                <tr>
-                                    <td><strong class="text-white">{{ request.date }}</strong></td>
-                                    <td><strong>{{ request.hours }} hrs</strong></td>
-                                    <td>
-                                        {% if request.status == 'approved' %}
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Approved</span>
-                                        {% elif request.status == 'rejected' %}
-                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Rejected</span>
-                                        {% else %}
-                                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Pending</span>
-                                        {% endif %}
-                                    </td>
-                                    <td><span class="text-muted small">{{ request.reason|default:'—' }}</span></td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="text-center py-5">
-                    <p class="text-muted mb-0">No Overtime logs logged yet.</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-{% elif active_tab == 'corrections' %}
-<!-- ========================================== -->
-<!-- 5. CORRECTIONS PORTAL                      -->
-<!-- ========================================== -->
-<div class="row mb-4 fade-in-el">
-    <div class="col-12">
-        <h3 class="fw-bold text-white mb-2">Punch Correction Portal</h3>
-    </div>
-</div>
-
-<div class="row g-4 fade-in-el">
-    <!-- Apply correction form -->
-    <div class="col-lg-5">
-        <div class="card-custom">
-            <h5 class="fw-bold text-white mb-4">
-                📝 Apply Correction
-            </h5>
-            
-            <form method="POST">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="apply_correction">
-                
-                <div class="mb-3">
-                    <label for="log_date" class="form-label-custom">Log Date</label>
-                    <input type="date" id="log_date" name="log_date" class="form-control form-control-custom w-100" required>
-                </div>
-                
-                <div class="row g-3 mb-3">
-                    <div class="col-6">
-                        <label for="correct_in_time" class="form-label-custom">Correct In-Time</label>
-                        <input type="time" id="correct_in_time" name="correct_in_time" class="form-control form-control-custom w-100" required>
-                    </div>
-                    <div class="col-6">
-                        <label for="correct_out_time" class="form-label-custom">Correct Out-Time</label>
-                        <input type="time" id="correct_out_time" name="correct_out_time" class="form-control form-control-custom w-100" required>
-                    </div>
-                </div>
-                
-                <div class="mb-4">
-                    <label for="corr_reason" class="form-label-custom">Reason for Correction</label>
-                    <textarea id="corr_reason" name="reason" rows="4" class="form-control form-control-custom w-100" placeholder="Reason for punch correction..." required></textarea>
-                </div>
-                
-                <button type="submit" class="btn btn-accent w-100 py-3">Request Correction</button>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Correction History list column -->
-    <div class="col-lg-7">
-        <div class="card-custom">
-            <h5 class="fw-bold text-white mb-3">
-                🕒 Submission Status
-            </h5>
-            
-            {% if user_corrections %}
-                <div class="table-responsive">
-                    <table class="table table-custom mb-0">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Correct In</th>
-                                <th>Correct Out</th>
-                                <th>Status</th>
-                                <th>Reason</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for request in user_corrections %}
-                                <tr>
-                                    <td><strong class="text-white">{{ request.date }}</strong></td>
-                                    <td><strong>{{ request.correct_in_time }}</strong></td>
-                                    <td><strong>{{ request.correct_out_time }}</strong></td>
-                                    <td>
-                                        {% if request.status == 'approved' %}
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Approved</span>
-                                        {% elif request.status == 'rejected' %}
-                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Rejected</span>
-                                        {% else %}
-                                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Pending</span>
-                                        {% endif %}
-                                    </td>
-                                    <td><span class="text-muted small">{{ request.reason|default:'—' }}</span></td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="text-center py-5">
-                    <p class="text-muted mb-0">No correction requests recorded.</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-{% elif active_tab == 'approvals' %}
-<!-- ========================================== -->
-<!-- 6. APPROVALS WORKSPACE                     -->
-<!-- ========================================== -->
-<div class="row mb-4 fade-in-el">
-    <div class="col-12">
-        <h3 class="fw-bold text-white mb-2">Approvals Management Portal</h3>
-        <p class="text-muted">Review, approve or reject team requests for leaves, overtime, and punch corrections.</p>
-    </div>
-</div>
-
-{% if is_supervisor %}
-<div class="fade-in-el">
-    <!-- Sub tabs navigation -->
-    <div class="nav-pills-custom">
-        <div class="nav-pill-custom active" id="pillLeaves" onclick="switchApprovalTab('leaves-panel', this)">
-            📂 Leaves Requests
-        </div>
-        <div class="nav-pill-custom" id="pillOvertime" onclick="switchApprovalTab('overtime-panel', this)">
-            🕒 Overtime Log
-        </div>
-        <div class="nav-pill-custom" id="pillCorrections" onclick="switchApprovalTab('corrections-panel', this)">
-            📝 Punch Corrections
-        </div>
-    </div>
-
-    <!-- 1. Leaves Requests panel -->
-    <div class="approval-panel-container" id="leaves-panel">
-        <div class="card-custom">
-            <h5 class="fw-bold text-white mb-4">Pending Leave Applications</h5>
-            
-            {% if pending_leaves %}
-                <div class="table-responsive">
-                    <table class="table table-custom mb-0">
-                        <thead>
-                            <tr>
-                                <th>Emp ID</th>
-                                <th>Category</th>
-                                <th>Dates</th>
-                                <th>Reason</th>
-                                <th>Submitted At</th>
-                                <th class="text-end">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for req in pending_leaves %}
-                                <tr>
-                                    <td><strong class="text-info">{{ req.user.username }}</strong></td>
-                                    <td><strong class="text-white">{{ req.get_category_display }}</strong></td>
-                                    <td>{{ req.start_date }} to {{ req.end_date }}</td>
-                                    <td><span class="text-muted small">{{ req.reason }}</span></td>
-                                    <td><small class="text-muted">{{ req.created_at|date:"d-m-Y H:i" }}</small></td>
-                                    <td class="text-end">
-                                        <div class="d-inline-flex gap-2">
-                                            <form method="POST">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="action" value="approve">
-                                                <input type="hidden" name="request_type" value="leave">
-                                                <input type="hidden" name="request_id" value="{{ req.id }}">
-                                                <button type="submit" class="btn btn-sm btn-success px-3">Approve</button>
-                                            </form>
-                                            <form method="POST">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="action" value="reject">
-                                                <input type="hidden" name="request_type" value="leave">
-                                                <input type="hidden" name="request_id" value="{{ req.id }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger px-3">Reject</button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="text-center py-5">
-                    <p class="text-muted mb-0">No pending leave requests found.</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- 2. Overtime log panel -->
-    <div class="approval-panel-container" id="overtime-panel" style="display: none;">
-        <div class="card-custom">
-            <h5 class="fw-bold text-white mb-4">Pending Overtime Submissions</h5>
-            
-            {% if pending_ots %}
-                <div class="table-responsive">
-                    <table class="table table-custom mb-0">
-                        <thead>
-                            <tr>
-                                <th>Emp ID</th>
-                                <th>OT Date</th>
-                                <th>Hours</th>
-                                <th>Activity Log</th>
-                                <th>Submitted At</th>
-                                <th class="text-end">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for req in pending_ots %}
-                                <tr>
-                                    <td><strong class="text-info">{{ req.user.username }}</strong></td>
-                                    <td><strong>{{ req.date }}</strong></td>
-                                    <td><span class="badge bg-info text-white">{{ req.hours }} hrs</span></td>
-                                    <td><span class="text-muted small">{{ req.reason }}</span></td>
-                                    <td><small class="text-muted">{{ req.created_at|date:"d-m-Y H:i" }}</small></td>
-                                    <td class="text-end">
-                                        <div class="d-inline-flex gap-2">
-                                            <form method="POST">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="action" value="approve">
-                                                <input type="hidden" name="request_type" value="ot">
-                                                <input type="hidden" name="request_id" value="{{ req.id }}">
-                                                <button type="submit" class="btn btn-sm btn-success px-3">Approve</button>
-                                            </form>
-                                            <form method="POST">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="action" value="reject">
-                                                <input type="hidden" name="request_type" value="ot">
-                                                <input type="hidden" name="request_id" value="{{ req.id }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger px-3">Reject</button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="text-center py-5">
-                    <p class="text-muted mb-0">No pending Overtime requests found.</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- 3. Punch corrections panel -->
-    <div class="approval-panel-container" id="corrections-panel" style="display: none;">
-        <div class="card-custom">
-            <h5 class="fw-bold text-white mb-4">Pending Punch Corrections</h5>
-            
-            {% if pending_corrections %}
-                <div class="table-responsive">
-                    <table class="table table-custom mb-0">
-                        <thead>
-                            <tr>
-                                <th>Emp ID</th>
-                                <th>Log Date</th>
-                                <th>Correct Check-in</th>
-                                <th>Correct Check-out</th>
-                                <th>Reason</th>
-                                <th>Submitted At</th>
-                                <th class="text-end">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for req in pending_corrections %}
-                                <tr>
-                                    <td><strong class="text-info">{{ req.user.username }}</strong></td>
-                                    <td><strong>{{ req.date }}</strong></td>
-                                    <td><span class="text-success fw-semibold">{{ req.correct_in_time }}</span></td>
-                                    <td><span class="text-danger fw-semibold">{{ req.correct_out_time }}</span></td>
-                                    <td><span class="text-muted small">{{ req.reason }}</span></td>
-                                    <td><small class="text-muted">{{ req.created_at|date:"d-m-Y H:i" }}</small></td>
-                                    <td class="text-end">
-                                        <div class="d-inline-flex gap-2">
-                                            <form method="POST">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="action" value="approve">
-                                                <input type="hidden" name="request_type" value="correction">
-                                                <input type="hidden" name="request_id" value="{{ req.id }}">
-                                                <button type="submit" class="btn btn-sm btn-success px-3">Approve</button>
-                                            </form>
-                                            <form method="POST">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="action" value="reject">
-                                                <input type="hidden" name="request_type" value="correction">
-                                                <input type="hidden" name="request_id" value="{{ req.id }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger px-3">Reject</button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="text-center py-5">
-                    <p class="text-muted mb-0">No pending punch corrections found.</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-<script>
-    function switchApprovalTab(panelId, element) {
-        // Hide all panels
-        document.querySelectorAll('.approval-panel-container').forEach(p => p.style.display = 'none');
-        // Deactivate all pills
-        document.querySelectorAll('.nav-pill-custom').forEach(p => p.classList.remove('active'));
-        
-        // Show selected panel
-        document.getElementById(panelId).style.display = 'block';
-        // Activate clicked pill
-        element.classList.add('active');
-    }
-</script>
-{% else %}
-<div class="row fade-in-el">
-    <div class="col-12 text-center py-5">
-        <span class="fs-1 d-block mb-3">🛡️</span>
-        <h4 class="text-white fw-bold">Access Restricted</h4>
-        <p class="text-muted">The approvals management portal is accessible only to production directors and site administrators.</p>
-    </div>
-</div>
-{% endif %}
-
-{% elif active_tab == 'reports' %}
-<!-- ========================================== -->
-<!-- 7. REPORT CENTER                           -->
-<!-- ========================================== -->
-<div class="row mb-4 fade-in-el">
-    <div class="col-12">
-        <h3 class="fw-bold text-white mb-2">Report Center</h3>
-        <p class="text-muted">High-level statistics summarizing attendance cycles and team operational metrics.</p>
-    </div>
-</div>
-
-<div class="row g-4 mb-4 fade-in-el">
-    <div class="col-md-6 col-xl-3">
-        <div class="card-custom text-center py-4">
-            <span class="text-muted text-uppercase small font-monospace d-block mb-2">Operational Attendance</span>
-            <h2 class="text-success fw-bold mb-0">94.8%</h2>
-            <div class="text-muted small mt-2">Average check-in rate</div>
-        </div>
-    </div>
-    <div class="col-md-6 col-xl-3">
-        <div class="card-custom text-center py-4">
-            <span class="text-muted text-uppercase small font-monospace d-block mb-2">Punctuality Score</span>
-            <h2 class="text-info fw-bold mb-0">98.2%</h2>
-            <div class="text-muted small mt-2">Check-ins within grace period</div>
-        </div>
-    </div>
-    <div class="col-md-6 col-xl-3">
-        <div class="card-custom text-center py-4">
-            <span class="text-muted text-uppercase small font-monospace d-block mb-2">Total OT Logged</span>
-            <h2 class="text-white fw-bold mb-0">{{ stats.total_ot }}h</h2>
-            <div class="text-muted small mt-2">Approved hours logged</div>
-        </div>
-    </div>
-    <div class="col-md-6 col-xl-3">
-        <div class="card-custom text-center py-4">
-            <span class="text-muted text-uppercase small font-monospace d-block mb-2">Section Size</span>
-            <h2 class="text-warning fw-bold mb-0">{{ total_headcount }}</h2>
-            <div class="text-muted small mt-2">Enrolled employees</div>
-        </div>
-    </div>
-</div>
-
-<div class="row fade-in-el">
-    <div class="col-12">
-        <div class="card-custom">
-            <h5 class="fw-bold text-white mb-4">📊 Performance & Analytics Summary</h5>
-            <p class="text-muted">This dashboard aggregates records between {{ start_date }} and {{ end_date }} for the active profile view. Attendance, late punch frequencies, and overtime durations are computed dynamically. To pull reports for another range, open the Dashboard and choose <strong>Adjust Period & Search</strong>.</p>
-        </div>
-    </div>
-</div>
-
-{% endif %}
 
 {% endblock %}

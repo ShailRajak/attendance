@@ -1,85 +1,584 @@
 {% extends 'attendance/base.html' %}
 
-{% block title %}Overtime Requests - IIPL Enterprise eHR{% endblock %}
+{% block title %}Overtime Dashboard - EHR Attendance Management{% endblock %}
+
+{% block extra_head %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    .page-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 1.5rem;
+    }
+    .page-header-icon {
+        font-size: 2rem;
+        color: var(--secondary-accent);
+    }
+    .period-toggle {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 1.5rem;
+        position: relative;
+    }
+    .dropdown {
+        position: relative;
+    }
+    .period-btn {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--card-border);
+        color: var(--text-muted);
+        padding: 0.5rem 1.25rem;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 0.85rem;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        position: relative;
+    }
+    .period-btn:hover {
+        color: var(--text-main);
+        background: rgba(255, 255, 255, 0.06);
+    }
+    .period-btn.active {
+        background: transparent;
+        color: var(--text-main);
+        border-color: var(--text-main);
+        font-weight: 600;
+    }
+    .dropdown-toggle::after {
+        content: ' ▼';
+        font-size: 0.7rem;
+        margin-left: 4px;
+    }
+    .dropdown-item {
+        display: block;
+        padding: 0.6rem 1rem;
+        color: var(--text-muted);
+        text-decoration: none;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+    }
+    .dropdown-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-main);
+    }
+    .dropdown-item.active {
+        background: rgba(99, 102, 241, 0.15);
+        color: var(--text-main);
+        font-weight: 600;
+    }
+    .dropdown-header {
+        padding: 0.5rem 1rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid var(--card-border);
+        margin-bottom: 0.5rem;
+    }
+    .ot-stat-card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 1.25rem;
+        min-height: 110px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        transition: all 0.2s ease;
+    }
+    .ot-stat-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+    .ot-stat-title {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .ot-stat-number {
+        font-size: 1.7rem;
+        font-weight: 700;
+    }
+    .ot-stat-detail {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+    .badge-ot-low {
+        background-color: rgba(16, 185, 129, 0.15);
+        color: var(--success-color);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.2em 0.6em;
+        border-radius: 6px;
+        display: inline-block;
+        vertical-align: middle;
+    }
+    .badge-ot-medium {
+        background-color: rgba(245, 158, 11, 0.15);
+        color: var(--warning-color);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.2em 0.6em;
+        border-radius: 6px;
+        display: inline-block;
+        vertical-align: middle;
+    }
+    .badge-ot-high {
+        background-color: rgba(239, 68, 68, 0.15);
+        color: var(--danger-color);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.2em 0.6em;
+        border-radius: 6px;
+        display: inline-block;
+        vertical-align: middle;
+    }
+    .chart-card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        height: 100%;
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+    .anomaly-alert {
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        border-radius: 10px;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .anomaly-table {
+        margin-top: 0.75rem;
+    }
+    .scope-table {
+        margin-top: 2rem;
+    }
+    .scope-table-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    
+    /* Override Bootstrap dropdown styles for proper visibility */
+    div.custom-dropdown {
+        background: #151c2c !important;
+        border: 1px solid var(--card-border) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+        padding: 1rem !important;
+        margin-top: 0.5rem !important;
+    }
+    
+    .dropdown-item {
+        color: var(--text-muted) !important;
+        border-radius: 8px !important;
+        padding: 0.6rem 1rem !important;
+        margin: 0.2rem 0 !important;
+        transition: all 0.2s ease;
+    }
+    
+    .dropdown-item:hover,
+    .dropdown-item:focus {
+        background: rgba(255, 255, 255, 0.05) !important;
+        color: var(--text-main) !important;
+    }
+    
+    .dropdown-toggle::after {
+        color: var(--text-muted);
+    }
+    
+    .dropdown-toggle.active::after {
+        color: var(--text-main);
+    }
+</style>
+{% endblock %}
 
 {% block content %}
+
 <!-- Page Header -->
-<div class="mb-4 fade-in-el">
-    <h2 class="fw-bold text-white mb-1"><i class="bi bi-clock-history text-primary"></i> Overtime Request Portal</h2>
-    <p class="text-muted">Log overtime hours for approval and track your OT history.</p>
+<div class="row mb-4 fade-in-el">
+    <div class="col-12">
+        <div class="page-header">
+            <span class="page-header-icon">⏱️</span>
+            <h3 class="fw-bold mb-0 text-white">Overtime Dashboard</h3>
+        </div>
+    </div>
 </div>
 
-<div class="row g-4 fade-in-el">
-    <!-- Left Column: OT Request Form -->
-    <div class="col-lg-5">
-        <div class="card-custom h-100">
-            <h5 class="fw-bold text-white mb-4"><i class="bi bi-calendar-plus text-info"></i> Log Overtime Hours</h5>
-            <form method="POST">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="log_ot">
-                
-                <div class="mb-3">
-                    <label for="date" class="form-label-custom">OT Date</label>
-                    <input type="date" id="date" name="date" class="form-control form-control-custom w-100" required>
-                </div>
-                
-                <div class="mb-3">
-                    <label for="hours" class="form-label-custom">Hours Logged</label>
-                    <input type="number" step="0.5" min="0.5" max="8.0" id="hours" name="hours" class="form-control form-control-custom w-100" placeholder="e.g. 2.5" required>
-                    <div class="text-muted small mt-1">Specify OT hours (e.g. 0.5 to 8.0)</div>
-                </div>
-                
-                <div class="mb-4">
-                    <label for="reason" class="form-label-custom">Reason / Activity Log</label>
-                    <textarea id="reason" name="reason" rows="4" class="form-control form-control-custom w-100" placeholder="Describe the task you worked on..." required></textarea>
-                </div>
-                
-                <button type="submit" class="btn btn-accent w-100 py-3">
-                    Submit OT Request
+<!-- Period Toggle & Date Picker -->
+<div class="row mb-4 fade-in-el" style="position: relative; z-index: 100;">
+    <div class="col-12">
+        <div class="period-toggle">
+            <a href="?period=daily{% if custom_start %}&custom_start={{ custom_start }}&custom_end={{ custom_end }}{% endif %}" class="period-btn {% if period == 'daily' %}active{% endif %}">
+                📅 Daily
+            </a>
+            
+            <!-- Weekly Button with Dropdown -->
+            <div class="dropdown">
+                <button class="period-btn dropdown-toggle {% if period == 'weekly' %}active{% endif %}" type="button" id="weeklyDropdownBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                    📊 Weekly
                 </button>
+                <div class="dropdown-menu custom-dropdown" style="min-width: 320px; z-index: 999999;">
+                    <div class="dropdown-header">Select Week</div>
+                    <form method="GET" style="min-width: 300px;">
+                        <input type="hidden" name="period" value="weekly">
+                        <div class="mb-3">
+                            <label class="form-label-custom" style="font-size: 0.75rem;">Year</label>
+                            <select name="year" class="form-select form-control-custom" style="font-size: 0.85rem;">
+                                <option value="{{ current_year }}" selected>{{ current_year }}</option>
+                                <option value="{{ current_year|add:'-1' }}">{{ current_year|add:'-1' }}</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label-custom" style="font-size: 0.75rem;">Week</label>
+                            <select name="week_num" class="form-select form-control-custom" style="font-size: 0.85rem; max-height: 200px; overflow-y: auto;">
+                                {% for week in all_weeks %}
+                                <option value="{{ week.week_num }}" {% if selected_week == week.week_num|stringformat:"s" %}selected{% endif %}>{{ week.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-accent w-100 py-2">Apply Week</button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Monthly Button with Dropdown -->
+            <div class="dropdown">
+                <button class="period-btn dropdown-toggle {% if period == 'monthly' %}active{% endif %}" type="button" id="monthlyDropdownBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                    💰 Monthly (21-20)
+                </button>
+                <div class="dropdown-menu custom-dropdown" style="min-width: 320px; max-height: 80vh; overflow-y: auto; z-index: 999999;">
+                    <div class="dropdown-header">Select Billing Cycle (21-20)</div>
+                    <form method="GET">
+                        <input type="hidden" name="period" value="monthly">
+                        <div class="mb-3">
+                            <label class="form-label-custom" style="font-size: 0.75rem;">Year</label>
+                            <select name="year" class="form-select form-control-custom" style="font-size: 0.85rem;">
+                                <option value="{{ current_year }}" selected>{{ current_year }}</option>
+                                <option value="{{ current_year|add:'-1' }}">{{ current_year|add:'-1' }}</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label-custom" style="font-size: 0.75rem;">Billing Cycle</label>
+                            <select name="cycle_num" class="form-select form-control-custom" style="font-size: 0.85rem; max-height: 200px; overflow-y: auto;">
+                                {% for cycle in all_cycles %}
+                                <option value="{{ cycle.cycle_num }}" {% if selected_cycle == cycle.cycle_num|stringformat:"s" %}selected{% endif %}>{{ cycle.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-accent w-100 py-2">Apply Cycle</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Custom Date Range Picker -->
+        <div class="card-custom mt-3">
+            <h6 class="fw-semibold mb-3 text-white">Custom Date Range</h6>
+            <form method="GET" class="row g-3">
+                <input type="hidden" name="period" value="custom">
+                <div class="col-md-4">
+                    <label for="custom_start" class="form-label-custom">Start Date</label>
+                    <input type="date" id="custom_start" name="custom_start" class="form-control form-control-custom" value="{{ start_date }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="custom_end" class="form-label-custom">End Date</label>
+                    <input type="date" id="custom_end" name="custom_end" class="form-control form-control-custom" value="{{ end_date }}" required>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-accent w-100 py-2">Apply Custom Range</button>
+                </div>
             </form>
         </div>
     </div>
-    
-    <!-- Right Column: OT History -->
-    <div class="col-lg-7">
-        <div class="card-custom h-100">
-            <h5 class="fw-bold text-white mb-4"><i class="bi bi-list-check text-warning"></i> OT History & Approvals</h5>
-            <div class="table-responsive">
-                <table class="table table-custom mb-0">
+</div>
+
+<!-- OT Stat Cards -->
+<div class="row g-3 mb-4 fade-in-el">
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="ot-stat-card">
+            <span class="ot-stat-title">Card Punch OT</span>
+            <div class="ot-stat-number text-info">{{ summary.card_punch_ot }}h</div>
+            <span class="ot-stat-detail">System calculated</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="ot-stat-card">
+            <span class="ot-stat-title">Requested OT</span>
+            <div class="ot-stat-number text-warning">{{ summary.requested_ot }}h</div>
+            <span class="ot-stat-detail">Pre-approved</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="ot-stat-card">
+            <span class="ot-stat-title">Weekend OT</span>
+            <div class="ot-stat-number text-success">{{ summary.weekend_ot }}h</div>
+            <span class="ot-stat-detail">Sunday work</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="ot-stat-card">
+            <span class="ot-stat-title">Holiday OT</span>
+            <div class="ot-stat-number text-danger">{{ summary.holiday_ot }}h</div>
+            <span class="ot-stat-detail">Holiday work</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="ot-stat-card">
+            <div class="d-flex justify-content-between align-items-center w-100">
+                <span class="ot-stat-title">Total OT</span>
+                {% if summary.total_ot < 45 %}
+                    <span class="badge-ot-low">Low</span>
+                {% elif summary.total_ot <= 75 %}
+                    <span class="badge-ot-medium">Medium</span>
+                {% else %}
+                    <span class="badge-ot-high">High</span>
+                {% endif %}
+            </div>
+            <div class="ot-stat-number text-white">{{ summary.total_ot }}h</div>
+            <span class="ot-stat-detail">All types combined</span>
+        </div>
+    </div>
+</div>
+
+<!-- Anomalies Alert -->
+{% if summary.anomalies %}
+<div class="row fade-in-el">
+    <div class="col-12">
+        <div class="anomaly-alert">
+            <div class="d-flex align-items-center gap-2">
+                <span class="fs-4">⚠️</span>
+                <div>
+                    <strong class="text-white">Punch Anomalies Detected</strong>
+                    <div class="text-muted small">{{ summary.anomalies|length }} issue(s) found in this period</div>
+                </div>
+            </div>
+            <div class="anomaly-table">
+                <table class="table table-custom mt-3">
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th>Requested Hours</th>
-                            <th>Status</th>
+                            <th>Anomaly Type</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% if user_overtimes %}
-                            {% for req in user_overtimes %}
-                            <tr>
-                                <td><strong class="text-white">{{ req.date }}</strong></td>
-                                <td><strong>{{ req.hours }} hrs</strong></td>
-                                <td>
-                                    {% if req.status == 'approved' %}
-                                        <span class="badge badge-custom badge-active">Approved</span>
-                                    {% elif req.status == 'rejected' %}
-                                        <span class="badge badge-custom badge-absent">Rejected</span>
-                                    {% else %}
-                                        <span class="badge badge-status-cl badge-custom">Pending</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td colspan="3" class="text-center text-muted py-5 small">No Overtime logs logged yet.</td>
-                            </tr>
-                        {% endif %}
+                        {% for anomaly in summary.anomalies %}
+                        <tr>
+                            <td><strong class="text-white">{{ anomaly.date }}</strong></td>
+                            <td>
+                                <span class="badge badge-custom badge-absent">{{ anomaly.type }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 </div>
+{% endif %}
+
+<!-- OT Trend Chart -->
+<div class="row g-4 mb-5 fade-in-el">
+    <div class="col-12">
+        <div class="chart-card">
+            <h5 class="fw-bold mb-3 text-white">Overtime Breakdown by Day</h5>
+            <div class="chart-container">
+                <canvas id="otBreakdownChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scope Rollup Table (for supervisors) -->
+{% if scope_summary and scope_summary.employees %}
+<div class="row fade-in-el scope-table">
+    <div class="col-12">
+        <div class="card-custom">
+            <div class="scope-table-header">
+                <h4 class="fw-bold mb-0 text-white">{{ scope_summary.dtname4_scope }} — Employee OT Summary</h4>
+                <div class="text-muted small">{{ scope_summary.employees|length }} employees</div>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-custom">
+                    <thead>
+                        <tr>
+                            <th>Emp ID</th>
+                            <th>Name</th>
+                            <th>Card Punch OT</th>
+                            <th>Requested OT</th>
+                            <th>Weekend OT</th>
+                            <th>Holiday OT</th>
+                            <th>Total OT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for emp in scope_summary.employees %}
+                        <tr>
+                            <td><strong class="text-info">{{ emp.emp_id }}</strong></td>
+                            <td>{{ emp.emp_name }}</td>
+                            <td>{{ emp.card_punch_ot }}h</td>
+                            <td>{{ emp.requested_ot }}h</td>
+                            <td>{{ emp.weekend_ot }}h</td>
+                            <td>{{ emp.holiday_ot }}h</td>
+                            <td><strong class="text-white">{{ emp.total_ot }}h</strong></td>
+                        </tr>
+                        {% endfor %}
+                        <tr style="background: rgba(99, 102, 241, 0.1);">
+                            <td colspan="2"><strong class="text-white">Scope Total</strong></td>
+                            <td><strong class="text-info">{{ scope_summary.scope_total.card_punch_ot }}h</strong></td>
+                            <td><strong class="text-warning">{{ scope_summary.scope_total.requested_ot }}h</strong></td>
+                            <td><strong class="text-success">{{ scope_summary.scope_total.weekend_ot }}h</strong></td>
+                            <td><strong class="text-danger">{{ scope_summary.scope_total.holiday_ot }}h</strong></td>
+                            <td><strong class="text-white">{{ scope_summary.scope_total.total_ot }}h</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- JSON data for charts -->
+{{ summary.daily_breakdown|json_script:"ot-breakdown-data" }}
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const chartTextColor = '#94a3b8';
+        const chartBorderColor = 'rgba(255, 255, 255, 0.08)';
+
+        // OT Breakdown Stacked Bar Chart
+        const breakdownData = JSON.parse(document.getElementById('ot-breakdown-data').textContent);
+        const ctxBar = document.getElementById('otBreakdownChart').getContext('2d');
+        
+        const labels = breakdownData.map(d => d.date);
+        const cardPunchData = breakdownData.map(d => d.card_punch_ot);
+        const requestedData = breakdownData.map(d => d.requested_ot);
+        const weekendData = breakdownData.map(d => d.weekend_ot);
+        const holidayData = breakdownData.map(d => d.holiday_ot);
+        
+        new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Card Punch OT',
+                        data: cardPunchData,
+                        backgroundColor: '#3b82f6',
+                        borderColor: '#2563eb',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        barPercentage: 0.6
+                    },
+                    {
+                        label: 'Requested OT',
+                        data: requestedData,
+                        backgroundColor: '#f59e0b',
+                        borderColor: '#d97706',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        barPercentage: 0.6
+                    },
+                    {
+                        label: 'Weekend OT',
+                        data: weekendData,
+                        backgroundColor: '#10b981',
+                        borderColor: '#059669',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        barPercentage: 0.6
+                    },
+                    {
+                        label: 'Holiday OT',
+                        data: holidayData,
+                        backgroundColor: '#ef4444',
+                        borderColor: '#dc2626',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        barPercentage: 0.6
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: chartTextColor,
+                            font: { size: 11 },
+                            padding: 15,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#f8fafc',
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.parsed.y + 'h';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        grid: { display: false },
+                        ticks: {
+                            color: chartTextColor,
+                            font: { size: 10 },
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    },
+                    y: {
+                        stacked: true,
+                        grid: { color: chartBorderColor },
+                        ticks: {
+                            color: chartTextColor,
+                            font: { size: 10 },
+                            callback: function(value) { return value + 'h'; }
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+
 {% endblock %}

@@ -34,7 +34,7 @@
                 </div>
 
                 <!-- Section Selector -->
-                <div class="mb-3 text-start" id="section-group" style="{% if role in 'smt_pd assy_pd' %}display: block;{% else %}display: none;{% endif %}">
+                <div class="mb-3 text-start" id="section-group" {% if role not in 'smt_pd assy_pd' %}style="display: none;"{% endif %}>
                     <label for="section" class="form-label-custom">Section</label>
                     <select id="section" name="section" class="form-select form-control-custom w-100">
                         <option value="" disabled {% if not section %}selected{% endif %}>Select Section</option>

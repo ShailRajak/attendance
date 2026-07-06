@@ -11,11 +11,13 @@ REQUIRED_COLUMNS = {
     "GO1": "In Time",
     "OUT1": "Out Time",
     "WorkTime1": "Working Hours",
-    "OverTime": "Total OT",
-    "OverTime1": "OT1",
-    "OverTime2": "OT2",
+    "OverTime": "Card Punch OT",
+    "OverTime1": "Requested OT",
+    "OverTime2": "Weekend OT",
+    "OverTime3": "Holiday OT",
+    "OverTime4": "OT4",
     "OverTimeAll": "Total OT All",
-    "ReqOverTime": "Requested OT",
+    "ReqOverTime": "Req OverTime",
     "AfterOverAdd": "Approved OT",
     "WTID": "WT ID",
     "WTTypeNo": "WT Type No",
@@ -26,6 +28,8 @@ REQUIRED_COLUMNS = {
     "Mobile": "Mobile",
     "LaterMin1": "Late Minutes",
     "LeaveTypeName": "Leave Type",
+    "WorkDay": "WorkDay",
+    "Weekday": "Weekday",
 }
 
 
