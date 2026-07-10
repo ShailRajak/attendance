@@ -240,15 +240,32 @@
                 📅 Daily
             </a>
             
-            <!-- Weekly Button with Dropdown -->
-            <div class="dropdown">
-                <button class="period-btn dropdown-toggle {% if period == 'weekly' %}active{% endif %}" type="button" id="weeklyDropdownBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+            <!-- Weekly button -->
+            <div class="dropdown d-flex align-items-center" 
+                 style="border: 1px solid {% if period == 'weekly' %}var(--text-main){% else %}var(--card-border){% endif %}; border-radius: 8px; background: rgba(255, 255, 255, 0.03); overflow: visible; height: 38px;">
+                <!-- Main link button -->
+                <a href="?period=weekly{% if request.GET.employee_id %}&employee_id={{ request.GET.employee_id }}{% endif %}" 
+                   class="px-3 text-decoration-none d-flex align-items-center gap-2" 
+                   style="color: {% if period == 'weekly' %}var(--text-main){% else %}var(--text-muted){% endif %}; font-weight: {% if period == 'weekly' %}600{% else %}500{% endif %}; font-size: 0.85rem; border-right: 1px solid {% if period == 'weekly' %}var(--text-main){% else %}var(--card-border){% endif %}; height: 100%; transition: all 0.2s; border-top-left-radius: 7px; border-bottom-left-radius: 7px;"
+                   onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">
                     📊 Weekly
+                </a>
+                <!-- Dropdown toggle arrow -->
+                <button class="px-2 d-flex align-items-center justify-content-center" 
+                        type="button" 
+                        data-bs-toggle="dropdown" 
+                        data-bs-auto-close="outside"
+                        style="background: none; border: none; color: {% if period == 'weekly' %}var(--text-main){% else %}var(--text-muted){% endif %}; height: 100%; font-size: 0.7rem; transition: all 0.2s; border-top-right-radius: 7px; border-bottom-right-radius: 7px;"
+                        onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">
+                    ▼
                 </button>
                 <div class="dropdown-menu custom-dropdown" style="min-width: 320px; z-index: 999999;">
                     <div class="dropdown-header">Select Week</div>
                     <form method="GET" style="min-width: 300px;">
                         <input type="hidden" name="period" value="weekly">
+                        {% if request.GET.employee_id %}
+                        <input type="hidden" name="employee_id" value="{{ request.GET.employee_id }}">
+                        {% endif %}
                         <div class="mb-3">
                             <label class="form-label-custom" style="font-size: 0.75rem;">Year</label>
                             <select name="year" class="form-select form-control-custom" style="font-size: 0.85rem;">
@@ -269,15 +286,32 @@
                 </div>
             </div>
             
-            <!-- Monthly Button with Dropdown -->
-            <div class="dropdown">
-                <button class="period-btn dropdown-toggle {% if period == 'monthly' %}active{% endif %}" type="button" id="monthlyDropdownBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+            <!-- Monthly button -->
+            <div class="dropdown d-flex align-items-center" 
+                 style="border: 1px solid {% if period == 'monthly' %}var(--text-main){% else %}var(--card-border){% endif %}; border-radius: 8px; background: rgba(255, 255, 255, 0.03); overflow: visible; height: 38px;">
+                <!-- Main link button -->
+                <a href="?period=monthly{% if request.GET.employee_id %}&employee_id={{ request.GET.employee_id }}{% endif %}" 
+                   class="px-3 text-decoration-none d-flex align-items-center gap-2" 
+                   style="color: {% if period == 'monthly' %}var(--text-main){% else %}var(--text-muted){% endif %}; font-weight: {% if period == 'monthly' %}600{% else %}500{% endif %}; font-size: 0.85rem; border-right: 1px solid {% if period == 'monthly' %}var(--text-main){% else %}var(--card-border){% endif %}; height: 100%; transition: all 0.2s; border-top-left-radius: 7px; border-bottom-left-radius: 7px;"
+                   onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">
                     💰 Monthly (21-20)
+                </a>
+                <!-- Dropdown toggle arrow -->
+                <button class="px-2 d-flex align-items-center justify-content-center" 
+                        type="button" 
+                        data-bs-toggle="dropdown" 
+                        data-bs-auto-close="outside"
+                        style="background: none; border: none; color: {% if period == 'monthly' %}var(--text-main){% else %}var(--text-muted){% endif %}; height: 100%; font-size: 0.7rem; transition: all 0.2s; border-top-right-radius: 7px; border-bottom-right-radius: 7px;"
+                        onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">
+                    ▼
                 </button>
                 <div class="dropdown-menu custom-dropdown" style="min-width: 320px; max-height: 80vh; overflow-y: auto; z-index: 999999;">
                     <div class="dropdown-header">Select Billing Cycle (21-20)</div>
                     <form method="GET">
                         <input type="hidden" name="period" value="monthly">
+                        {% if request.GET.employee_id %}
+                        <input type="hidden" name="employee_id" value="{{ request.GET.employee_id }}">
+                        {% endif %}
                         <div class="mb-3">
                             <label class="form-label-custom" style="font-size: 0.75rem;">Year</label>
                             <select name="year" class="form-select form-control-custom" style="font-size: 0.85rem;">
@@ -354,9 +388,9 @@
         <div class="ot-stat-card">
             <div class="d-flex justify-content-between align-items-center w-100">
                 <span class="ot-stat-title">Total OT</span>
-                {% if summary.total_ot < 45 %}
+                {% if summary.total_ot < ot_low_limit|default:52 %}
                     <span class="badge-ot-low">Low</span>
-                {% elif summary.total_ot <= 75 %}
+                {% elif summary.total_ot <= ot_medium_limit|default:78 %}
                     <span class="badge-ot-medium">Medium</span>
                 {% else %}
                     <span class="badge-ot-high">High</span>
@@ -415,21 +449,65 @@
             </div>
         </div>
     </div>
+<!-- Daily Overtime Log (for employees or when a specific employee is selected) -->
+{% if not scope_summary or request.GET.employee_id %}
+<div class="row mb-5 fade-in-el">
+    <div class="col-12">
+        <div class="card-custom">
+            <h4 class="fw-bold mb-3 text-white">Daily Overtime Logs</h4>
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto; overflow-x: auto;">
+                <table class="table table-custom mb-0 text-nowrap">
+                    <thead style="position: sticky; top: 0; z-index: 10; background-color: var(--card-bg);">
+                        <tr>
+                            <th>Date</th>
+                            <th>Day</th>
+                            <th>Card Punch OT</th>
+                            <th>Requested OT</th>
+                            <th>Weekend OT</th>
+                            <th>Holiday OT</th>
+                            <th>Total OT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for day in summary.daily_breakdown %}
+                        <tr>
+                            <td><strong class="text-info">{{ day.date }}</strong></td>
+                            <td>{{ day.weekday }}</td>
+                            <td>{% if day.card_punch_ot > 0 %}{{ day.card_punch_ot }}h{% else %}—{% endif %}</td>
+                            <td>{% if day.requested_ot > 0 %}{{ day.requested_ot }}h{% else %}—{% endif %}</td>
+                            <td>{% if day.weekend_ot > 0 %}{{ day.weekend_ot }}h{% else %}—{% endif %}</td>
+                            <td>{% if day.holiday_ot > 0 %}{{ day.holiday_ot }}h{% else %}—{% endif %}</td>
+                            <td><strong>{% if day.total_ot > 0 %}{{ day.total_ot }}h{% else %}—{% endif %}</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
+{% endif %}
+
 
 <!-- Scope Rollup Table (for supervisors) -->
 {% if scope_summary and scope_summary.employees %}
 <div class="row fade-in-el scope-table">
     <div class="col-12">
         <div class="card-custom">
-            <div class="scope-table-header">
-                <h4 class="fw-bold mb-0 text-white">{{ scope_summary.dtname4_scope }} — Employee OT Summary</h4>
-                <div class="text-muted small">{{ scope_summary.employees|length }} employees</div>
+            <div class="scope-table-header d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3">
+                <div>
+                    <h4 class="fw-bold mb-0 text-white" id="otSectionTitle">{{ scope_summary.dtname4_scope }} — Employee OT Summary</h4>
+                    <div class="text-muted small" id="employeeCountText">{{ scope_summary.employees|length }} employees</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" id="btnDayShift" class="btn btn-accent btn-sm py-2 px-3">☀️ Day Shift</button>
+                    <button type="button" id="btnNightShift" class="btn btn-outline-custom btn-sm py-2 px-3">🌙 Night Shift</button>
+                </div>
             </div>
             
-            <div class="table-responsive">
-                <table class="table table-custom">
-                    <thead>
+            <div class="table-responsive" style="max-height: 500px; overflow-y: auto; overflow-x: auto;">
+                <table class="table table-custom mb-0 text-nowrap">
+                    <thead style="position: sticky; top: 0; z-index: 10; background-color: var(--card-bg);">
                         <tr>
                             <th>Emp ID</th>
                             <th>Name</th>
@@ -442,23 +520,23 @@
                     </thead>
                     <tbody>
                         {% for emp in scope_summary.employees %}
-                        <tr>
+                        <tr data-shift="{{ emp.shift_label }}">
                             <td><strong class="text-info">{{ emp.emp_id }}</strong></td>
                             <td>{{ emp.emp_name }}</td>
                             <td>{{ emp.card_punch_ot }}h</td>
                             <td>{{ emp.requested_ot }}h</td>
                             <td>{{ emp.weekend_ot }}h</td>
                             <td>{{ emp.holiday_ot }}h</td>
-                            <td><strong class="text-white">{{ emp.total_ot }}h</strong></td>
+                            <td><strong>{{ emp.total_ot }}h</strong></td>
                         </tr>
                         {% endfor %}
                         <tr style="background: rgba(99, 102, 241, 0.1);">
-                            <td colspan="2"><strong class="text-white">Scope Total</strong></td>
+                            <td colspan="2"><strong>Scope Total</strong></td>
                             <td><strong class="text-info">{{ scope_summary.scope_total.card_punch_ot }}h</strong></td>
                             <td><strong class="text-warning">{{ scope_summary.scope_total.requested_ot }}h</strong></td>
                             <td><strong class="text-success">{{ scope_summary.scope_total.weekend_ot }}h</strong></td>
                             <td><strong class="text-danger">{{ scope_summary.scope_total.holiday_ot }}h</strong></td>
-                            <td><strong class="text-white">{{ scope_summary.scope_total.total_ot }}h</strong></td>
+                            <td><strong>{{ scope_summary.scope_total.total_ot }}h</strong></td>
                         </tr>
                     </tbody>
                 </table>
@@ -578,6 +656,76 @@
                 }
             }
         });
+
+        // Shift filtering for supervisor scope table
+        const btnDayShift = document.getElementById('btnDayShift');
+        const btnNightShift = document.getElementById('btnNightShift');
+        const otSectionTitle = document.getElementById('otSectionTitle');
+        const employeeCountText = document.getElementById('employeeCountText');
+        const tableRows = document.querySelectorAll('.scope-table tbody tr');
+
+        if (btnDayShift && btnNightShift && tableRows.length > 0) {
+            const baseTitle = otSectionTitle.textContent.split(' — ')[0];
+
+            function filterByShift(shift) {
+                let count = 0;
+                let sumCardPunch = 0;
+                let sumRequested = 0;
+                let sumWeekend = 0;
+                let sumHoliday = 0;
+                let sumTotal = 0;
+
+                tableRows.forEach(row => {
+                    // Check if it's the Scope Total row at the bottom
+                    if (row.getAttribute('style') && row.getAttribute('style').includes('rgba')) {
+                        // Keep total row visible
+                        return;
+                    }
+                    const rowShift = row.getAttribute('data-shift');
+                    if (rowShift === shift) {
+                        row.style.display = '';
+                        count++;
+
+                        // Parse values from cells
+                        const cells = row.querySelectorAll('td');
+                        if (cells.length >= 7) {
+                            sumCardPunch += parseFloat(cells[2].textContent.replace('h', '')) || 0;
+                            sumRequested += parseFloat(cells[3].textContent.replace('h', '')) || 0;
+                            sumWeekend += parseFloat(cells[4].textContent.replace('h', '')) || 0;
+                            sumHoliday += parseFloat(cells[5].textContent.replace('h', '')) || 0;
+                            sumTotal += parseFloat(cells[6].textContent.replace('h', '')) || 0;
+                        }
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+                btnDayShift.className = shift === 'day' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
+                btnNightShift.className = shift === 'night' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
+                
+                // Update header title and count
+                otSectionTitle.textContent = `${baseTitle} — ${shift === 'day' ? '☀️ Day Shift' : '🌙 Night Shift'} OT`;
+                employeeCountText.textContent = `${count} employees`;
+
+                // Update total row cells dynamically
+                const totalRow = document.querySelector('.scope-table tbody tr[style*="rgba"]');
+                if (totalRow) {
+                    const totalCells = totalRow.querySelectorAll('td');
+                    if (totalCells.length >= 6) {
+                        totalCells[1].querySelector('strong').textContent = sumCardPunch.toFixed(1) + 'h';
+                        totalCells[2].querySelector('strong').textContent = sumRequested.toFixed(1) + 'h';
+                        totalCells[3].querySelector('strong').textContent = sumWeekend.toFixed(1) + 'h';
+                        totalCells[4].querySelector('strong').textContent = sumHoliday.toFixed(1) + 'h';
+                        totalCells[5].querySelector('strong').textContent = sumTotal.toFixed(1) + 'h';
+                    }
+                }
+            }
+
+            btnDayShift.addEventListener('click', function () { filterByShift('day'); });
+            btnNightShift.addEventListener('click', function () { filterByShift('night'); });
+
+            // Apply default day shift filter on load
+            filterByShift('day');
+        }
     });
 </script>
 

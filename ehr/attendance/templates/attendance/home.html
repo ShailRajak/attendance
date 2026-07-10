@@ -17,6 +17,7 @@
         justify-content: space-between;
         margin-bottom: 2rem;
     }
+
     .profile-card {
         background: var(--card-bg);
         border: 1px solid var(--card-border);
@@ -24,6 +25,13 @@
         padding: 1.5rem 2rem;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
     }
+
+    @media (max-width: 576px) {
+        .profile-card {
+            padding: 1.25rem 1rem !important;
+        }
+    }
+
     .profile-avatar {
         width: 64px;
         height: 64px;
@@ -37,6 +45,7 @@
         justify-content: center;
         box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
     }
+
     .badge-onroll {
         background-color: rgba(16, 185, 129, 0.15);
         color: var(--success-color);
@@ -48,6 +57,7 @@
         display: inline-block;
         vertical-align: middle;
     }
+
     .summary-card {
         background: var(--card-bg);
         border: 1px solid var(--card-border);
@@ -60,10 +70,12 @@
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
         transition: all 0.2s ease;
     }
+
     .summary-card:hover {
         transform: translateY(-2px);
         border-color: rgba(255, 255, 255, 0.15);
     }
+
     .summary-title {
         font-size: 0.75rem;
         font-weight: 600;
@@ -71,6 +83,7 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
+
     .summary-number {
         font-size: 2.2rem;
         font-weight: 700;
@@ -78,10 +91,12 @@
         margin-top: 0.4rem;
         margin-bottom: 0.4rem;
     }
+
     .summary-detail {
         font-size: 0.75rem;
         color: var(--text-muted);
     }
+
     .stat-card {
         background: var(--card-bg);
         border: 1px solid var(--card-border);
@@ -94,10 +109,12 @@
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
         transition: all 0.2s ease;
     }
+
     .stat-card:hover {
         transform: translateY(-2px);
         border-color: rgba(255, 255, 255, 0.15);
     }
+
     .stat-title {
         font-size: 0.8rem;
         font-weight: 600;
@@ -105,14 +122,17 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
+
     .stat-number {
         font-size: 1.7rem;
         font-weight: 700;
     }
+
     .stat-detail {
         font-size: 0.75rem;
         color: var(--text-muted);
     }
+
     .chart-card {
         background: var(--card-bg);
         border: 1px solid var(--card-border);
@@ -121,16 +141,19 @@
         box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
         height: 100%;
     }
+
     .chart-container {
         position: relative;
         height: 240px;
         width: 100%;
     }
+
     .badge-status-cl {
         background-color: rgba(245, 158, 11, 0.12);
         color: #f59e0b;
         border: 1px solid rgba(245, 158, 11, 0.2);
     }
+
     .badge-status-rest {
         background-color: rgba(148, 163, 184, 0.1);
         color: var(--text-muted);
@@ -144,6 +167,7 @@
         gap: 15px;
         margin-top: 1rem;
     }
+
     .allotment-card {
         background: rgba(11, 15, 25, 0.4);
         border: 1px solid var(--card-border);
@@ -152,20 +176,24 @@
         text-align: center;
         transition: border-color 0.2s ease;
     }
+
     .allotment-card:hover {
         border-color: rgba(255, 255, 255, 0.1);
     }
+
     .allotment-title {
         font-size: 0.7rem;
         text-transform: uppercase;
         font-weight: 600;
         color: var(--text-muted);
     }
+
     .allotment-value {
         font-size: 1.8rem;
         font-weight: 700;
         margin: 0.25rem 0;
     }
+
     .allotment-used {
         font-size: 0.72rem;
         color: var(--text-muted);
@@ -178,6 +206,7 @@
         gap: 10px;
         margin-top: 1.5rem;
     }
+
     .calendar-header-cell {
         text-align: center;
         font-weight: 600;
@@ -187,6 +216,7 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
+
     .calendar-day-cell {
         background: rgba(21, 28, 44, 0.4);
         border: 1px solid var(--card-border);
@@ -200,44 +230,54 @@
         align-items: center;
         transition: all 0.2s ease;
     }
+
     .calendar-day-cell:hover {
         transform: translateY(-1px);
         border-color: rgba(255, 255, 255, 0.15);
     }
+
     .calendar-present {
         background-color: rgba(16, 185, 129, 0.12) !important;
         border-color: rgba(16, 185, 129, 0.3) !important;
         color: #10b981 !important;
     }
+
     .calendar-present .calendar-time {
         color: #10b981;
     }
+
     .calendar-late {
         background-color: rgba(239, 68, 68, 0.1) !important;
         border-color: rgba(239, 68, 68, 0.3) !important;
         color: #ef4444 !important;
     }
+
     .calendar-late .calendar-time {
         color: #ef4444;
     }
+
     .calendar-leave {
         background-color: rgba(245, 158, 11, 0.12) !important;
         border-color: rgba(245, 158, 11, 0.3) !important;
         color: #f59e0b !important;
     }
+
     .calendar-leave .calendar-time {
         color: #f59e0b;
     }
+
     .calendar-weekend {
         background-color: rgba(148, 163, 184, 0.05) !important;
         border-color: rgba(148, 163, 184, 0.15) !important;
         color: var(--text-muted) !important;
     }
+
     .calendar-day-num {
         font-weight: 600;
         font-size: 0.85rem;
         margin-bottom: 0.25rem;
     }
+
     .calendar-time {
         font-size: 0.72rem;
         width: 100%;
@@ -245,13 +285,16 @@
         flex-direction: column;
         align-items: center;
     }
+
     .calendar-time-range {
         font-weight: 500;
         opacity: 0.95;
     }
+
     .calendar-work-hrs {
         font-size: 0.75rem;
     }
+
     .calendar-legend-dot {
         width: 12px;
         height: 12px;
@@ -270,10 +313,12 @@
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
         transition: transform 0.2s ease, border-color 0.2s ease;
     }
+
     .coworker-card:hover {
         transform: translateY(-2px);
         border-color: rgba(99, 102, 241, 0.2);
     }
+
     .coworker-avatar {
         width: 48px;
         height: 48px;
@@ -296,6 +341,7 @@
         padding-bottom: 0.75rem;
         margin-bottom: 1.5rem;
     }
+
     .nav-pill-custom {
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid var(--card-border);
@@ -311,10 +357,12 @@
         transition: all 0.2s ease;
         cursor: pointer;
     }
+
     .nav-pill-custom:hover {
         color: var(--text-main);
         background: rgba(255, 255, 255, 0.06);
     }
+
     .nav-pill-custom.active {
         background: transparent;
         color: var(--text-main);
@@ -336,7 +384,8 @@
         <span class="fs-4">👋</span>
         <div class="text-white fw-semibold">Welcome back, {{ user.username }}!</div>
     </div>
-    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close" onclick="this.parentElement.style.display='none';"></button>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"
+        onclick="this.parentElement.style.display='none';"></button>
 </div>
 
 {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
@@ -407,7 +456,8 @@
         <h3 class="fw-bold mb-0 text-white">Dashboard Overview</h3>
     </div>
     <div class="col-md-6 text-md-end mt-3 mt-md-0">
-        <button class="btn btn-outline-custom btn-sm py-2 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse" aria-expanded="false" aria-controls="filterCollapse">
+        <button class="btn btn-outline-custom btn-sm py-2 px-3" type="button" data-bs-toggle="collapse"
+            data-bs-target="#filterCollapse" aria-expanded="false" aria-controls="filterCollapse">
             🔍 Adjust Period & Search
         </button>
     </div>
@@ -424,18 +474,23 @@
                 <div class="col-md-4">
                     <label for="employee_id" class="form-label-custom">Employee ID</label>
                     {% if is_superuser or role == 'smt_pd' or role == 'assy_pd' %}
-                        <input type="text" id="employee_id" name="employee_id" class="form-control form-control-custom w-100" value="{{ employee_id_value|default:'' }}" placeholder="Leave blank for section view">
+                    <input type="text" id="employee_id" name="employee_id"
+                        class="form-control form-control-custom w-100" value="{{ employee_id_value|default:'' }}"
+                        placeholder="Leave blank for section view">
                     {% else %}
-                        <input type="text" id="employee_id" name="employee_id" class="form-control form-control-custom w-100" value="{{ employee_id_value }}" readonly>
+                    <input type="text" id="employee_id" name="employee_id"
+                        class="form-control form-control-custom w-100" value="{{ employee_id_value }}" readonly>
                     {% endif %}
                 </div>
                 <div class="col-md-3">
                     <label for="start_date" class="form-label-custom">Start Date</label>
-                    <input type="date" id="start_date" name="start_date" class="form-control form-control-custom w-100" value="{{ start_date }}" required>
+                    <input type="date" id="start_date" name="start_date" class="form-control form-control-custom w-100"
+                        value="{{ start_date }}" required>
                 </div>
                 <div class="col-md-3">
                     <label for="end_date" class="form-label-custom">End Date</label>
-                    <input type="date" id="end_date" name="end_date" class="form-control form-control-custom w-100" value="{{ end_date }}" required>
+                    <input type="date" id="end_date" name="end_date" class="form-control form-control-custom w-100"
+                        value="{{ end_date }}" required>
                 </div>
                 <div class="col-md-2 d-flex align-items-end">
                     <button type="submit" class="btn btn-accent w-100 py-3">Apply</button>
@@ -448,28 +503,30 @@
 <!-- Employee profile info card -->
 <div class="row mb-4 fade-in-el">
     <div class="col-12">
-        <div class="profile-card d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
-            <div class="d-flex align-items-center gap-3">
-                <div class="profile-avatar">
+        <div
+            class="profile-card d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+            <div class="d-flex align-items-center gap-3 w-100" style="min-width: 0;">
+                <div class="profile-avatar flex-shrink-0">
                     {{ stats.employee_details.initials }}
                 </div>
-                <div>
-                    <div class="d-flex align-items-center gap-2">
-                        <h4 class="fw-bold mb-0 text-white">{{ stats.employee_details.name }}</h4>
+                <div class="flex-grow-1" style="min-width: 0;">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <h4 class="fw-bold mb-0 text-white" style="word-break: break-word; overflow-wrap: break-word;">{{ stats.employee_details.name }}</h4>
                         {% if is_section_view %}
-                            <span class="badge-onroll">Section View</span>
+                        <span class="badge-onroll">Section View</span>
                         {% else %}
-                            <span class="badge-onroll">Onroll</span>
+                        <span class="badge-onroll">Onroll</span>
                         {% endif %}
                     </div>
-                    <div class="text-muted small mt-1">
+                    <div class="text-muted small mt-1" style="word-break: break-word; overflow-wrap: break-word;">
                         {% if is_section_view %}
-                            Role: {{ role_display }} &middot; Section: {{ section_display }} &middot; Total Employees: {{ stats.total_employees }}
+                        Role: {{ role_display }} &middot; Section: {{ section_display }} &middot; Total Employees: {{ stats.total_employees }}
                         {% else %}
-                            Emp ID: {{ stats.employee_details.id }} &middot; Mobile: {{ stats.employee_details.mobile }} &middot; {{ stats.employee_details.job_title }}
+                        Emp ID: {{ stats.employee_details.id }} &middot; Mobile: {{ stats.employee_details.mobile }}
+                        &middot; {{ stats.employee_details.job_title }}
                         {% endif %}
                     </div>
-                    <div class="text-muted small">
+                    <div class="text-muted small" style="word-break: break-word; overflow-wrap: break-word;">
                         {{ stats.employee_details.sector }} &middot; IIPL &middot; {{ stats.employee_details.shift }}
                     </div>
                 </div>
@@ -497,13 +554,13 @@
             <div class="stat-number text-success">{{ stats.days_present }}</div>
             <span class="stat-detail">
                 {% if is_section_view %}
-                    total present logs
+                total present logs
                 {% else %}
-                    {% if stats.working_days > 0 %}
-                        {% widthratio stats.days_present stats.working_days 100 %}% attendance
-                    {% else %}
-                        100% attendance
-                    {% endif %}
+                {% if stats.working_days > 0 %}
+                {% widthratio stats.days_present stats.working_days 100 %}% attendance
+                {% else %}
+                100% attendance
+                {% endif %}
                 {% endif %}
             </span>
         </div>
@@ -562,88 +619,103 @@
 <div class="row fade-in-el">
     <div class="col-12">
         <div class="card-custom">
-            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4">
+            <div
+                class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4">
                 <h4 class="fw-bold mb-0 text-white" id="dashboardSectionTitle">Attendance Logs ({{ period_text }})</h4>
                 <div class="d-flex gap-2 flex-wrap">
                     {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
                     <button type="button" id="btnDayShift" class="btn btn-accent btn-sm py-2 px-3">☀️ Day Shift</button>
-                    <button type="button" id="btnNightShift" class="btn btn-outline-custom btn-sm py-2 px-3">🌙 Night Shift</button>
+                    <button type="button" id="btnNightShift" class="btn btn-outline-custom btn-sm py-2 px-3">🌙 Night
+                        Shift</button>
                     {% else %}
                     <button type="button" id="btnListView" class="btn btn-accent btn-sm py-2 px-3">📋 List View</button>
-                    <button type="button" id="btnCalendarView" class="btn btn-outline-custom btn-sm py-2 px-3">📅 Calendar View</button>
+                    <button type="button" id="btnCalendarView" class="btn btn-outline-custom btn-sm py-2 px-3">📅
+                        Calendar View</button>
                     {% endif %}
                 </div>
             </div>
-            
+
             <div id="listViewContainer">
                 {% if attendance %}
-                    <div class="table-responsive" style="max-height: 480px; overflow-y: auto; overflow-x: auto; border-radius: 10px;">
-                        <table class="table table-custom" style="white-space: nowrap;">
-                            <thead>
-                                <tr>
-                                    {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
-                                        <th>Emp ID</th>
-                                        <th>Name</th>
+                <div class="table-responsive"
+                    style="max-height: 480px; overflow-y: auto; overflow-x: auto; border-radius: 10px;">
+                    <table class="table table-custom" style="white-space: nowrap;">
+                        <thead>
+                            <tr>
+                                {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
+                                <th>Emp ID</th>
+                                <th>Name</th>
+                                {% endif %}
+                                <th>Date</th>
+                                <th>Day</th>
+                                <th>Check-in</th>
+                                <th>Check-out</th>
+                                <th>Work hrs</th>
+                                <th>OT hrs</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in attendance %}
+                            <tr data-shift="{{ row.shift_label }}">
+                                {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
+                                <td><strong class="text-info">{{ row.employee_id }}</strong></td>
+                                <td>{{ row.employee_name }}</td>
+                                {% endif %}
+                                <td><strong>{{ row.date }}</strong></td>
+                                <td class="fw-semibold" style="color: #64748b;">{{ row.day }}</td>
+                                <td>{{ row.in_time }}</td>
+                                <td>{{ row.out_time }}</td>
+                                <td>{{ row.work_hrs }}</td>
+                                <td>{{ row.ot_hrs }}</td>
+                                <td>
+                                    {% if row.status == "Present" %}
+                                    <span class="badge badge-custom badge-active">Present</span>
+                                    {% elif row.status == "Absent" %}
+                                    <span class="badge badge-custom badge-absent">Absent</span>
+                                    {% elif row.status == "Mispunch" %}
+                                    <span class="badge badge-custom badge-absent" style="background-color: rgba(239, 68, 68, 0.12); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2);">Mispunch</span>
+                                    {% elif row.status == "Rest Day" %}
+                                    <span class="badge badge-status-rest badge-custom">Rest Day</span>
+                                    {% else %}
+                                    <span class="badge badge-status-cl badge-custom">{{ row.status }}</span>
                                     {% endif %}
-                                    <th>Date</th>
-                                    <th>Day</th>
-                                    <th>Check-in</th>
-                                    <th>Check-out</th>
-                                    <th>Work hrs</th>
-                                    <th>OT hrs</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for row in attendance %}
-                                <tr data-shift="{{ row.shift_label }}">
-                                    {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
-                                        <td><strong class="text-info">{{ row.employee_id }}</strong></td>
-                                        <td>{{ row.employee_name }}</td>
-                                    {% endif %}
-                                    <td><strong>{{ row.date }}</strong></td>
-                                    <td class="fw-semibold" style="color: #64748b;">{{ row.day }}</td>
-                                    <td>{{ row.in_time }}</td>
-                                    <td>{{ row.out_time }}</td>
-                                    <td>{{ row.work_hrs }}</td>
-                                    <td>{{ row.ot_hrs }}</td>
-                                    <td>
-                                        {% if row.status == "Present" %}
-                                            <span class="badge badge-custom badge-active">Present</span>
-                                        {% elif row.status == "Absent" %}
-                                            <span class="badge badge-custom badge-absent">Absent</span>
-                                        {% elif row.status == "Rest Day" %}
-                                            <span class="badge badge-status-rest badge-custom">Rest Day</span>
-                                        {% else %}
-                                            <span class="badge badge-status-cl badge-custom">{{ row.status }}</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
                 {% else %}
-                    <div class="text-center py-5">
-                        <span class="fs-1 text-muted d-block mb-3">📭</span>
-                        <h5 class="text-muted fw-normal">No logs found for this period.</h5>
-                    </div>
+                <div class="text-center py-5">
+                    <span class="fs-1 text-muted d-block mb-3">📭</span>
+                    <h5 class="text-muted fw-normal">No logs found for this period.</h5>
+                </div>
                 {% endif %}
             </div>
 
             <div id="calendarViewContainer" style="display: none;">
-                <div class="d-flex flex-wrap gap-4 mb-4 text-muted small justify-content-center justify-content-sm-start">
+                <div
+                    class="d-flex flex-wrap gap-4 mb-4 text-muted small justify-content-center justify-content-sm-start">
                     <div class="d-flex align-items-center">
-                        <span class="calendar-legend-dot" style="background-color: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3);"></span> Present
+                        <span class="calendar-legend-dot"
+                            style="background-color: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3);"></span>
+                        Present
                     </div>
                     <div class="d-flex align-items-center">
-                        <span class="calendar-legend-dot" style="background-color: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3);"></span> Leave (CL)
+                        <span class="calendar-legend-dot"
+                            style="background-color: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3);"></span>
+                        Leave (CL)
                     </div>
                     <div class="d-flex align-items-center">
-                        <span class="calendar-legend-dot" style="background-color: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35);"></span> Late arrival
+                        <span class="calendar-legend-dot"
+                            style="background-color: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35);"></span>
+                        Late arrival
                     </div>
                     <div class="d-flex align-items-center">
-                        <span class="calendar-legend-dot" style="background-color: rgba(148, 163, 184, 0.05); border: 1px solid rgba(148, 163, 184, 0.15);"></span> Weekend / holiday
+                        <span class="calendar-legend-dot"
+                            style="background-color: rgba(148, 163, 184, 0.05); border: 1px solid rgba(148, 163, 184, 0.15);"></span>
+                        Weekend / holiday
                     </div>
                 </div>
                 <div class="calendar-grid" id="calendarGridContainer"></div>
@@ -709,7 +781,7 @@
                         ticks: {
                             color: chartTextColor,
                             font: { size: 10 },
-                            callback: function(value) { return value + 'h'; }
+                            callback: function (value) { return value + 'h'; }
                         }
                     }
                 }
@@ -867,7 +939,7 @@
                 const displayLabel = `${months[current.getMonth()]} ${dateNum}`;
                 const key = `${dateNum}-${current.getMonth() + 1}-${current.getFullYear()}`;
                 const record = recordMap[key];
-                
+
                 const cell = document.createElement('div');
                 cell.className = 'calendar-day-cell';
                 const numEl = document.createElement('div');
@@ -901,6 +973,11 @@
                     } else if (record.status === 'Absent') {
                         cell.classList.add('calendar-leave');
                         timeEl.innerHTML = `<div class="calendar-time-range">—</div><div class="calendar-work-hrs fw-semibold mt-1">Absent</div>`;
+                    } else if (record.status === 'Mispunch') {
+                        cell.classList.add('calendar-late');
+                        const inTime = record.in_time !== '—' ? record.in_time : '—';
+                        const outTime = record.out_time !== '—' ? record.out_time : '—';
+                        timeEl.innerHTML = `<div class="calendar-time-range">${inTime} - ${outTime}</div><div class="calendar-work-hrs fw-semibold mt-1">Mispunch</div>`;
                     } else {
                         cell.classList.add('calendar-weekend');
                         timeEl.innerHTML = `<div class="calendar-time-range">—</div>`;

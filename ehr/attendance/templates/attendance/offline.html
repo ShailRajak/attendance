@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline | EHR Attendance Management System</title>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --bg-gradient: linear-gradient(135deg, #0b0f19 0%, #111827 100%);
+            --card-bg: rgba(21, 28, 44, 0.7);
+            --card-border: rgba(255, 255, 255, 0.06);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary-accent: #6366f1;
+            --primary-accent-hover: #4f46e5;
+            --secondary-accent: #38bdf8;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .offline-container {
+            max-width: 480px;
+            width: 90%;
+            padding: 2.5rem;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .icon-wrapper {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-bg-pulse {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: rgba(99, 102, 241, 0.15);
+            border-radius: 50%;
+            animation: pulse 2s infinite ease-in-out;
+        }
+
+        .offline-icon {
+            font-size: 3.5rem;
+            color: var(--secondary-accent);
+            z-index: 2;
+            animation: float 4s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                opacity: 0.5;
+            }
+            50% {
+                transform: scale(1.2);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(0.95);
+                opacity: 0.5;
+            }
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-8px);
+            }
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #fff 0%, var(--text-muted) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p {
+            color: var(--text-muted);
+            font-size: 1rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+        }
+
+        .btn-reconnect {
+            background: var(--primary-accent);
+            color: #fff;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-reconnect:hover {
+            background: var(--primary-accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+            color: #fff;
+        }
+
+        .btn-reconnect:active {
+            transform: translateY(0);
+        }
+
+        .network-status {
+            margin-top: 1.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #ef4444;
+            border-radius: 50%;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="offline-container">
+        <div class="icon-wrapper">
+            <div class="icon-bg-pulse"></div>
+            <i class="bi bi-wifi-off offline-icon"></i>
+        </div>
+        
+        <h1>You are Offline</h1>
+        <p>It looks like you've lost connection to the network. Please check your internet settings and try again.</p>
+        
+        <button onclick="checkConnection()" class="btn-reconnect">
+            <i class="bi bi-arrow-clockwise me-2"></i>Try Reconnecting
+        </button>
+
+        <div class="network-status">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Connection status: Offline</span>
+        </div>
+    </div>
+
+    <script>
+        function checkConnection() {
+            const btn = document.querySelector('.btn-reconnect');
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Checking...';
+            
+            // Short delay to simulate checking connection
+            setTimeout(() => {
+                if (navigator.onLine) {
+                    window.location.reload();
+                } else {
+                    btn.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>Try Reconnecting';
+                    // Shake effect on failure
+                    const container = document.querySelector('.offline-container');
+                    container.style.animation = 'none';
+                    container.offsetHeight; // Trigger reflow
+                    container.style.animation = 'shake 0.5s ease-in-out';
+                }
+            }, 800);
+        }
+
+        // Add shake keyframe style dynamically
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+                20%, 40%, 60%, 80% { transform: translateX(5px); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Monitor actual connection changes
+        window.addEventListener('online', () => {
+            document.getElementById('statusDot').style.backgroundColor = '#10b981';
+            document.getElementById('statusText').innerText = 'Connection restored! Reloading...';
+            setTimeout(() => window.location.reload(), 1000);
+        });
+
+        window.addEventListener('offline', () => {
+            document.getElementById('statusDot').style.backgroundColor = '#ef4444';
+            document.getElementById('statusText').innerText = 'Connection status: Offline';
+        });
+    </script>
+</body>
+</html>

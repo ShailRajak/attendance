@@ -1,0 +1,100 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Audit Logs - Administration - IIPL eHR{% endblock %}
+
+{% block content %}
+<div class="row fade-in-el mb-4 align-items-center">
+    <div class="col-sm-12">
+        <h3 class="fw-bold text-white mb-1">📜 System Audit Logs</h3>
+        <p class="text-muted small mb-0">Trace history of user creations, password resets, structural deactivations, and role updates.</p>
+    </div>
+</div>
+
+<!-- Search & Filters -->
+<div class="row fade-in-el mb-3">
+    <div class="col-12">
+        <div class="card bg-dark border-secondary p-3" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 12px;">
+            <form method="GET" class="row g-2 align-items-center">
+                <div class="col-md-9">
+                    <input type="text" name="q" class="form-control form-control-custom w-100" 
+                           placeholder="Search logs by action type, description, or operator username..." value="{{ query }}">
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100 py-2" style="background-color: var(--primary-accent); border: none;">
+                        🔍 Search Logs
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Logs Table -->
+<div class="row fade-in-el">
+    <div class="col-12">
+        <div class="card bg-dark border-secondary overflow-hidden shadow-sm" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px;">
+            <div class="table-responsive">
+                <table class="table table-custom mb-0 text-white" style="vertical-align: middle;">
+                    <thead style="background: rgba(255,255,255,0.02);">
+                        <tr class="text-muted small">
+                            <th class="py-3 px-4">Timestamp</th>
+                            <th class="py-3 px-4">Action Type</th>
+                            <th class="py-3 px-4">Operator</th>
+                            <th class="py-3 px-4">Target User</th>
+                            <th class="py-3 px-4">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in page_obj %}
+                        <tr style="border-bottom: 1px solid var(--card-border);">
+                            <td class="py-3 px-4" style="white-space: nowrap;">
+                                <span class="text-muted small">{{ log.timestamp|date:"d-m-Y H:i:s" }}</span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <code class="text-info bg-dark px-2 py-1 rounded" style="font-size: 0.85rem;">{{ log.action_type }}</code>
+                            </td>
+                            <td class="py-3 px-4">
+                                <span class="text-white fw-bold">{{ log.user.username|default:"System" }}</span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <span class="text-white">{{ log.target_user.username|default:"—" }}</span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <span class="text-muted small">{{ log.description }}</span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                No audit log records found matching your search.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <div class="d-flex justify-content-between align-items-center p-3 border-top border-secondary" style="background: rgba(255,255,255,0.01);">
+                <span class="text-muted small">
+                    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                </span>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item"><a class="page-link bg-dark text-white border-secondary" href="?page=1{% if query %}&q={{ query }}{% endif %}">&laquo; First</a></li>
+                        <li class="page-item"><a class="page-link bg-dark text-white border-secondary" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}">Previous</a></li>
+                        {% endif %}
+                        {% if page_obj.has_next %}
+                        <li class="page-item"><a class="page-link bg-dark text-white border-secondary" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}">Next</a></li>
+                        <li class="page-item"><a class="page-link bg-dark text-white border-secondary" href="?page={{ page_obj.paginator.num_pages }}{% if query %}&q={{ query }}{% endif %}">Last &raquo;</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

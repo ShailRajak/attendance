@@ -1,0 +1,167 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Administration Dashboard - IIPL eHR{% endblock %}
+
+{% block content %}
+<div class="row fade-in-el">
+    <div class="col-12 mb-4">
+        <div class="card bg-dark text-white border-secondary p-4 shadow-sm" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px;">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="fs-1">🛠️</span>
+                    <div>
+                        <h3 class="fw-bold mb-1 text-white">System Administration Portal</h3>
+                        <p class="text-muted mb-0">Configure enterprise roles, organizational structure, dynamic permissions, and assign users.</p>
+                    </div>
+                </div>
+                <div>
+                    <a href="{% url 'admin_import_excel' %}" class="btn btn-accent px-4 py-2" style="border-radius: 10px; font-weight: 500;">
+                        📥 Import Excel Schema
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Admin KPI Cards -->
+<div class="row mb-4 fade-in-el">
+    <!-- Users -->
+    <div class="col-md-4 mb-3">
+        <a href="{% url 'admin_users' %}" class="text-decoration-none">
+            <div class="card bg-dark text-white border-secondary p-4 shadow-sm h-100 card-custom" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px; transition: transform 0.2s;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small uppercase fw-bold">Active Users</span>
+                    <span class="fs-3">👤</span>
+                </div>
+                <h2 class="fw-bold mb-0 text-white">{{ users_count }}</h2>
+                <div class="mt-2 text-info small">Manage Accounts &rarr;</div>
+            </div>
+        </a>
+    </div>
+    <!-- Roles -->
+    <div class="col-md-4 mb-3">
+        <a href="{% url 'admin_roles' %}" class="text-decoration-none">
+            <div class="card bg-dark text-white border-secondary p-4 shadow-sm h-100 card-custom" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px; transition: transform 0.2s;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small uppercase fw-bold">Configured Roles</span>
+                    <span class="fs-3">🛡️</span>
+                </div>
+                <h2 class="fw-bold mb-0 text-white">{{ roles_count }}</h2>
+                <div class="mt-2 text-info small">Manage Roles &rarr;</div>
+            </div>
+        </a>
+    </div>
+    <!-- Permissions -->
+    <div class="col-md-4 mb-3">
+        <a href="{% url 'admin_permissions' %}" class="text-decoration-none">
+            <div class="card bg-dark text-white border-secondary p-4 shadow-sm h-100 card-custom" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px; transition: transform 0.2s;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small uppercase fw-bold">Permissions</span>
+                    <span class="fs-3">🔑</span>
+                </div>
+                <h2 class="fw-bold mb-0 text-white">{{ permissions_count }}</h2>
+                <div class="mt-2 text-info small">View Matrices &rarr;</div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4 fade-in-el">
+    <!-- Companies -->
+    <div class="col-md-3 mb-3">
+        <a href="{% url 'admin_companies' %}" class="text-decoration-none">
+            <div class="card bg-dark text-white border-secondary p-4 shadow-sm h-100 card-custom" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px; transition: transform 0.2s;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small uppercase fw-bold">Companies</span>
+                    <span class="fs-3">🌐</span>
+                </div>
+                <h2 class="fw-bold mb-0 text-white">{{ companies_count }}</h2>
+                <div class="mt-2 text-info small">Configure Companies &rarr;</div>
+            </div>
+        </a>
+    </div>
+    <!-- Plants -->
+    <div class="col-md-3 mb-3">
+        <a href="{% url 'admin_plants' %}" class="text-decoration-none">
+            <div class="card bg-dark text-white border-secondary p-4 shadow-sm h-100 card-custom" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px; transition: transform 0.2s;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small uppercase fw-bold">Plants / Locations</span>
+                    <span class="fs-3">📍</span>
+                </div>
+                <h2 class="fw-bold mb-0 text-white">{{ plants_count }}</h2>
+                <div class="mt-2 text-info small">Configure Plants &rarr;</div>
+            </div>
+        </a>
+    </div>
+    <!-- Departments -->
+    <div class="col-md-3 mb-3">
+        <a href="{% url 'admin_departments' %}" class="text-decoration-none">
+            <div class="card bg-dark text-white border-secondary p-4 shadow-sm h-100 card-custom" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px; transition: transform 0.2s;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small uppercase fw-bold">Departments</span>
+                    <span class="fs-3">🏬</span>
+                </div>
+                <h2 class="fw-bold mb-0 text-white">{{ departments_count }}</h2>
+                <div class="mt-2 text-info small">Configure Depts &rarr;</div>
+            </div>
+        </a>
+    </div>
+    <!-- Sections -->
+    <div class="col-md-3 mb-3">
+        <a href="{% url 'admin_sections' %}" class="text-decoration-none">
+            <div class="card bg-dark text-white border-secondary p-4 shadow-sm h-100 card-custom" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px; transition: transform 0.2s;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small uppercase fw-bold">Sections</span>
+                    <span class="fs-3">🏢</span>
+                </div>
+                <h2 class="fw-bold mb-0 text-white">{{ sections_count }}</h2>
+                <div class="mt-2 text-info small">Configure Sections &rarr;</div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4 fade-in-el">
+    <!-- Teams -->
+    <div class="col-md-6 mb-3">
+        <a href="{% url 'admin_teams' %}" class="text-decoration-none">
+            <div class="card bg-dark text-white border-secondary p-4 shadow-sm h-100 card-custom" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px; transition: transform 0.2s;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small uppercase fw-bold">Operational Teams</span>
+                    <span class="fs-3">👥</span>
+                </div>
+                <h2 class="fw-bold mb-0 text-white">{{ teams_count }}</h2>
+                <div class="mt-2 text-info small">Configure Teams &rarr;</div>
+            </div>
+        </a>
+    </div>
+    <!-- Audit Logs -->
+    <div class="col-md-6 mb-3">
+        <a href="{% url 'admin_audit_logs' %}" class="text-decoration-none">
+            <div class="card bg-dark text-white border-secondary p-4 shadow-sm h-100 card-custom" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px; transition: transform 0.2s;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small uppercase fw-bold">System Audit Logs</span>
+                    <span class="fs-3">📜</span>
+                </div>
+                <h2 class="fw-bold mb-0 text-white">{{ audit_count }}</h2>
+                <div class="mt-2 text-info small">View System Changes &rarr;</div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Administration Core Description -->
+<div class="row fade-in-el">
+    <div class="col-12">
+        <div class="card bg-dark text-white border-secondary p-4" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px;">
+            <h5 class="fw-bold text-white mb-3">Admin Portal Guidelines</h5>
+            <ul class="text-muted small mb-0 ps-3">
+                <li class="mb-2"><strong>Organizational Levels</strong> structure: <code>Company -> Plant -> Department -> Section -> Team</code>. Deactivating a parent node recursively impacts cascade visibility.</li>
+                <li class="mb-2"><strong>Roles & Scopes</strong>: Define hierarchical visibility scopes: <code>OWN</code>, <code>TEAM</code>, <code>SECTION</code>, <code>DEPARTMENT</code>, <code>PLANT</code>, <code>COMPANY</code>, or <code>ALL</code>.</li>
+                <li class="mb-2"><strong>Audit Logs</strong> log user profile edits, password resets, deactivations, and Excel schema uploads.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

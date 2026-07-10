@@ -1,0 +1,100 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}{% if is_create %}Create Section{% else %}Edit Section{% endif %} - Administration - IIPL eHR{% endblock %}
+
+{% block content %}
+<div class="row fade-in-el mb-4">
+    <div class="col-12">
+        <a href="{% url 'admin_sections' %}" class="text-info text-decoration-none small fw-medium">&larr; Back to Section List</a>
+        <h3 class="fw-bold text-white mt-2 mb-1">{% if is_create %}🏢 Create Section{% else %}🏢 Configure Section: {{ section.name }}{% endif %}</h3>
+        <p class="text-muted small">Configure physical departments and offices. Section Name MUST exactly match the `Day` column returned by the attendance API.</p>
+    </div>
+</div>
+
+<div class="row fade-in-el">
+    <div class="col-lg-8 mb-4">
+        <div class="card bg-dark border-secondary p-4 shadow-sm" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px;">
+            <form method="POST">
+                {% csrf_token %}
+
+                <!-- Name -->
+                <div class="mb-3">
+                    <label for="name" class="form-label text-muted small fw-bold">Section Name (API `Day` key value)</label>
+                    <input type="text" id="name" name="name" class="form-control form-control-custom" 
+                           placeholder="e.g., Sector 63 - SMT PD" value="{{ section.name|default:'' }}" required>
+                    <div class="form-text text-muted small">Important: This name is matched against attendance logs. Ensure exact spelling.</div>
+                </div>
+
+                <!-- Code -->
+                <div class="mb-3">
+                    <label for="code" class="form-label text-muted small fw-bold">Section Code (Must be unique)</label>
+                    <input type="text" id="code" name="code" class="form-control form-control-custom" 
+                           placeholder="e.g., s63_smt" value="{{ section.code|default:'' }}" 
+                           {% if not is_create %}readonly style="opacity: 0.6; cursor: not-allowed;"{% endif %} required>
+                </div>
+
+                <!-- Department Parent -->
+                <div class="mb-3">
+                    <label for="department" class="form-label text-muted small fw-bold">Department Parent</label>
+                    <select id="department" name="department" class="form-select form-control-custom" required>
+                        <option value="" disabled {% if is_create %}selected{% endif %}>Select Department</option>
+                        {% for dept in departments %}
+                        <option value="{{ dept.code }}" {% if not is_create and section.department.code == dept.code %}selected{% endif %}>{{ dept.name }} ({{ dept.plant.name }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Location -->
+                <div class="mb-3">
+                    <label for="location" class="form-label text-muted small fw-bold">Location / Branch</label>
+                    <input type="text" id="location" name="location" class="form-control form-control-custom" 
+                           placeholder="e.g., Sector 63, Noida" value="{{ section.location|default:'' }}">
+                </div>
+
+                <!-- Description -->
+                <div class="mb-3">
+                    <label for="description" class="form-label text-muted small fw-bold">Description</label>
+                    <textarea id="description" name="description" class="form-control form-control-custom" rows="3"
+                              placeholder="Brief description of the department...">{{ section.description|default:'' }}</textarea>
+                </div>
+
+                <!-- Status (Active Toggle) -->
+                {% if not is_create %}
+                <div class="mb-4">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="is_active" name="is_active" {% if section.is_active %}checked{% endif %}>
+                        <label class="form-check-label text-white small fw-bold" for="is_active">Section is Active</label>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Form Submit -->
+                <div class="mt-4 d-flex justify-content-between align-items-center">
+                    <button type="submit" class="btn btn-accent px-4" style="background-color: var(--primary-accent); border: none; color: #fff;">
+                        💾 Save Section Settings
+                    </button>
+                    <a href="{% url 'admin_sections' %}" class="btn btn-outline-custom text-white border-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Soft Delete Card -->
+    {% if not is_create %}
+    <div class="col-lg-4 mb-4">
+        <div class="card bg-dark border-danger p-4 shadow-sm" style="background: var(--card-bg) !important; border: 1px solid var(--danger-color) !important; border-radius: 16px;">
+            <h5 class="fw-bold text-danger mb-2">Danger Zone</h5>
+            <p class="text-muted small">Deactivating the section will exclude it from filters and active lists. Assigned user profiles will keep their relationships but it won't be selectable for new ones.</p>
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="deactivate">
+                <button type="submit" class="btn btn-danger w-100 py-2.5 small" 
+                        onclick="return confirm('Are you sure you want to deactivate this section?');">
+                    ⚠️ Deactivate Section
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

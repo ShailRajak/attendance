@@ -1,0 +1,147 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}User Management - Administration - IIPL eHR{% endblock %}
+
+{% block content %}
+<div class="row fade-in-el mb-4">
+    <div class="col-12">
+        <h3 class="fw-bold text-white mb-1">👤 User Account Management</h3>
+        <p class="text-muted small">Manage user profiles, assign organizational roles/sections, and perform security actions.</p>
+    </div>
+</div>
+
+<!-- Search & Filters -->
+<div class="row fade-in-el mb-4">
+    <div class="col-12">
+        <div class="card bg-dark border-secondary p-4" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px;">
+            <form method="GET" class="row g-3">
+                <!-- Search bar -->
+                <div class="col-md-5">
+                    <label class="form-label text-muted small fw-bold">Search Employees</label>
+                    <input type="text" name="q" class="form-control form-control-custom w-100" 
+                           placeholder="Search by Employee ID or username..." value="{{ query }}">
+                </div>
+                <!-- Role Filter -->
+                <div class="col-md-3">
+                    <label class="form-label text-muted small fw-bold">Filter by Role</label>
+                    <select name="role" class="form-select form-control-custom w-100">
+                        <option value="">All Roles</option>
+                        {% for role in all_roles %}
+                        <option value="{{ role.code }}" {% if role_filter == role.code %}selected{% endif %}>{{ role.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <!-- Section Filter -->
+                <div class="col-md-3">
+                    <label class="form-label text-muted small fw-bold">Filter by Section</label>
+                    <select name="section" class="form-select form-control-custom w-100">
+                        <option value="">All Sections</option>
+                        {% for sec in all_sections %}
+                        <option value="{{ sec.code }}" {% if section_filter == sec.code %}selected{% endif %}>{{ sec.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <!-- Action button -->
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100 py-2.5" style="background-color: var(--primary-accent); border: none;">
+                        🔍
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Users Table -->
+<div class="row fade-in-el">
+    <div class="col-12">
+        <div class="card bg-dark border-secondary overflow-hidden shadow-sm" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px;">
+            <div class="table-responsive">
+                <table class="table table-custom mb-0 text-white" style="vertical-align: middle;">
+                    <thead style="background: rgba(255,255,255,0.02);">
+                        <tr class="text-muted small">
+                            <th class="py-3 px-4">Employee ID</th>
+                            <th class="py-3 px-4">Dynamic Role</th>
+                            <th class="py-3 px-4">Organizational Assignment</th>
+                            <th class="py-3 px-4">Status</th>
+                            <th class="py-3 px-4 text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for usr in page_obj %}
+                        <tr style="border-bottom: 1px solid var(--card-border);">
+                            <td class="py-3 px-4">
+                                <strong class="text-white">{{ usr.username }}</strong>
+                                {% if usr.is_superuser %}
+                                <span class="badge bg-danger ms-1" style="font-size: 0.65rem;">Superuser</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-4">
+                                {% if usr.profile.role %}
+                                <span class="text-info" style="font-weight: 500;">🛡️ {{ usr.profile.role.name }}</span>
+                                {% else %}
+                                <span class="text-muted">No Role</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-4 small">
+                                {% if usr.profile.company %}
+                                <span class="text-white">
+                                    {{ usr.profile.company.name }} 
+                                    {% if usr.profile.plant %} &rsaquo; {{ usr.profile.plant.name }}{% endif %}
+                                    {% if usr.profile.department %} &rsaquo; {{ usr.profile.department.name }}{% endif %}
+                                    {% if usr.profile.section %} &rsaquo; {{ usr.profile.section.name }}{% endif %}
+                                    {% if usr.profile.team %} &rsaquo; {{ usr.profile.team.name }}{% endif %}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-4">
+                                {% if usr.is_active %}
+                                <span class="badge badge-active text-success">Enabled</span>
+                                {% else %}
+                                <span class="badge badge-absent text-danger">Disabled</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-4 text-end">
+                                <a href="{% url 'admin_user_edit' usr.id %}" class="btn btn-sm btn-outline-custom text-info border-0">
+                                    ⚙️ Assign & Manage
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                No user accounts found.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <div class="d-flex justify-content-between align-items-center p-3 border-top border-secondary" style="background: rgba(255,255,255,0.01);">
+                <span class="text-muted small">
+                    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                </span>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item"><a class="page-link bg-dark text-white border-secondary" href="?page=1{% if query %}&q={{ query }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}{% if section_filter %}&section={{ section_filter }}{% endif %}">&laquo; First</a></li>
+                        <li class="page-item"><a class="page-link bg-dark text-white border-secondary" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}{% if section_filter %}&section={{ section_filter }}{% endif %}">Previous</a></li>
+                        {% endif %}
+
+                        {% if page_obj.has_next %}
+                        <li class="page-item"><a class="page-link bg-dark text-white border-secondary" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}{% if section_filter %}&section={{ section_filter }}{% endif %}">Next</a></li>
+                        <li class="page-item"><a class="page-link bg-dark text-white border-secondary" href="?page={{ page_obj.paginator.num_pages }}{% if query %}&q={{ query }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}{% if section_filter %}&section={{ section_filter }}{% endif %}">Last &raquo;</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -37,6 +37,7 @@ REQUIRED_COLUMNS = {
 # DATE FORMAT
 # ==========================================================
 
+
 def format_date(date_value):
     """
     Convert
@@ -51,18 +52,16 @@ def format_date(date_value):
         return ""
 
     try:
-        return datetime.strptime(
-            str(date_value),
-            "%Y%m%d"
-        ).strftime("%d-%m-%Y")
+        return datetime.strptime(str(date_value), "%Y%m%d").strftime("%d-%m-%Y")
 
-    except Exception:
+    except (ValueError, TypeError):
         return str(date_value)
 
 
 # ==========================================================
 # TIME FORMAT
 # ==========================================================
+
 
 def format_time(time_value):
     """
@@ -91,6 +90,7 @@ def format_time(time_value):
 # ==========================================================
 # MAIN FORMATTER
 # ==========================================================
+
 
 def filter_attendance_data(records):
     """

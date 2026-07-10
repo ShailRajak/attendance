@@ -1,6 +1,7 @@
 from datetime import date
 from django.utils import timezone
 
+
 def get_attendance_date_range(today=None):
     """
     Calculates the start and end dates for the current attendance cycle.
@@ -25,6 +26,7 @@ def get_attendance_date_range(today=None):
             # Respect timezone support if enabled in settings
             today = timezone.localdate()
         except Exception:
+            # Fallback to local system date if Django is not initialized (e.g. in offline scripts)
             today = date.today()
 
     if today.day >= 21:

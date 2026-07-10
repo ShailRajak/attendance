@@ -1,8 +1,17 @@
+{% load rbac_tags %}
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA Settings -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0b0f19">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="EHR Attendance">
+    <link rel="apple-touch-icon" href="/static/attendance/icons/icon-192x192.png">
     <title>{% block title %}Attendance Management System{% endblock %}</title>
     <!-- Google Fonts: Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -34,99 +43,155 @@
             --sidebar-bg: #ffffff;
             --card-bg: #ffffff;
             --card-border: rgba(0, 0, 0, 0.1);
-            --text-main: #0f172a;
-            --text-muted: #64748b;
+            --text-main: #020617;
+            --text-muted: #334155;
         }
 
-        [data-theme="light"] .bg-dark { background-color: var(--card-bg) !important; border-color: var(--card-border) !important; }
-        [data-theme="light"] .text-white { color: var(--text-main) !important; }
-        [data-theme="light"] .border-secondary { border-color: var(--card-border) !important; }
-        [data-theme="light"] .btn-close-white, [data-theme="light"] .navbar-toggler-icon { filter: invert(1); }
-        [data-theme="light"] .table-custom th { background: rgba(0,0,0,0.03) !important; color: #475569 !important; }
-        [data-theme="light"] .table-custom tbody tr { background: #ffffff; }
-        [data-theme="light"] .top-navbar { background: rgba(255, 255, 255, 0.7); }
+        [data-theme="light"] .bg-dark {
+            background-color: var(--card-bg) !important;
+            border-color: var(--card-border) !important;
+        }
+
+        [data-theme="light"] .text-white {
+            color: var(--text-main) !important;
+        }
+
+        [data-theme="light"] .border-secondary {
+            border-color: var(--card-border) !important;
+        }
+
+        [data-theme="light"] .btn-close-white,
+        [data-theme="light"] .navbar-toggler-icon {
+            filter: invert(1);
+        }
+
+        [data-theme="light"] .table-custom th {
+            background: rgba(0, 0, 0, 0.03) !important;
+            color: var(--text-muted) !important;
+        }
+
+        [data-theme="light"] .table-custom tbody tr {
+            background: #ffffff;
+        }
+
+        [data-theme="light"] .top-navbar {
+            background: rgba(255, 255, 255, 0.7);
+        }
+
         [data-theme="light"] .card-custom:hover {
             transform: translateY(-4px);
             box-shadow: 0 16px 32px rgba(0, 0, 0, 0.08);
             border-color: var(--primary-accent);
         }
+
         [data-theme="light"] .sidebar-link:hover {
             background: rgba(0, 0, 0, 0.04);
             color: var(--primary-accent);
         }
+
         [data-theme="light"] .form-control-custom {
             background: #ffffff !important;
             border: 1.5px solid #cbd5e1 !important;
-            color: #0f172a !important;
+            color: var(--text-main) !important;
         }
+
         [data-theme="light"] .form-control-custom:focus {
             background: #ffffff !important;
             border-color: var(--primary-accent) !important;
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
-            color: #0f172a !important;
+            color: var(--text-main) !important;
         }
+
         [data-theme="light"] .form-control-custom::placeholder {
-            color: #64748b !important;
+            color: var(--text-muted) !important;
             opacity: 0.7 !important;
         }
+
         [data-theme="light"] .alert-custom {
             background: #ffffff !important;
-            color: #0f172a !important;
+            color: var(--text-main) !important;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
             border: 1px solid rgba(0, 0, 0, 0.08) !important;
             border-left: 4px solid var(--primary-accent) !important;
         }
+
         [data-theme="light"] .alert-danger-custom {
             border-left-color: var(--danger-color) !important;
         }
+
         [data-theme="light"] .alert-success-custom {
             border-left-color: var(--success-color) !important;
         }
+
         [data-theme="light"] .alert-info-custom {
             border-left-color: var(--secondary-accent) !important;
         }
+
         [data-theme="light"] .text-info {
             color: var(--primary-accent) !important;
         }
+
         [data-theme="light"] .notification-btn {
             background: #ffffff !important;
             border: 1px solid rgba(0, 0, 0, 0.08) !important;
-            color: #0f172a !important;
+            color: var(--text-main) !important;
         }
+
         [data-theme="light"] .notification-btn:hover {
             background: rgba(0, 0, 0, 0.02) !important;
         }
+
         [data-theme="light"] .period-btn {
             background: #ffffff !important;
             border: 1px solid rgba(0, 0, 0, 0.1) !important;
-            color: #0f172a !important;
+            color: var(--text-main) !important;
         }
+
         [data-theme="light"] .period-btn:hover {
             background: rgba(0, 0, 0, 0.02) !important;
         }
+
         [data-theme="light"] .allotment-card {
             background: #ffffff !important;
             border: 1px solid rgba(0, 0, 0, 0.08) !important;
         }
+
         [data-theme="light"] .allotment-card:hover {
             border-color: var(--primary-accent) !important;
         }
+
         [data-theme="light"] .calendar-day-cell {
             background: #ffffff !important;
             border: 1px solid rgba(0, 0, 0, 0.08) !important;
         }
+
         [data-theme="light"] .calendar-day-cell:hover {
             border-color: var(--primary-accent) !important;
         }
-        [data-theme="light"] .stat-card:hover, [data-theme="light"] .ot-stat-card:hover {
+
+        [data-theme="light"] .stat-card:hover,
+        [data-theme="light"] .ot-stat-card:hover {
             border-color: var(--primary-accent) !important;
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05) !important;
         }
 
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.6); }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.4);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.6);
+        }
 
         .text-muted {
             color: var(--text-muted) !important;
@@ -411,7 +476,8 @@
             opacity: 0.5;
         }
 
-        .form-control-custom:disabled, .form-control-custom[readonly] {
+        .form-control-custom:disabled,
+        .form-control-custom[readonly] {
             background: rgba(11, 15, 25, 0.25);
             border-color: var(--card-border);
             color: var(--text-muted);
@@ -498,12 +564,14 @@
             vertical-align: middle;
         }
 
-        .table-custom td:first-child, .table-custom th:first-child {
+        .table-custom td:first-child,
+        .table-custom th:first-child {
             border-top-left-radius: 10px;
             border-bottom-left-radius: 10px;
         }
 
-        .table-custom td:last-child, .table-custom th:last-child {
+        .table-custom td:last-child,
+        .table-custom th:last-child {
             border-top-right-radius: 10px;
             border-bottom-right-radius: 10px;
         }
@@ -546,8 +614,15 @@
 
         /* Micro-animations */
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(12px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .fade-in-el {
@@ -577,16 +652,36 @@
                 margin-left: 0;
                 overflow-x: hidden;
             }
+
             .top-navbar {
                 padding: 0.95rem 1.25rem;
             }
+
             .main-container {
                 padding: 1.25rem;
+            }
+
+            .profile-username-text {
+                display: none !important;
+            }
+
+            .profile-dropdown-btn {
+                padding: 0 !important;
+                width: 38px !important;
+                height: 38px !important;
+                border-radius: 50% !important;
+                justify-content: center !important;
+                gap: 0 !important;
+            }
+
+            .profile-dropdown-btn::after {
+                display: none !important;
             }
         }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
+
 <body>
 
     {% if user.is_authenticated %}
@@ -606,23 +701,50 @@
             </div>
 
             <nav class="sidebar-menu">
-                <a href="/?tab=dashboard" class="sidebar-link {% if active_tab == 'dashboard' or not active_tab %}active{% endif %}">
-                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                <a href="/?tab=dashboard"
+                    class="sidebar-link {% if active_tab == 'dashboard' or not active_tab %}active{% endif %}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 6v6l4 2" />
+                    </svg>
                     Dashboard
                 </a>
-                <a href="{% url 'overtime' %}" class="sidebar-link {% if request.resolver_match.url_name == 'overtime' %}active{% endif %}">
-                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <a href="{% url 'overtime' %}"
+                    class="sidebar-link {% if request.resolver_match.url_name == 'overtime' %}active{% endif %}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
                     Overtime
                 </a>
-                <a href="{% url 'leaves' %}" class="sidebar-link {% if request.resolver_match.url_name == 'leaves' or active_tab == 'leaves' %}active{% endif %}">
-                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <a href="{% url 'leaves' %}"
+                    class="sidebar-link {% if request.resolver_match.url_name == 'leaves' or active_tab == 'leaves' %}active{% endif %}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path
+                            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
                     Leaves
                 </a>
+                {% if user.is_superuser or user|has_permission:"role.manage" or user|has_permission:"section.manage" or user|has_permission:"user.manage" %}
+                <a href="{% url 'admin_dashboard' %}"
+                    class="sidebar-link {% if active_tab == 'admin' %}active{% endif %}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path
+                            d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                        <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    Administration
+                </a>
+                {% endif %}
             </nav>
         </aside>
 
         <!-- Sidebar Navigation Drawer (Mobile Offcanvas) -->
-        <div class="offcanvas offcanvas-start bg-dark text-white border-end border-secondary" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel" style="max-width: 280px; background-color: var(--sidebar-bg) !important;">
+        <div class="offcanvas offcanvas-start bg-dark text-white border-end border-secondary" tabindex="-1"
+            id="mobileSidebar" aria-labelledby="mobileSidebarLabel"
+            style="max-width: 280px; background-color: var(--sidebar-bg) !important;">
             <div class="offcanvas-header border-bottom border-secondary py-3 px-4">
                 <a href="/" class="sidebar-brand d-flex align-items-center gap-2">
                     <span class="fs-4 text-white">⚡</span>
@@ -631,22 +753,56 @@
                         <span>eHR</span>
                     </div>
                 </a>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"
+                    aria-label="Close"></button>
             </div>
             <div class="offcanvas-body p-3">
                 <nav class="sidebar-menu p-0">
-                    <a href="/?tab=dashboard" class="sidebar-link {% if active_tab == 'dashboard' or not active_tab %}active{% endif %}" onclick="bootstrap.Offcanvas.getInstance(document.getElementById('mobileSidebar')).hide();">
-                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    <a href="/?tab=dashboard"
+                        class="sidebar-link {% if active_tab == 'dashboard' or not active_tab %}active{% endif %}"
+                        onclick="bootstrap.Offcanvas.getInstance(document.getElementById('mobileSidebar')).hide();">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M12 6v6l4 2" />
+                        </svg>
                         Dashboard
                     </a>
-                    <a href="{% url 'overtime' %}" class="sidebar-link {% if request.resolver_match.url_name == 'overtime' %}active{% endif %}" onclick="bootstrap.Offcanvas.getInstance(document.getElementById('mobileSidebar')).hide();">
-                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <a href="{% url 'overtime' %}"
+                        class="sidebar-link {% if request.resolver_match.url_name == 'overtime' %}active{% endif %}"
+                        onclick="bootstrap.Offcanvas.getInstance(document.getElementById('mobileSidebar')).hide();">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>
                         Overtime
                     </a>
-                    <a href="{% url 'leaves' %}" class="sidebar-link {% if request.resolver_match.url_name == 'leaves' or active_tab == 'leaves' %}active{% endif %}" onclick="bootstrap.Offcanvas.getInstance(document.getElementById('mobileSidebar')).hide();">
-                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <a href="{% url 'leaves' %}"
+                        class="sidebar-link {% if request.resolver_match.url_name == 'leaves' or active_tab == 'leaves' %}active{% endif %}"
+                        onclick="bootstrap.Offcanvas.getInstance(document.getElementById('mobileSidebar')).hide();">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path
+                                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
                         Leaves
                     </a>
+                    {% if user.is_superuser or user|has_permission:"role.manage" or user|has_permission:"section.manage" or user|has_permission:"user.manage" %}
+                    <a href="{% url 'admin_dashboard' %}"
+                        class="sidebar-link {% if active_tab == 'admin' %}active{% endif %}"
+                        onclick="bootstrap.Offcanvas.getInstance(document.getElementById('mobileSidebar')).hide();">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path
+                                d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        Administration
+                    </a>
+                    {% endif %}
                 </nav>
             </div>
         </div>
@@ -656,8 +812,14 @@
             <!-- Navbar Header -->
             <header class="top-navbar">
                 <div class="d-flex align-items-center gap-3">
-                    <button class="btn btn-outline-custom d-lg-none py-1.5 px-2.5 border-0 text-white" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar">
-                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    <button class="btn btn-outline-custom d-lg-none py-1.5 px-2.5 border-0 text-white" type="button"
+                        data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <line x1="3" y1="12" x2="21" y2="12" />
+                            <line x1="3" y1="6" x2="21" y2="6" />
+                            <line x1="3" y1="18" x2="21" y2="18" />
+                        </svg>
                     </button>
                     <h2 class="top-navbar-title">Enterprise HR Portal</h2>
                 </div>
@@ -665,33 +827,42 @@
                 <div class="top-navbar-actions">
                     <!-- Theme Toggle -->
                     <div class="notification-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Theme">
-                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" id="themeIcon">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24" id="themeIcon">
                             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                         </svg>
                     </div>
 
                     <!-- Notification Bell -->
                     <div class="notification-btn">
-                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                        </svg>
                         <span class="notification-badge"></span>
                     </div>
 
                     <!-- Profile Dropdown -->
                     <div class="dropdown">
-                        <button class="profile-dropdown-btn dropdown-toggle" type="button" id="userProfileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <button class="profile-dropdown-btn dropdown-toggle" type="button" id="userProfileDropdown"
+                            data-bs-toggle="dropdown" aria-expanded="false">
                             <span class="profile-avatar-sm">
                                 {{ user.username|slice:":1"|upper }}
                             </span>
-                            {{ user.username }}
+                            <span class="profile-username-text">{{ user.username }}</span>
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary mt-2 shadow-lg" aria-labelledby="userProfileDropdown">
+                        <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary mt-2 shadow-lg"
+                            aria-labelledby="userProfileDropdown">
                             <li>
                                 <div class="dropdown-header text-muted small">
-                                    Role: {{ role_display }}
-                                    {% if section_display %} &middot; {{ section_display }}{% endif %}
+                                    Role: {{ user.profile.role.name|default:"User" }}
+                                    {% if user.profile.company %} &middot; {{ user.profile.company.name }}{% endif %}
                                 </div>
                             </li>
-                            <li><hr class="dropdown-divider border-secondary"></li>
+                            <li>
+                                <hr class="dropdown-divider border-secondary">
+                            </li>
                             <li>
                                 <a class="dropdown-item text-white py-2" href="{% url 'logout' %}">
                                     🚪 Logout
@@ -706,16 +877,18 @@
             <div class="container-fluid main-container fade-in-el px-lg-4 px-xl-5">
                 <!-- Flash Messages -->
                 {% if messages %}
-                    <div class="row justify-content-center">
-                        <div class="col-12">
-                            {% for message in messages %}
-                                <div class="alert alert-custom {% if message.tags == 'error' %}alert-danger-custom{% elif message.tags == 'success' %}alert-success-custom{% else %}alert-info-custom{% endif %} alert-dismissible fade show" role="alert">
-                                    {{ message }}
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
-                                </div>
-                            {% endfor %}
+                <div class="row justify-content-center">
+                    <div class="col-12">
+                        {% for message in messages %}
+                        <div class="alert alert-custom {% if message.tags == 'error' %}alert-danger-custom{% elif message.tags == 'success' %}alert-success-custom{% else %}alert-info-custom{% endif %} alert-dismissible fade show"
+                            role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"
+                                aria-label="Close"></button>
                         </div>
+                        {% endfor %}
                     </div>
+                </div>
                 {% endif %}
 
                 {% block content %}{% endblock %}
@@ -739,19 +912,21 @@
                     <span class="fs-4 text-white">⚡</span>
                     <strong class="text-white">EHR Attendance</strong>
                 </a>
-                <button class="navbar-toggler border-0 text-white" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+                <button class="navbar-toggler border-0 text-white" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false"
+                    aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
                 </button>
                 <div class="collapse navbar-collapse" id="navbarContent">
                     <ul class="navbar-nav ms-auto align-items-center gap-2">
                         {% if request.resolver_match.url_name == 'signup' %}
-                            <li class="nav-item">
-                                <a href="{% url 'login' %}" class="btn btn-accent btn-sm py-2">Login</a>
-                            </li>
+                        <li class="nav-item">
+                            <a href="{% url 'login' %}" class="btn btn-accent btn-sm py-2">Login</a>
+                        </li>
                         {% else %}
-                            <li class="nav-item">
-                                <a href="{% url 'signup' %}" class="btn btn-accent btn-sm py-2">Sign Up</a>
-                            </li>
+                        <li class="nav-item">
+                            <a href="{% url 'signup' %}" class="btn btn-accent btn-sm py-2">Sign Up</a>
+                        </li>
                         {% endif %}
                     </ul>
                 </div>
@@ -761,16 +936,18 @@
         <div class="container main-container fade-in-el flex-grow-1 d-flex flex-column justify-content-center">
             <!-- Flash Messages -->
             {% if messages %}
-                <div class="row justify-content-center">
-                    <div class="col-12 col-md-6 col-lg-5 col-xl-4">
-                        {% for message in messages %}
-                            <div class="alert alert-custom {% if message.tags == 'error' %}alert-danger-custom{% elif message.tags == 'success' %}alert-success-custom{% else %}alert-info-custom{% endif %} alert-dismissible fade show" role="alert">
-                                {{ message }}
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
-                        {% endfor %}
+            <div class="row justify-content-center">
+                <div class="col-12 col-md-6 col-lg-5 col-xl-4">
+                    {% for message in messages %}
+                    <div class="alert alert-custom {% if message.tags == 'error' %}alert-danger-custom{% elif message.tags == 'success' %}alert-success-custom{% else %}alert-info-custom{% endif %} alert-dismissible fade show"
+                        role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"
+                            aria-label="Close"></button>
                     </div>
+                    {% endfor %}
                 </div>
+            </div>
             {% endif %}
 
             {% block auth_content %}{% endblock %}
@@ -811,14 +988,15 @@
         document.documentElement.setAttribute('data-theme', savedTheme);
         updateThemeIcon(savedTheme);
 
-        // Forcefully unregister rogue service workers from other apps on localhost:8000
+        // Register PWA Service Worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                for(let registration of registrations) {
-                    registration.unregister();
-                }
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registered successfully:', reg.scope))
+                    .catch(err => console.error('Service Worker registration failed:', err));
             });
         }
     </script>
 </body>
+
 </html>

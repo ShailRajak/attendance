@@ -1,0 +1,37 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}System Permissions - Administration - IIPL eHR{% endblock %}
+
+{% block content %}
+<div class="row fade-in-el mb-4">
+    <div class="col-12">
+        <h3 class="fw-bold text-white mb-1">🔑 System Permissions</h3>
+        <p class="text-muted small">Dynamic security permissions configured in the IIPL Enterprise HRMS system.</p>
+    </div>
+</div>
+
+<div class="row fade-in-el">
+    {% for module, perms in permissions_grouped.items %}
+    <div class="col-md-6 mb-4">
+        <div class="card bg-dark border-secondary shadow-sm h-100" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px;">
+            <div class="card-header bg-transparent border-secondary py-3 px-4">
+                <h5 class="fw-bold text-info mb-0">{{ module }} Module</h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="d-flex flex-column gap-3">
+                    {% for perm in perms %}
+                    <div class="d-flex justify-content-between align-items-start pb-2" style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                        <div>
+                            <strong class="text-white small d-block">{{ perm.name }}</strong>
+                            <span class="text-muted" style="font-size: 0.75rem;">{{ perm.description }}</span>
+                        </div>
+                        <code class="text-info bg-dark px-2 py-0.5 rounded small" style="font-size: 0.8rem; font-weight: 500;">{{ perm.code }}</code>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

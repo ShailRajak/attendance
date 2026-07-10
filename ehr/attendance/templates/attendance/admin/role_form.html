@@ -1,0 +1,119 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}{% if is_create %}Create Role{% else %}Edit Role{% endif %} - Administration - IIPL eHR{% endblock %}
+
+{% block content %}
+<div class="row fade-in-el mb-4">
+    <div class="col-12">
+        <a href="{% url 'admin_roles' %}" class="text-info text-decoration-none small fw-medium">&larr; Back to Role List</a>
+        <h3 class="fw-bold text-white mt-2 mb-1">{% if is_create %}🛡️ Create Role{% else %}🛡️ Configure Role: {{ role.name }}{% endif %}</h3>
+        <p class="text-muted small">Define custom role codes, access privileges, and data scope settings.</p>
+    </div>
+</div>
+
+<div class="row fade-in-el">
+    <div class="col-lg-8 mb-4">
+        <div class="card bg-dark border-secondary p-4 shadow-sm" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px;">
+            <form method="POST">
+                {% csrf_token %}
+
+                <!-- Name -->
+                <div class="mb-3">
+                    <label for="name" class="form-label text-muted small fw-bold">Role Name</label>
+                    <input type="text" id="name" name="name" class="form-control form-control-custom" 
+                           placeholder="e.g., HR Supervisor" value="{{ role.name|default:'' }}" required>
+                </div>
+
+                <!-- Code -->
+                <div class="mb-3">
+                    <label for="code" class="form-label text-muted small fw-bold">Role Code (Must be unique)</label>
+                    <input type="text" id="code" name="code" class="form-control form-control-custom" 
+                           placeholder="e.g., hr_supervisor" value="{{ role.code|default:'' }}" 
+                           {% if not is_create %}readonly style="opacity: 0.6; cursor: not-allowed;"{% endif %} required>
+                    {% if is_create %}
+                    <div class="form-text text-muted small">Internal identifier. lowercase and underscores only, no spaces.</div>
+                    {% endif %}
+                </div>
+
+                <!-- Description -->
+                <div class="mb-3">
+                    <label for="description" class="form-label text-muted small fw-bold">Description</label>
+                    <textarea id="description" name="description" class="form-control form-control-custom" rows="3"
+                              placeholder="Brief summary of duties and responsibilities...">{{ role.description|default:'' }}</textarea>
+                </div>
+
+                <!-- Data Scope -->
+                <div class="mb-4">
+                    <label for="data_scope" class="form-label text-muted small fw-bold">Data Access Scope</label>
+                    <select id="data_scope" name="data_scope" class="form-select form-control-custom" required>
+                        <option value="OWN" {% if role.data_scope == 'OWN' %}selected{% endif %}>OWN (Can only view own data)</option>
+                        <option value="SECTION" {% if role.data_scope == 'SECTION' %}selected{% endif %}>SECTION (Can view all data in assigned section)</option>
+                        <option value="ALL" {% if role.data_scope == 'ALL' or is_create and data_scope == 'ALL' %}selected{% endif %}>ALL (Full organization access)</option>
+                    </select>
+                </div>
+
+                <!-- Status (Active Toggle) -->
+                {% if not is_create %}
+                <div class="mb-4">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="is_active" name="is_active" {% if role.is_active %}checked{% endif %}>
+                        <label class="form-check-label text-white small fw-bold" for="is_active">Role is Active</label>
+                    </div>
+                    <div class="form-text text-muted small">Inactive roles will not grant permissions or show up for assignments.</div>
+                </div>
+                {% endif %}
+
+                <hr class="border-secondary mb-4">
+
+                <!-- Permissions List -->
+                <h5 class="fw-bold text-white mb-3">🗝️ Assign Permissions</h5>
+                {% for module, perms in permissions_grouped.items %}
+                <div class="mb-4 p-3 rounded" style="background: rgba(255, 255, 255, 0.01); border: 1px solid var(--card-border);">
+                    <h6 class="text-info fw-bold mb-3">{{ module }} Module</h6>
+                    <div class="row">
+                        {% for perm in perms %}
+                        <div class="col-md-6 mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="{{ perm.id }}" id="perm_{{ perm.id }}"
+                                       {% if perm.id in assigned_perm_ids %}checked{% endif %}>
+                                <label class="form-check-label text-white small" for="perm_{{ perm.id }}">
+                                    <strong>{{ perm.name }}</strong>
+                                    <span class="d-block text-muted small" style="font-size: 0.75rem;">{{ perm.description }}</span>
+                                </label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- Form Submit -->
+                <div class="mt-4 d-flex justify-content-between align-items-center">
+                    <button type="submit" class="btn btn-accent px-4" style="background-color: var(--primary-accent); border: none; color: #fff;">
+                        💾 Save Role settings
+                    </button>
+                    <a href="{% url 'admin_roles' %}" class="btn btn-outline-custom text-white border-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Soft Delete Card -->
+    {% if not is_create and role.code != 'admin' %}
+    <div class="col-lg-4 mb-4">
+        <div class="card bg-dark border-danger p-4 shadow-sm" style="background: var(--card-bg) !important; border: 1px solid var(--danger-color) !important; border-radius: 16px;">
+            <h5 class="fw-bold text-danger mb-2">Danger Zone</h5>
+            <p class="text-muted small">Deactivating the role will immediately revoke authorization from all users assigned to it. This action is soft and can be reversed.</p>
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="deactivate">
+                <button type="submit" class="btn btn-danger w-100 py-2.5 small" 
+                        onclick="return confirm('Are you sure you want to deactivate this role?');">
+                    ⚠️ Deactivate Role
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

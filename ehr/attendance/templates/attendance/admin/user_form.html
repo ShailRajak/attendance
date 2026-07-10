@@ -1,0 +1,184 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Manage User: {{ target_user.username }} - Administration - IIPL eHR{% endblock %}
+
+{% block content %}
+<div class="row fade-in-el mb-4">
+    <div class="col-12">
+        <a href="{% url 'admin_users' %}" class="text-info text-decoration-none small fw-medium">&larr; Back to User List</a>
+        <h3 class="fw-bold text-white mt-2 mb-1">👤 Manage User: {{ target_user.username }}</h3>
+        <p class="text-muted small">Update role assignments, organizational structure, status toggles, and credentials.</p>
+    </div>
+</div>
+
+<div class="row fade-in-el">
+    <!-- User assignment form -->
+    <div class="col-lg-7 mb-4">
+        <div class="card bg-dark border-secondary p-4 shadow-sm" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px;">
+            <h5 class="fw-bold text-white mb-3">Profile Settings</h5>
+            <form method="POST">
+                {% csrf_token %}
+
+                <!-- Role Selection -->
+                <div class="mb-3">
+                    <label for="role" class="form-label text-muted small fw-bold">Assign Role</label>
+                    <select id="role" name="role" class="form-select form-control-custom" required>
+                        <option value="" disabled {% if not profile.role %}selected{% endif %}>Select Role</option>
+                        {% for role in all_roles %}
+                        <option value="{{ role.code }}" data-scope="{{ role.data_scope }}" {% if profile.role.code == role.code %}selected{% endif %}>{{ role.name }} (Scope: {{ role.data_scope }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Hidden Company Input (fixed) -->
+                <input type="hidden" name="company" id="company" value="ismartu">
+
+                <!-- Plant Selection -->
+                <div class="mb-3">
+                    <label for="plant" class="form-label text-muted small fw-bold">Assign Plant / Location</label>
+                    <select id="plant" name="plant" class="form-select form-control-custom" required>
+                        <option value="" disabled {% if not profile.plant %}selected{% endif %}>Select Plant</option>
+                        {% for pl in all_plants %}
+                        <option value="{{ pl.code }}" {% if profile.plant.code == pl.code %}selected{% endif %}>{{ pl.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Section Selection -->
+                <div class="mb-3" id="section-group">
+                    <label for="section" class="form-label text-muted small fw-bold">Assign Section</label>
+                    <select id="section" name="section" class="form-select form-control-custom">
+                        <option value="" {% if not profile.section %}selected{% endif %}>Select Section</option>
+                        {% for sec in all_sections %}
+                        <option value="{{ sec.code }}" {% if profile.section.code == sec.code %}selected{% endif %}>{{ sec.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Team Selection -->
+                <div class="mb-3" id="team-group">
+                    <label for="team" class="form-label text-muted small fw-bold">Assign Team (Optional)</label>
+                    <select id="team" name="team" class="form-select form-control-custom">
+                        <option value="" {% if not profile.team %}selected{% endif %}>No Team</option>
+                        {% for t in profile.section.teams.all %}
+                            {% if t.is_active or t == profile.team %}
+                            <option value="{{ t.code }}" {% if profile.team.code == t.code %}selected{% endif %}>{{ t.name }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Login Toggle status -->
+                <div class="mb-4">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="is_active" name="is_active" {% if target_user.is_active %}checked{% endif %}>
+                        <label class="form-check-label text-white small fw-bold" for="is_active">User Account is Enabled (Can Login)</label>
+                    </div>
+                </div>
+
+                <!-- Form Submit -->
+                <div class="mt-4 d-flex justify-content-between align-items-center">
+                    <button type="submit" class="btn btn-accent px-4" style="background-color: var(--primary-accent); border: none; color: #fff;">
+                        💾 Save Assignment Settings
+                    </button>
+                    <a href="{% url 'admin_users' %}" class="btn btn-outline-custom text-white border-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Password Reset Card -->
+    <div class="col-lg-5 mb-4">
+        <div class="card bg-dark border-secondary p-4 shadow-sm" style="background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 16px;">
+            <h5 class="fw-bold text-white mb-2">🔑 Reset Password</h5>
+            <p class="text-muted small">Change the official login credential password for this employee account.</p>
+            
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="reset_password">
+                
+                <div class="mb-3">
+                    <label for="new_password" class="form-label text-muted small fw-bold">New Password</label>
+                    <input type="password" id="new_password" name="new_password" class="form-control form-control-custom" placeholder="Enter new password" required>
+                </div>
+
+                <button type="submit" class="btn btn-warning w-100 py-2.5 small fw-bold" 
+                        onclick="return confirm('Are you sure you want to reset password for this user?');">
+                    Reset User Password
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const roleSelect = document.getElementById('role');
+        const plantSelect = document.getElementById('plant');
+        const sectionGroup = document.getElementById('section-group');
+        const sectionSelect = document.getElementById('section');
+        const teamGroup = document.getElementById('team-group');
+        const teamSelect = document.getElementById('team');
+
+        function toggleScopes() {
+            const selectedOption = roleSelect.options[roleSelect.selectedIndex];
+            const scope = selectedOption ? selectedOption.getAttribute('data-scope') : '';
+            
+            if (scope === 'SECTION') {
+                sectionSelect.setAttribute('required', 'required');
+            } else {
+                sectionSelect.removeAttribute('required');
+            }
+            
+            if (scope === 'TEAM') {
+                sectionSelect.setAttribute('required', 'required');
+                teamSelect.setAttribute('required', 'required');
+            } else {
+                teamSelect.removeAttribute('required');
+            }
+        }
+
+        function clearSelect(select, defaultText) {
+            select.innerHTML = `<option value="" disabled selected>${defaultText}</option>`;
+        }
+
+        plantSelect.addEventListener('change', function() {
+            const code = this.value;
+            clearSelect(sectionSelect, 'Select Section');
+            clearSelect(teamSelect, 'Select Team');
+
+            if (!code) return;
+
+            fetch(`/api/org-nodes/?type=sections&plant_code=${code}`)
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        res.data.forEach(item => {
+                            sectionSelect.innerHTML += `<option value="${item.code}">${item.name}</option>`;
+                        });
+                    }
+                });
+        });
+
+        sectionSelect.addEventListener('change', function() {
+            const code = this.value;
+            clearSelect(teamSelect, 'Select Team');
+
+            if (!code) return;
+
+            fetch(`/api/org-nodes/?type=teams&section_code=${code}`)
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        res.data.forEach(item => {
+                            teamSelect.innerHTML += `<option value="${item.code}">${item.name}</option>`;
+                        });
+                    }
+                });
+        });
+
+        roleSelect.addEventListener('change', toggleScopes);
+        toggleScopes(); // Run on load
+    });
+</script>
+{% endblock %}
