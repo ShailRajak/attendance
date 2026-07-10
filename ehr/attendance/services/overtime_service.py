@@ -346,7 +346,7 @@ def get_all_cycles_in_year(year=None):
     return cycles
 
 
-def get_scope_overtime_summary(accessible_usernames, start_date, end_date, expected_dtname4=None):
+def get_scope_overtime_summary(accessible_usernames, start_date, end_date, expected_dtname4=None, is_all_scope=False):
     """
     Aggregates overtime data across all employees under a given dynamic scope.
 
@@ -362,6 +362,9 @@ def get_scope_overtime_summary(accessible_usernames, start_date, end_date, expec
     # Filter by section name if expected_dtname4 is provided, else fallback to accessible employee usernames
     if expected_dtname4:
         scope_records = [r for r in attendance if r.get("Day") == expected_dtname4]
+    elif is_all_scope:
+        # ALL scope or superuser sees all biometric machine records unfiltered
+        scope_records = attendance
     else:
         scope_records = [r for r in attendance if r.get("Employee ID") in accessible_usernames]
 
@@ -715,7 +718,7 @@ def get_overtime_dashboard_data(user, get_params):
             has_selected_employee = True
             emp_id = emp_id.strip()
         else:
-            emp_id = user.username
+            emp_id = ""
 
     expected_dtname4 = get_expected_dtname4(role, section, user.username)
 
@@ -744,7 +747,8 @@ def get_overtime_dashboard_data(user, get_params):
             RBACService.get_accessible_employees(user).values_list("user__username", flat=True)
         )
         scope_summary = get_scope_overtime_summary(
-            accessible_users_set, start_date_str, end_date_str, expected_dtname4
+            accessible_users_set, start_date_str, end_date_str, expected_dtname4,
+            is_all_scope=(is_superuser or scope == "ALL")
         )
 
         if not has_selected_employee:

@@ -13,6 +13,7 @@ urlpatterns = [
     path("api/attendance/", views.attendance_api, name="attendance_api"),
     path("overtime/", views.overtime_dashboard, name="overtime"),
     path("leaves/", views.leaves_dashboard, name="leaves"),
+    path("feedback/", views.submit_feedback, name="feedback"),
     path("sw.js", views.pwa_service_worker, name="pwa_service_worker"),
     path("manifest.json", views.pwa_manifest, name="pwa_manifest"),
     path("offline/", views.offline_view, name="offline"),

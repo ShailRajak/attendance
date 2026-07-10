@@ -234,6 +234,7 @@ class AttendanceAPIConfig(models.Model):
         return f"{self.api_url}:{self.port}"
 
 
+
 class OvertimeLimitConfig(models.Model):
     ot_low_limit = models.FloatField(
         default=52.0,
@@ -259,5 +260,25 @@ class OvertimeLimitConfig(models.Model):
 
     def __str__(self):
         return f"OT Low Limit: {self.ot_low_limit}h | OT Medium Limit: {self.ot_medium_limit}h"
+
+
+class Feedback(models.Model):
+    PLANT_CHOICES = [
+        ("S63", "Sector 63 (S63)"),
+        ("C39", "Phase 2 (C39)"),
+    ]
+
+    employee_id = models.CharField(max_length=50, verbose_name="Employee ID")
+    plant = models.CharField(max_length=10, choices=PLANT_CHOICES, verbose_name="Plant")
+    feedback = models.TextField(verbose_name="Feedback")
+    date = models.DateTimeField(auto_now_add=True, verbose_name="Date")
+
+    class Meta:
+        verbose_name = "Feedback"
+        verbose_name_plural = "Feedbacks"
+        ordering = ["-date"]
+
+    def __str__(self):
+        return f"Feedback from {self.employee_id} ({self.plant}) on {self.date.strftime('%Y-%m-%d %H:%M')}"
 
 

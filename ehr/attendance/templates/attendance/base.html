@@ -549,16 +549,18 @@
         }
 
         .table-custom tbody tr {
-            background: rgba(21, 28, 44, 0.3);
+            background: #ffffff !important;
             transition: transform 0.2s ease, background-color 0.2s ease;
         }
 
         .table-custom tbody tr:hover {
-            background: rgba(21, 28, 44, 0.5) !important;
+            background: #f8fafc !important;
             transform: scale(1.002);
         }
 
         .table-custom td {
+            color: #020617 !important;
+            background: transparent !important;
             border: none !important;
             padding: 14px 16px;
             vertical-align: middle;
@@ -727,6 +729,13 @@
                     </svg>
                     Leaves
                 </a>
+                <a href="{% url 'feedback' %}"
+                    class="sidebar-link {% if request.resolver_match.url_name == 'feedback' %}active{% endif %}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    Feedback
+                </a>
                 {% if user.is_superuser or user|has_permission:"role.manage" or user|has_permission:"section.manage" or user|has_permission:"user.manage" %}
                 <a href="{% url 'admin_dashboard' %}"
                     class="sidebar-link {% if active_tab == 'admin' %}active{% endif %}">
@@ -789,6 +798,15 @@
                             <line x1="12" y1="17" x2="12.01" y2="17" />
                         </svg>
                         Leaves
+                    </a>
+                    <a href="{% url 'feedback' %}"
+                        class="sidebar-link {% if request.resolver_match.url_name == 'feedback' %}active{% endif %}"
+                        onclick="bootstrap.Offcanvas.getInstance(document.getElementById('mobileSidebar')).hide();">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        Feedback
                     </a>
                     {% if user.is_superuser or user|has_permission:"role.manage" or user|has_permission:"section.manage" or user|has_permission:"user.manage" %}
                     <a href="{% url 'admin_dashboard' %}"

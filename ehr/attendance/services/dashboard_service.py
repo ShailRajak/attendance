@@ -159,7 +159,7 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
     is_supervisor = is_superuser or (scope in ("TEAM", "SECTION", "DEPARTMENT", "PLANT", "COMPANY", "ALL"))
 
     if not start_date or not end_date:
-        if scope == "OWN" or is_superuser:
+        if scope == "OWN" and not is_superuser:
             if not query_employee_id:
                 query_employee_id = user.username
         else:

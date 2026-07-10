@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import UserProfile, LeaveRequest, OvertimeRequest, CorrectionRequest, AttendanceAPIConfig, Role, Permission, RolePermission, OvertimeLimitConfig
+from .models import UserProfile, LeaveRequest, OvertimeRequest, CorrectionRequest, AttendanceAPIConfig, Role, Permission, RolePermission, OvertimeLimitConfig, Feedback
 
 
 @admin.register(AttendanceAPIConfig)
@@ -87,3 +87,25 @@ class PermissionAdmin(admin.ModelAdmin):
 class RolePermissionAdmin(admin.ModelAdmin):
     list_display = ("role", "permission")
     list_filter = ("role",)
+
+
+@admin.register(Feedback)
+class FeedbackAdmin(admin.ModelAdmin):
+    list_display = ("employee_id", "plant", "feedback", "date")
+    list_filter = ("plant", "date")
+    search_fields = ("employee_id", "feedback")
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser

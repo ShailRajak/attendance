@@ -234,3 +234,50 @@ def offline_view(request):
     Offline view fallback.
     """
     return render(request, "attendance/offline.html")
+
+
+@login_required
+def submit_feedback(request):
+    """
+    Allows employees to submit feedback, or allows superusers to view all feedback.
+    """
+    from attendance.models import Feedback
+
+    if request.user.is_superuser:
+        feedbacks = Feedback.objects.all().order_by("-date")
+        context = {
+            "active_tab": "feedback",
+            "feedbacks": feedbacks,
+        }
+        return render(request, "attendance/feedback.html", context)
+
+    # Resolve default plant from user profile
+    default_plant = "S63"
+    if hasattr(request.user, "profile") and request.user.profile.plant:
+        plant_code = request.user.profile.plant.code.upper()
+        if "C39" in plant_code:
+            default_plant = "C39"
+        else:
+            default_plant = "S63"
+
+    if request.method == "POST":
+        feedback_text = request.POST.get("feedback", "").strip()
+        plant = request.POST.get("plant", default_plant).strip()
+
+        if not feedback_text:
+            messages.error(request, "Feedback text cannot be empty.")
+        else:
+            Feedback.objects.create(
+                employee_id=request.user.username,
+                plant=plant,
+                feedback=feedback_text
+            )
+            messages.success(request, "Thank you! Your feedback has been submitted successfully.")
+            return redirect("home")
+
+    context = {
+        "active_tab": "feedback",
+        "default_plant": default_plant,
+        "employee_id": request.user.username,
+    }
+    return render(request, "attendance/feedback.html", context)
