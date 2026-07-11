@@ -4,7 +4,7 @@ import re
 from attendance.models import UserProfile
 from attendance.services.role_service import resolve_user_role_and_section, get_expected_dtname4
 from attendance.services.rbac_service import RBACService
-from attendance.services.attendance_service import fetch_attendance
+from attendance.services.attendance_service import fetch_attendance, fetch_attendance_from_db
 from attendance.services.analytics_service import parse_date
 from attendance.services.overtime_service import (
     get_all_cycles_in_year,
@@ -81,18 +81,24 @@ def get_leaves_dashboard_data(
         else:
             employee_id = ""
 
+    is_supervisor = is_superuser or (scope in ("TEAM", "SECTION", "DEPARTMENT", "PLANT", "COMPANY", "ALL"))
+
     attendance = []
     try:
         fetch_emp_id = employee_id if employee_id else ""
-        attendance = fetch_attendance(
-            employee_id=fetch_emp_id, start_date=start_str, end_date=end_str
-        )
+        if is_supervisor:
+            attendance = fetch_attendance_from_db(
+                employee_id=fetch_emp_id, start_date=start_str, end_date=end_str
+            )
+        else:
+            attendance = fetch_attendance(
+                employee_id=fetch_emp_id, start_date=start_str, end_date=end_str
+            )
     except Exception as e:
         print(f"Error fetching attendance in leaves dashboard: {e}")
 
     # Filter data based on RBAC rules and resolved section names
     expected_dtname4 = get_expected_dtname4(role, section, user.username)
-    is_supervisor = is_superuser or (scope in ("TEAM", "SECTION", "DEPARTMENT", "PLANT", "COMPANY", "ALL"))
 
     if scope == "OWN" or (not is_supervisor and not is_superuser):
         # Regular employee sees only their own data

@@ -2,13 +2,13 @@ from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 
 
-from attendance.services.attendance_service import fetch_attendance
+from attendance.services.attendance_service import fetch_attendance, fetch_attendance_from_db
 from attendance.services.role_service import resolve_user_role_and_section, get_expected_dtname4
 from attendance.services.rbac_service import RBACService
 from attendance.models import UserProfile
 
 
-def get_overtime_summary(emp_id, start_date, end_date):
+def get_overtime_summary(emp_id, start_date, end_date, is_supervisor=False):
     """
     Aggregates overtime data from cached attendance records for a single employee.
 
@@ -18,8 +18,11 @@ def get_overtime_summary(emp_id, start_date, end_date):
         - daily_breakdown: list of per-day dicts for charting
         - anomalies: list of punch anomalies
     """
-    # Fetch from cache (reuses existing cache key pattern)
-    attendance = fetch_attendance(emp_id, start_date, end_date)
+    # Fetch from cache or local DB depending on role
+    if is_supervisor:
+        attendance = fetch_attendance_from_db(emp_id, start_date, end_date)
+    else:
+        attendance = fetch_attendance(emp_id, start_date, end_date)
 
     # Initialize totals
     card_punch_ot = 0.0
@@ -356,8 +359,8 @@ def get_scope_overtime_summary(accessible_usernames, start_date, end_date, expec
         - scope_total: aggregated totals across all employees
         - dtname4_scope: scope name
     """
-    # Fetch all attendance records (no employee filter)
-    attendance = fetch_attendance("", start_date, end_date)
+    # Fetch all attendance records (no employee filter) from local DB for supervisor scope
+    attendance = fetch_attendance_from_db("", start_date, end_date)
 
     # Filter by section name if expected_dtname4 is provided, else fallback to accessible employee usernames
     if expected_dtname4:
@@ -724,10 +727,10 @@ def get_overtime_dashboard_data(user, get_params):
 
     if has_selected_employee and not is_superuser and scope != "ALL" and expected_dtname4:
         # Verify employee belongs to section
-        attendance_chk = fetch_attendance(emp_id, start_date_str, end_date_str)
+        attendance_chk = fetch_attendance_from_db(emp_id, start_date_str, end_date_str)
         belongs = any(r.get("Day") == expected_dtname4 for r in attendance_chk)
         if belongs:
-            summary = get_overtime_summary(emp_id, start_date_str, end_date_str)
+            summary = get_overtime_summary(emp_id, start_date_str, end_date_str, is_supervisor=is_supervisor)
         else:
             summary = {
                 "card_punch_ot": 0.0,
@@ -739,7 +742,7 @@ def get_overtime_dashboard_data(user, get_params):
                 "anomalies": [],
             }
     else:
-        summary = get_overtime_summary(emp_id, start_date_str, end_date_str)
+        summary = get_overtime_summary(emp_id, start_date_str, end_date_str, is_supervisor=is_supervisor)
 
     scope_summary = None
     if is_supervisor:

@@ -282,3 +282,103 @@ class Feedback(models.Model):
         return f"Feedback from {self.employee_id} ({self.plant}) on {self.date.strftime('%Y-%m-%d %H:%M')}"
 
 
+class AttendanceRecord(models.Model):
+    employee_id = models.CharField(max_length=50, db_index=True)
+    employee_name = models.CharField(max_length=150, blank=True, default="")
+    attendance_date = models.DateField(db_index=True)
+
+    in_time = models.CharField(max_length=10, blank=True, default="")
+    out_time = models.CharField(max_length=10, blank=True, default="")
+    working_hours = models.FloatField(default=0.0, null=True, blank=True)
+
+    card_punch_ot = models.FloatField(default=0.0, null=True, blank=True)
+    requested_ot = models.FloatField(default=0.0, null=True, blank=True)
+    weekend_ot = models.FloatField(default=0.0, null=True, blank=True)
+    holiday_ot = models.FloatField(default=0.0, null=True, blank=True)
+    ot4 = models.FloatField(default=0.0, null=True, blank=True)
+    total_ot_all = models.FloatField(default=0.0, null=True, blank=True)
+    req_overtime = models.FloatField(default=0.0, null=True, blank=True)
+    approved_ot = models.FloatField(default=0.0, null=True, blank=True)
+
+    wt_id = models.CharField(max_length=50, blank=True, default="")
+    wt_type_no = models.CharField(max_length=50, blank=True, default="")
+    attendance_source = models.CharField(max_length=100, blank=True, default="")
+    day = models.CharField(max_length=100, blank=True, default="", db_index=True)  # Section name from dtName4
+    attendance_status = models.CharField(max_length=100, blank=True, default="")
+    shift = models.CharField(max_length=100, blank=True, default="")
+    mobile = models.CharField(max_length=50, blank=True, default="")
+    late_minutes = models.FloatField(default=0.0, null=True, blank=True)
+    leave_type = models.CharField(max_length=100, blank=True, default="")
+    workday = models.CharField(max_length=50, blank=True, default="")
+    weekday = models.CharField(max_length=50, blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("employee_id", "attendance_date")
+        ordering = ["-attendance_date", "employee_id"]
+
+    def __str__(self):
+        return f"{self.employee_id} - {self.attendance_date} - {self.attendance_status}"
+
+    def to_dict(self):
+        """
+        Convert to the dictionary structure matching the raw/formatter output format
+        to maintain total backward compatibility with dashboard/analytics services.
+        """
+        def format_float(val):
+            if val is None:
+                return ""
+            if isinstance(val, float) and val.is_integer():
+                return str(int(val))
+            return str(val)
+
+        return {
+            "Date": self.attendance_date.strftime("%d-%m-%Y") if self.attendance_date else "",
+            "Employee ID": self.employee_id,
+            "Employee Name": self.employee_name,
+            "In Time": self.in_time,
+            "Out Time": self.out_time,
+            "Working Hours": format_float(self.working_hours),
+            "Card Punch OT": format_float(self.card_punch_ot),
+            "Requested OT": format_float(self.requested_ot),
+            "Weekend OT": format_float(self.weekend_ot),
+            "Holiday OT": format_float(self.holiday_ot),
+            "OT4": format_float(self.ot4),
+            "Total OT All": format_float(self.total_ot_all),
+            "Req OverTime": format_float(self.req_overtime),
+            "Approved OT": format_float(self.approved_ot),
+            "WT ID": self.wt_id,
+            "WT Type No": self.wt_type_no,
+            "Attendance Source": self.attendance_source,
+            "Day": self.day,
+            "Attendance Status": self.attendance_status,
+            "Shift": self.shift,
+            "Mobile": self.mobile,
+            "Late Minutes": format_float(self.late_minutes),
+            "Leave Type": self.leave_type,
+            "WorkDay": self.workday,
+            "Weekday": self.weekday,
+        }
+
+
+class SyncLog(models.Model):
+    sync_date = models.DateField(unique=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[("SUCCESS", "Success"), ("FAILED", "Failed")]
+    )
+    records_created = models.IntegerField(default=0)
+    records_updated = models.IntegerField(default=0)
+    records_unchanged = models.IntegerField(default=0)
+    last_sync = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-sync_date"]
+
+    def __str__(self):
+        return f"{self.sync_date} - {self.status}"
+
+
+

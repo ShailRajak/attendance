@@ -103,6 +103,32 @@ def _fetch_single_date(date_obj, employee_id):
     return []
 
 
+def fetch_attendance_from_db(employee_id, start_date, end_date):
+    """
+    Retrieve attendance records from the local synchronized database.
+    """
+    from attendance.models import AttendanceRecord
+
+    if isinstance(start_date, str):
+        start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+    elif isinstance(start_date, datetime):
+        start_date = start_date.date()
+
+    if isinstance(end_date, str):
+        end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+    elif isinstance(end_date, datetime):
+        end_date = end_date.date()
+
+    qs = AttendanceRecord.objects.filter(attendance_date__range=(start_date, end_date))
+    if employee_id:
+        qs = qs.filter(employee_id=employee_id)
+
+    # Sort descending by date
+    qs = qs.order_by("-attendance_date", "employee_id")
+
+    return [record.to_dict() for record in qs]
+
+
 def fetch_attendance(employee_id, start_date, end_date):
     """
     Fetch attendance data from Attendance REST API.

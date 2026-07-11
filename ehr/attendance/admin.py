@@ -1,6 +1,11 @@
 from django.contrib import admin
 
-from .models import UserProfile, LeaveRequest, OvertimeRequest, CorrectionRequest, AttendanceAPIConfig, Role, Permission, RolePermission, OvertimeLimitConfig, Feedback
+# pyrefly: ignore [missing-import]
+from .models import (
+    UserProfile, LeaveRequest, OvertimeRequest, CorrectionRequest,
+    AttendanceAPIConfig, Role, Permission, RolePermission,
+    OvertimeLimitConfig, Feedback, AttendanceRecord, SyncLog
+)
 
 
 @admin.register(AttendanceAPIConfig)
@@ -109,3 +114,35 @@ class FeedbackAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return request.user.is_superuser
+
+
+@admin.register(AttendanceRecord)
+class AttendanceRecordAdmin(admin.ModelAdmin):
+    list_display = (
+        "employee_id",
+        "employee_name",
+        "attendance_date",
+        "in_time",
+        "out_time",
+        "working_hours",
+        "attendance_status",
+        "day",
+    )
+    list_filter = ("attendance_date", "day", "attendance_status", "shift")
+    search_fields = ("employee_id", "employee_name", "day")
+    date_hierarchy = "attendance_date"
+
+
+@admin.register(SyncLog)
+class SyncLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "sync_date",
+        "status",
+        "records_created",
+        "records_updated",
+        "records_unchanged",
+        "last_sync",
+    )
+    list_filter = ("status", "sync_date")
+    date_hierarchy = "sync_date"
+

@@ -8,7 +8,7 @@ from attendance.services.analytics_service import (
     calculate_section_dashboard_stats,
     parse_date,
 )
-from attendance.services.attendance_service import fetch_attendance
+from attendance.services.attendance_service import fetch_attendance, fetch_attendance_from_db
 from attendance.services.role_service import get_expected_dtname4, resolve_user_role_and_section
 from attendance.services.rbac_service import RBACService
 
@@ -181,9 +181,14 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
     attendance = []
     try:
         fetch_emp_id = query_employee_id if query_employee_id else ""
-        attendance = fetch_attendance(
-            employee_id=fetch_emp_id, start_date=start_date, end_date=end_date
-        )
+        if is_supervisor:
+            attendance = fetch_attendance_from_db(
+                employee_id=fetch_emp_id, start_date=start_date, end_date=end_date
+            )
+        else:
+            attendance = fetch_attendance(
+                employee_id=fetch_emp_id, start_date=start_date, end_date=end_date
+            )
     except Exception as e:
         print(f"Error fetching attendance: {e}")
         attendance = []

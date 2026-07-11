@@ -153,3 +153,206 @@ class RBACSystemTests(TestCase):
 
         # Employee (user_emp) has team, so gets no subordinates
         self.assertEqual(OrganizationService.get_subordinates(self.user_emp).count(), 0)
+
+
+from datetime import date, timedelta
+from unittest.mock import patch
+from django.core.management import call_command
+from attendance.models import AttendanceRecord, SyncLog
+from attendance.management.commands.sync_attendance import get_cycle_dates, get_retention_cutoff
+
+
+class AttendanceSyncTests(TestCase):
+    def test_get_cycle_dates_10_july(self):
+        # 10 July 2026
+        # Previous fixed cycle: 21 May 2026 -> 20 June 2026
+        # Current active cycle: 21 June 2026 -> 10 July 2026
+        today = date(2026, 7, 10)
+        (prev_start, prev_end), (curr_start, curr_end) = get_cycle_dates(today)
+        self.assertEqual(prev_start, date(2026, 5, 21))
+        self.assertEqual(prev_end, date(2026, 6, 20))
+        self.assertEqual(curr_start, date(2026, 6, 21))
+        self.assertEqual(curr_end, date(2026, 7, 10))
+
+    def test_get_cycle_dates_20_july(self):
+        # 20 July 2026
+        # Previous fixed cycle: 21 May 2026 -> 20 June 2026
+        # Current active cycle: 21 June 2026 -> 20 July 2026
+        today = date(2026, 7, 20)
+        (prev_start, prev_end), (curr_start, curr_end) = get_cycle_dates(today)
+        self.assertEqual(prev_start, date(2026, 5, 21))
+        self.assertEqual(prev_end, date(2026, 6, 20))
+        self.assertEqual(curr_start, date(2026, 6, 21))
+        self.assertEqual(curr_end, date(2026, 7, 20))
+
+    def test_get_cycle_dates_21_july(self):
+        # 21 July 2026
+        # Previous fixed cycle: 21 June 2026 -> 20 July 2026
+        # Current active cycle: 21 July 2026 -> 21 July 2026
+        today = date(2026, 7, 21)
+        (prev_start, prev_end), (curr_start, curr_end) = get_cycle_dates(today)
+        self.assertEqual(prev_start, date(2026, 6, 21))
+        self.assertEqual(prev_end, date(2026, 7, 20))
+        self.assertEqual(curr_start, date(2026, 7, 21))
+        self.assertEqual(curr_end, date(2026, 7, 21))
+
+    def test_get_cycle_dates_1_august(self):
+        # 1 August 2026
+        # Previous fixed cycle: 21 June 2026 -> 20 July 2026
+        # Current active cycle: 21 July 2026 -> 1 August 2026
+        today = date(2026, 8, 1)
+        (prev_start, prev_end), (curr_start, curr_end) = get_cycle_dates(today)
+        self.assertEqual(prev_start, date(2026, 6, 21))
+        self.assertEqual(prev_end, date(2026, 7, 20))
+        self.assertEqual(curr_start, date(2026, 7, 21))
+        self.assertEqual(curr_end, date(2026, 8, 1))
+
+    def test_december_january_boundary(self):
+        # Test Year Boundary (5 January 2027)
+        # Previous fixed cycle: 21 November 2026 -> 20 December 2026
+        # Current active cycle: 21 December 2026 -> 5 January 2027
+        today = date(2027, 1, 5)
+        (prev_start, prev_end), (curr_start, curr_end) = get_cycle_dates(today)
+        self.assertEqual(prev_start, date(2026, 11, 21))
+        self.assertEqual(prev_end, date(2026, 12, 20))
+        self.assertEqual(curr_start, date(2026, 12, 21))
+        self.assertEqual(curr_end, date(2027, 1, 5))
+
+    def test_retention_cutoff(self):
+        # 31 July 2026 -> cutoff starts 21 May 2026 (June cycle starts 21 May, kept)
+        self.assertEqual(get_retention_cutoff(date(2026, 7, 31)), date(2026, 5, 21))
+        # 1 August 2026 -> cutoff starts 21 June 2026 (June cycle starts 21 May, deleted)
+        self.assertEqual(get_retention_cutoff(date(2026, 8, 1)), date(2026, 6, 21))
+
+    @patch("attendance.management.commands.sync_attendance.fetch_single_date_with_status")
+    def test_sync_db_write_modes_and_safety(self, mock_fetch):
+        # Pre-seed some SyncLogs to simulate partial sync of previous cycle
+        # We'll mark all days of previous cycle as SUCCESS except for 2026-06-15.
+        d = date(2026, 5, 21)
+        while d <= date(2026, 6, 20):
+            if d != date(2026, 6, 15):
+                SyncLog.objects.create(sync_date=d, status="SUCCESS")
+            d += timedelta(days=1)
+
+        # Pre-seed one AttendanceRecord on 2026-06-25 with old info (will check UPDATE)
+        AttendanceRecord.objects.create(
+            employee_id="KQ062001",
+            employee_name="Old Name",
+            attendance_date=date(2026, 6, 25),
+            in_time="09:00",
+            out_time="18:00",
+            working_hours=8.0,
+            day="Sector 63 - SMT PD",
+            attendance_status="Present"
+        )
+
+        # Pre-seed one AttendanceRecord on 2026-06-26 with identical info (will check SKIP)
+        AttendanceRecord.objects.create(
+            employee_id="KQ062001",
+            employee_name="Identical Name",
+            attendance_date=date(2026, 6, 26),
+            in_time="09:00",
+            out_time="18:00",
+            working_hours=8.0,
+            day="Sector 63 - SMT PD",
+            attendance_status="Present"
+        )
+
+        # Define API responses for fetch_single_date_with_status
+        def mock_fetch_side_effect(dt):
+            # KQ062001 on June 15 (unsynced prev): New INSERT
+            if dt == date(2026, 6, 15):
+                return True, [{
+                    "EmpNo": "KQ062001",
+                    "EmpName": "John Doe",
+                    "YYMMDD": "20260615",
+                    "GO1": "09:00",
+                    "OUT1": "18:00",
+                    "WorkTime1": "8.0",
+                    "dtName4": "Sector 63 - SMT PD",
+                    "WorkTypeName": "Present"
+                }]
+            # KQ062001 on June 25: changed employee_name to "New Name" (UPDATE check)
+            elif dt == date(2026, 6, 25):
+                return True, [{
+                    "EmpNo": "KQ062001",
+                    "EmpName": "New Name",
+                    "YYMMDD": "20260625",
+                    "GO1": "09:00",
+                    "OUT1": "18:00",
+                    "WorkTime1": "8.0",
+                    "dtName4": "Sector 63 - SMT PD",
+                    "WorkTypeName": "Present"
+                }]
+            # KQ062001 on June 26: identical (SKIP check)
+            elif dt == date(2026, 6, 26):
+                return True, [{
+                    "EmpNo": "KQ062001",
+                    "EmpName": "Identical Name",
+                    "YYMMDD": "20260626",
+                    "GO1": "09:00",
+                    "OUT1": "18:00",
+                    "WorkTime1": "8.0",
+                    "dtName4": "Sector 63 - SMT PD",
+                    "WorkTypeName": "Present"
+                }]
+            # Let 2026-07-08 fail completely (API Failure safety check)
+            elif dt == date(2026, 7, 8):
+                return False, []
+
+            return True, []
+
+        mock_fetch.side_effect = mock_fetch_side_effect
+
+        # Run command for 11 July 2026 (target date is passed to date option)
+        call_command("sync_attendance", date="2026-07-11")
+
+        # 1. Verify INSERT
+        rec_insert = AttendanceRecord.objects.get(attendance_date=date(2026, 6, 15), employee_id="KQ062001")
+        self.assertEqual(rec_insert.employee_name, "John Doe")
+
+        # 2. Verify UPDATE
+        rec_update = AttendanceRecord.objects.get(attendance_date=date(2026, 6, 25), employee_id="KQ062001")
+        self.assertEqual(rec_update.employee_name, "New Name")
+
+        # 3. Verify API Failure: date 2026-07-08 SyncLog status is FAILED
+        log_failed = SyncLog.objects.get(sync_date=date(2026, 7, 8))
+        self.assertEqual(log_failed.status, "FAILED")
+
+        # 4. Verify that other dates remain safe
+        self.assertEqual(AttendanceRecord.objects.filter(attendance_date=date(2026, 6, 25)).count(), 1)
+
+    @patch("attendance.management.commands.sync_attendance.fetch_single_date_with_status")
+    def test_retention_deletion_execution(self, mock_fetch):
+        mock_fetch.return_value = (True, [])
+
+        # Seed record belonging to June cycle (21 May -> 20 June)
+        AttendanceRecord.objects.create(
+            employee_id="KQ062001",
+            employee_name="June Emp",
+            attendance_date=date(2026, 6, 19),
+            in_time="09:00",
+            out_time="18:00"
+        )
+        SyncLog.objects.create(sync_date=date(2026, 6, 19), status="SUCCESS")
+
+        # Seed record belonging to July cycle (starts 21 June)
+        AttendanceRecord.objects.create(
+            employee_id="KQ062001",
+            employee_name="July Emp",
+            attendance_date=date(2026, 6, 22),
+            in_time="09:00",
+            out_time="18:00"
+        )
+        SyncLog.objects.create(sync_date=date(2026, 6, 22), status="SUCCESS")
+
+        # Run command with date 1st August 2026
+        call_command("sync_attendance", date="2026-08-01")
+
+        # Verify June records are deleted
+        self.assertFalse(AttendanceRecord.objects.filter(attendance_date=date(2026, 6, 19)).exists())
+        self.assertFalse(SyncLog.objects.filter(sync_date=date(2026, 6, 19)).exists())
+
+        # Verify July records are preserved
+        self.assertTrue(AttendanceRecord.objects.filter(attendance_date=date(2026, 6, 22)).exists())
+        self.assertTrue(SyncLog.objects.filter(sync_date=date(2026, 6, 22)).exists())

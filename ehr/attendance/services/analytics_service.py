@@ -208,7 +208,7 @@ def calculate_dashboard_stats(
                         status_leave += 1.0
                 else:
                     if is_weekend:
-                        if work_time >= 8.0:
+                        if work_time >= 8.0 or is_today:
                             working_days += 1
                             days_present += 1.0
                             status_present += 1.0
@@ -218,7 +218,7 @@ def calculate_dashboard_stats(
                             total_work_time += work_time
                     else:
                         working_days += 1
-                        if work_time >= 8.0:
+                        if work_time >= 8.0 or is_today:
                             days_present += 1.0
                             status_present += 1.0
                             total_work_time += work_time
