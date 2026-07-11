@@ -356,3 +356,123 @@ class AttendanceSyncTests(TestCase):
         # Verify July records are preserved
         self.assertTrue(AttendanceRecord.objects.filter(attendance_date=date(2026, 6, 22)).exists())
         self.assertTrue(SyncLog.objects.filter(sync_date=date(2026, 6, 22)).exists())
+
+
+class AttendanceDrilldownTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from attendance.models import Role, UserProfile, Section, AttendanceRecord
+        from datetime import date
+
+        # Setup standard roles/sections
+        self.role_employee = Role.objects.get(code="employee")
+        self.role_supervisor = Role.objects.get(code="supervisor")
+        self.section_smt = Section.objects.get(code="s63_smt")
+
+        # Create standard employee
+        self.user_emp = User.objects.create_user(username="emp456", password="password")
+        UserProfile.objects.create(user=self.user_emp, role=self.role_employee, section=None)
+
+        # Create supervisor
+        self.user_sup = User.objects.create_user(username="sup456", password="password")
+        UserProfile.objects.create(user=self.user_sup, role=self.role_supervisor, section=self.section_smt)
+
+        # Seed records for standard employee
+        AttendanceRecord.objects.create(
+            employee_id="emp456",
+            employee_name="Emp FourFiveSix",
+            attendance_date=date(2026, 7, 10),
+            in_time="09:00",
+            out_time="18:00",
+            attendance_status="Present",
+            working_hours=8.0
+        )
+        AttendanceRecord.objects.create(
+            employee_id="emp456",
+            employee_name="Emp FourFiveSix",
+            attendance_date=date(2026, 7, 9),
+            in_time="",
+            out_time="",
+            attendance_status="Absent",
+            working_hours=0.0
+        )
+
+        # Seed record for supervisor (under SMT section)
+        AttendanceRecord.objects.create(
+            employee_id="sup456",
+            employee_name="Supervisor SMT",
+            attendance_date=date(2026, 7, 10),
+            in_time="09:10",
+            out_time="18:00",
+            attendance_status="Present",
+            working_hours=8.0,
+            day="Sector 63 - SMT PD"
+        )
+
+    def test_unauthenticated_user_denied(self):
+        response = self.client.get("/api/attendance/chart-drilldown/")
+        self.assertEqual(response.status_code, 302)
+
+    def test_employee_cannot_see_other_data(self):
+        self.client.login(username="emp456", password="password")
+        
+        response = self.client.get("/api/attendance/chart-drilldown/", {
+            "start_date": "2026-07-01",
+            "end_date": "2026-07-15",
+            "filter_type": "attendance_status",
+            "filter_value": "Present"
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["records"][0]["employee_id"], "emp456")
+
+        response2 = self.client.get("/api/attendance/chart-drilldown/", {
+            "start_date": "2026-07-01",
+            "end_date": "2026-07-15",
+            "employee_id": "sup456",
+            "filter_type": "attendance_status",
+            "filter_value": "Present"
+        })
+        self.assertEqual(response2.status_code, 403)
+
+    def test_supervisor_sees_scoped_records(self):
+        self.client.login(username="sup456", password="password")
+        
+        response = self.client.get("/api/attendance/chart-drilldown/", {
+            "start_date": "2026-07-01",
+            "end_date": "2026-07-15",
+            "filter_type": "attendance_status",
+            "filter_value": "Present"
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["records"][0]["employee_id"], "sup456")
+
+    def test_drilldown_filtering_date(self):
+        self.client.login(username="emp456", password="password")
+        
+        response = self.client.get("/api/attendance/chart-drilldown/", {
+            "start_date": "2026-07-01",
+            "end_date": "2026-07-15",
+            "filter_type": "date",
+            "filter_value": "2026-07-09"
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["records"][0]["raw_date"], "09-07-2026")
+
+    def test_invalid_filter_type_denied(self):
+        self.client.login(username="emp456", password="password")
+        
+        response = self.client.get("/api/attendance/chart-drilldown/", {
+            "start_date": "2026-07-01",
+            "end_date": "2026-07-15",
+            "filter_type": "invalid_orm_field",
+            "filter_value": "SomeValue"
+        })
+        self.assertEqual(response.status_code, 400)

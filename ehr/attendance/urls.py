@@ -11,6 +11,7 @@ urlpatterns = [
     path("signup/", views.signup_view, name="signup"),
     path("logout/", views.logout_view, name="logout"),
     path("api/attendance/", views.attendance_api, name="attendance_api"),
+    path("api/attendance/chart-drilldown/", views.attendance_drilldown_api, name="attendance_drilldown_api"),
     path("overtime/", views.overtime_dashboard, name="overtime"),
     path("leaves/", views.leaves_dashboard, name="leaves"),
     path("feedback/", views.submit_feedback, name="feedback"),

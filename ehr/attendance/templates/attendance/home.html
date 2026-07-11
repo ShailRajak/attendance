@@ -622,20 +622,26 @@
             <div
                 class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4">
                 <h4 class="fw-bold mb-0 text-white" id="dashboardSectionTitle">Attendance Logs ({{ period_text }})</h4>
-                <div class="d-flex gap-2 flex-wrap">
+                <div class="d-flex gap-1 align-items-center flex-nowrap">
                     {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
-                    <button type="button" id="btnDayShift" class="btn btn-accent btn-sm py-2 px-3">☀️ Day Shift</button>
-                    <button type="button" id="btnNightShift" class="btn btn-outline-custom btn-sm py-2 px-3">🌙 Night
-                        Shift</button>
+                    <div class="d-flex gap-1 align-items-center border-end border-secondary pe-2 me-1">
+                        <button type="button" id="btnS63" class="btn btn-accent btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">🏢 S63</button>
+                        <button type="button" id="btnC39" class="btn btn-outline-custom btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">🏢 C39</button>
+                    </div>
+                    <button type="button" id="btnDayShift" class="btn btn-accent btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">☀️ Day Shift</button>
+                    <button type="button" id="btnNightShift" class="btn btn-outline-custom btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">🌙 Night Shift</button>
                     {% else %}
-                    <button type="button" id="btnListView" class="btn btn-accent btn-sm py-2 px-3">📋 List View</button>
-                    <button type="button" id="btnCalendarView" class="btn btn-outline-custom btn-sm py-2 px-3">📅
-                        Calendar View</button>
+                    <button type="button" id="btnListView" class="btn btn-accent btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">📋 List View</button>
+                    <button type="button" id="btnCalendarView" class="btn btn-outline-custom btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">📅 Calendar View</button>
                     {% endif %}
                 </div>
             </div>
 
             <div id="listViewContainer">
+                <div id="drilldownFilterHeader" class="mb-3 d-none" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); padding: 10px 15px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                    <span class="text-white fw-semibold" id="drilldownFilterText"></span>
+                    <button type="button" id="btnClearDrilldown" class="btn btn-outline-danger btn-sm py-1 px-3" style="font-size: 0.8rem;">✕ Clear Filter</button>
+                </div>
                 {% if attendance %}
                 <div class="table-responsive"
                     style="max-height: 480px; overflow-y: auto; overflow-x: auto; border-radius: 10px;">
@@ -655,9 +661,9 @@
                                 <th>Status</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="attendanceTableBody">
                             {% for row in attendance %}
-                            <tr data-shift="{{ row.shift_label }}">
+                            <tr data-shift="{{ row.shift_label }}" data-section="{% if 'Sector 63' in row.department or 's63' in row.department %}s63{% elif 'Phase 2' in row.department or 'c39' in row.department %}c39{% else %}other{% endif %}">
                                 {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
                                 <td><strong class="text-info">{{ row.employee_id }}</strong></td>
                                 <td>{{ row.employee_name }}</td>
@@ -729,8 +735,75 @@
 {{ stats.chart_worktime_data|json_script:"chart-worktime-data" }}
 {{ stats.breakdown_data|json_script:"breakdown-data" }}
 {{ attendance|json_script:"attendance-data" }}
+{{ start_date|json_script:"active-start-date" }}
+{{ end_date|json_script:"active-end-date" }}
+{{ role|json_script:"user-role" }}
+{{ is_superuser|json_script:"user-is-superuser" }}
 
 <script>
+    // Define shift and section filtering globally so drill-down helper can access them
+    let currentShift = 'day';
+    let currentSection = 's63';
+
+    function applyFilters() {
+        const dynamicRows = document.querySelectorAll('#attendanceTableBody tr');
+        dynamicRows.forEach(row => {
+            const shiftLabel = row.getAttribute('data-shift');
+            const sectionLabel = row.getAttribute('data-section');
+            
+            // Check if section buttons are present (for supervisor roles)
+            const btnS63 = document.getElementById('btnS63');
+            if (btnS63) {
+                if (shiftLabel === currentShift && sectionLabel === currentSection) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            } else {
+                if (shiftLabel === currentShift) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        });
+
+        // Update button classes dynamically
+        const btnDayShift = document.getElementById('btnDayShift');
+        const btnNightShift = document.getElementById('btnNightShift');
+        if (btnDayShift && btnNightShift) {
+            btnDayShift.className = currentShift === 'day' ? 'btn btn-accent btn-sm py-1 px-2 fw-semibold' : 'btn btn-outline-custom btn-sm py-1 px-2 fw-semibold';
+            btnNightShift.className = currentShift === 'night' ? 'btn btn-accent btn-sm py-1 px-2 fw-semibold' : 'btn btn-outline-custom btn-sm py-1 px-2 fw-semibold';
+            btnDayShift.style.fontSize = '0.75rem';
+            btnNightShift.style.fontSize = '0.75rem';
+        }
+
+        const btnS63 = document.getElementById('btnS63');
+        const btnC39 = document.getElementById('btnC39');
+        if (btnS63 && btnC39) {
+            btnS63.className = currentSection === 's63' ? 'btn btn-accent btn-sm py-1 px-2 fw-semibold' : 'btn btn-outline-custom btn-sm py-1 px-2 fw-semibold';
+            btnC39.className = currentSection === 'c39' ? 'btn btn-accent btn-sm py-1 px-2 fw-semibold' : 'btn btn-outline-custom btn-sm py-1 px-2 fw-semibold';
+            btnS63.style.fontSize = '0.75rem';
+            btnC39.style.fontSize = '0.75rem';
+        }
+
+        const titleEl = document.getElementById('dashboardSectionTitle');
+        if (titleEl) {
+            const shiftText = currentShift === 'day' ? '☀️ Day Shift' : '🌙 Night Shift';
+            if (btnS63) {
+                const secText = currentSection === 's63' ? 'S63' : 'C39';
+                titleEl.textContent = `${secText} — ${shiftText} — {{ period_text|escapejs }}`;
+            } else {
+                titleEl.textContent = `${shiftText} — {{ period_text|escapejs }}`;
+            }
+        }
+    }
+
+    function filterByShift(shift) {
+        currentShift = shift;
+        applyFilters();
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
         const chartTextColor = '#94a3b8';
         const chartBorderColor = 'rgba(255, 255, 255, 0.08)';
@@ -756,6 +829,13 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                onClick: (event, elements, chart) => {
+                    if (elements && elements.length > 0) {
+                        const index = elements[0].index;
+                        const label = chart.data.labels[index];
+                        handleDrilldown('date', label);
+                    }
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -794,10 +874,10 @@
         new Chart(ctxPie, {
             type: 'doughnut',
             data: {
-                labels: ['Present', 'Leaves', 'Rest Days'],
+                labels: ['Present', 'Leaves', 'Rest Days', 'Mispunches', 'CL(0.5d)'],
                 datasets: [{
                     data: breakdownData,
-                    backgroundColor: ['#10b981', '#f59e0b', '#64748b'],
+                    backgroundColor: ['#10b981', '#f59e0b', '#64748b', '#ef4444', '#3b82f6'],
                     borderWidth: 0,
                     hoverOffset: 4
                 }]
@@ -806,6 +886,13 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 cutout: '70%',
+                onClick: (event, elements, chart) => {
+                    if (elements && elements.length > 0) {
+                        const index = elements[0].index;
+                        const label = chart.data.labels[index];
+                        handleDrilldown('attendance_status', label);
+                    }
+                },
                 plugins: {
                     legend: {
                         position: 'bottom',
@@ -827,31 +914,161 @@
             }
         });
 
-        // 3. Day Shift / Night Shift toggle (Management)
-        const btnDayShift = document.getElementById('btnDayShift');
-        const btnNightShift = document.getElementById('btnNightShift');
-        const allRows = document.querySelectorAll('#listViewContainer tbody tr');
+        // Drilldown Logic
+        let activeRequestController = null;
+        const originalTableBody = document.getElementById('attendanceTableBody');
+        const originalTableHtml = originalTableBody ? originalTableBody.innerHTML : '';
+        const drilldownHeader = document.getElementById('drilldownFilterHeader');
+        const drilldownText = document.getElementById('drilldownFilterText');
+        const clearBtn = document.getElementById('btnClearDrilldown');
+        
+        const activeStartDate = JSON.parse(document.getElementById('active-start-date').textContent);
+        const activeEndDate = JSON.parse(document.getElementById('active-end-date').textContent);
+        const userRole = JSON.parse(document.getElementById('user-role').textContent);
+        const isSuperuser = JSON.parse(document.getElementById('user-is-superuser').textContent) === "True" || JSON.parse(document.getElementById('user-is-superuser').textContent) === true;
+        const showEmpDetails = (userRole === 'smt_pd' || userRole === 'assy_pd' || isSuperuser);
 
-        if (btnDayShift && btnNightShift && allRows.length > 0) {
-            // Show all rows by default (Day Shift active)
-            let currentShift = 'day';
+        function handleDrilldown(filterType, filterValue) {
+            if (activeRequestController) {
+                activeRequestController.abort();
+            }
+            activeRequestController = new AbortController();
 
-            function filterByShift(shift) {
-                currentShift = shift;
-                allRows.forEach(row => {
-                    const shiftLabel = row.getAttribute('data-shift');
-                    row.style.display = (shiftLabel === shift) ? '' : 'none';
-                });
-                btnDayShift.className = shift === 'day' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
-                btnNightShift.className = shift === 'night' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
-                document.getElementById('dashboardSectionTitle').textContent = (shift === 'day' ? '☀️ Day Shift' : '🌙 Night Shift') + ' — ' + "{{ period_text|escapejs }}";
+            const tableBody = document.getElementById('attendanceTableBody');
+            if (tableBody) {
+                tableBody.innerHTML = `<tr><td colspan="${showEmpDetails ? 9 : 7}" class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></td></tr>`;
             }
 
-            btnDayShift.addEventListener('click', function () { filterByShift('day'); });
-            btnNightShift.addEventListener('click', function () { filterByShift('night'); });
+            if (drilldownHeader && drilldownText) {
+                drilldownText.textContent = `Showing: ${filterType.replace('_', ' ')} — "${filterValue}"`;
+                drilldownHeader.classList.remove('d-none');
+            }
 
-            // Apply initial day shift filter
-            filterByShift('day');
+            const urlParams = new URLSearchParams(window.location.search);
+            const empId = urlParams.get('employee_id') || (document.getElementById('employee_id') ? document.getElementById('employee_id').value : '');
+
+            const fetchUrl = `/api/attendance/chart-drilldown/?start_date=${activeStartDate}&end_date=${activeEndDate}&employee_id=${empId}&filter_type=${filterType}&filter_value=${encodeURIComponent(filterValue)}&section=${currentSection}`;
+
+            fetch(fetchUrl, { signal: activeRequestController.signal })
+                .then(response => {
+                    if (!response.ok) throw new Error('API request failed');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        if (drilldownText) {
+                            drilldownText.textContent = `Showing: ${filterType.replace('_', ' ')} — "${filterValue}" (${data.count} records)`;
+                        }
+
+                        if (data.records.length === 0) {
+                            tableBody.innerHTML = `<tr><td colspan="${showEmpDetails ? 9 : 7}" class="text-center py-5 text-muted">No records found matching this category.</td></tr>`;
+                            return;
+                        }
+
+                        let rowsHtml = '';
+                        data.records.forEach(row => {
+                            let badgeHtml = '';
+                            if (row.status === "Present") {
+                                badgeHtml = '<span class="badge badge-custom badge-active">Present</span>';
+                            } else if (row.status === "Absent") {
+                                badgeHtml = '<span class="badge badge-custom badge-absent">Absent</span>';
+                            } else if (row.status === "Mispunch") {
+                                badgeHtml = '<span class="badge badge-custom badge-absent" style="background-color: rgba(239, 68, 68, 0.12); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2);">Mispunch</span>';
+                            } else if (row.status === "Rest Day") {
+                                badgeHtml = '<span class="badge badge-status-rest badge-custom">Rest Day</span>';
+                            } else {
+                                badgeHtml = `<span class="badge badge-status-cl badge-custom">${row.status}</span>`;
+                            }
+
+                            let empCols = '';
+                            if (showEmpDetails) {
+                                empCols = `<td><strong class="text-info">${row.employee_id}</strong></td>
+                                           <td>${row.employee_name}</td>`;
+                            }
+
+                            const deptLower = (row.department || '').toLowerCase();
+                            let rowSec = 'other';
+                            if (deptLower.includes('sector 63') || deptLower.includes('s63')) {
+                                rowSec = 's63';
+                            } else if (deptLower.includes('phase 2') || deptLower.includes('c39')) {
+                                rowSec = 'c39';
+                            }
+
+                            rowsHtml += `
+                                <tr data-shift="${row.shift_label}" data-section="${rowSec}">
+                                    ${empCols}
+                                    <td><strong>${row.date}</strong></td>
+                                    <td class="fw-semibold">${row.day}</td>
+                                    <td>${row.in_time}</td>
+                                    <td>${row.out_time}</td>
+                                    <td>${row.work_hrs}</td>
+                                    <td>${row.ot_hrs}</td>
+                                    <td>${badgeHtml}</td>
+                                </tr>
+                            `;
+                        });
+                        tableBody.innerHTML = rowsHtml;
+
+                        applyFilters();
+                    } else {
+                        throw new Error(data.error || 'Unknown error');
+                    }
+                })
+                .catch(err => {
+                    if (err.name === 'AbortError') return;
+                    console.error(err);
+                    tableBody.innerHTML = `<tr><td colspan="${showEmpDetails ? 9 : 7}" class="text-center py-4 text-danger">⚠️ Error loading records: ${err.message}</td></tr>`;
+                });
+        }
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function() {
+                if (activeRequestController) {
+                    activeRequestController.abort();
+                }
+                const tableBody = document.getElementById('attendanceTableBody');
+                if (tableBody) {
+                    tableBody.innerHTML = originalTableHtml;
+                }
+                if (drilldownHeader) {
+                    drilldownHeader.classList.add('d-none');
+                }
+                applyFilters();
+            });
+        }
+
+        // 3. Day Shift / Night Shift & Section toggle (Management)
+        const btnDayShift = document.getElementById('btnDayShift');
+        const btnNightShift = document.getElementById('btnNightShift');
+        const btnS63 = document.getElementById('btnS63');
+        const btnC39 = document.getElementById('btnC39');
+        const testRows = document.querySelectorAll('#attendanceTableBody tr');
+
+        if (btnDayShift && btnNightShift && testRows.length > 0) {
+            btnDayShift.addEventListener('click', function () { 
+                currentShift = 'day'; 
+                applyFilters(); 
+            });
+            btnNightShift.addEventListener('click', function () { 
+                currentShift = 'night'; 
+                applyFilters(); 
+            });
+        }
+
+        if (btnS63 && btnC39 && testRows.length > 0) {
+            btnS63.addEventListener('click', function () { 
+                currentSection = 's63'; 
+                applyFilters(); 
+            });
+            btnC39.addEventListener('click', function () { 
+                currentSection = 'c39'; 
+                applyFilters(); 
+            });
+        }
+
+        // Apply initial filters on load
+        if (testRows.length > 0) {
+            applyFilters();
         }
 
         // 4. Calendar View toggle (employee only)

@@ -441,7 +441,7 @@
 
 <!-- OT Trend Chart -->
 <div class="row g-4 mb-5 fade-in-el">
-    <div class="col-12">
+    <div class="col-12 {% if is_supervisor and scope_summary %}col-lg-8{% endif %}">
         <div class="chart-card">
             <h5 class="fw-bold mb-3 text-white">Overtime Breakdown by Day</h5>
             <div class="chart-container">
@@ -449,11 +449,27 @@
             </div>
         </div>
     </div>
+    {% if is_supervisor and scope_summary %}
+    <div class="col-12 col-lg-4">
+        <div class="chart-card">
+            <h5 class="fw-bold mb-3 text-white">OT Level Distribution</h5>
+            <div class="chart-container">
+                <canvas id="otDistributionChart"></canvas>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
 <!-- Daily Overtime Log (for employees or when a specific employee is selected) -->
 {% if not scope_summary or request.GET.employee_id %}
 <div class="row mb-5 fade-in-el">
     <div class="col-12">
         <div class="card-custom">
+            <div id="drilldownFilterHeaderDaily" class="mb-3 d-none" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); padding: 10px 15px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                <span class="text-white fw-semibold" id="drilldownFilterTextDaily"></span>
+                <button type="button" id="btnClearDrilldownDaily" class="btn btn-outline-danger btn-sm py-1 px-3" style="font-size: 0.8rem;">✕ Clear Filter</button>
+            </div>
             <h4 class="fw-bold mb-3 text-white">Daily Overtime Logs</h4>
             <div class="table-responsive" style="max-height: 400px; overflow-y: auto; overflow-x: auto;">
                 <table class="table table-custom mb-0 text-nowrap">
@@ -468,7 +484,7 @@
                             <th>Total OT</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="dailyOvertimeTableBody">
                         {% for day in summary.daily_breakdown %}
                         <tr>
                             <td><strong class="text-info">{{ day.date }}</strong></td>
@@ -505,6 +521,11 @@
                 </div>
             </div>
             
+            <div id="drilldownFilterHeaderScope" class="mb-3 d-none" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); padding: 10px 15px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                <span class="text-white fw-semibold" id="drilldownFilterTextScope"></span>
+                <button type="button" id="btnClearDrilldownScope" class="btn btn-outline-danger btn-sm py-1 px-3" style="font-size: 0.8rem;">✕ Clear Filter</button>
+            </div>
+
             <div class="table-responsive" style="max-height: 500px; overflow-y: auto; overflow-x: auto;">
                 <table class="table table-custom mb-0 text-nowrap">
                     <thead style="position: sticky; top: 0; z-index: 10; background-color: var(--card-bg);">
@@ -518,7 +539,7 @@
                             <th>Total OT</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="overtimeTableBody">
                         {% for emp in scope_summary.employees %}
                         <tr data-shift="{{ emp.shift_label }}">
                             <td><strong class="text-info">{{ emp.emp_id }}</strong></td>
@@ -548,13 +569,83 @@
 
 <!-- JSON data for charts -->
 {{ summary.daily_breakdown|json_script:"ot-breakdown-data" }}
+{{ start_date|json_script:"active-start-date" }}
+{{ end_date|json_script:"active-end-date" }}
+{{ is_supervisor|json_script:"active-is-supervisor" }}
+{{ is_superuser|json_script:"active-is-superuser" }}
+{{ ot_low_limit|json_script:"active-ot-low-limit" }}
+{{ ot_medium_limit|json_script:"active-ot-medium-limit" }}
+{% if is_supervisor and scope_summary %}
+{{ scope_summary.employees|json_script:"scope-employees-data" }}
+{% endif %}
 
 <script>
+    // Define shift filtering globally so drill-down helper can access them
+    let currentShift = 'day';
+    function filterByShift(shift) {
+        currentShift = shift;
+        const btnDayShift = document.getElementById('btnDayShift');
+        const btnNightShift = document.getElementById('btnNightShift');
+        const otSectionTitle = document.getElementById('otSectionTitle');
+        const employeeCountText = document.getElementById('employeeCountText');
+        const tableRows = document.querySelectorAll('#overtimeTableBody tr');
+
+        if (btnDayShift && btnNightShift && tableRows.length > 0) {
+            const baseTitle = otSectionTitle.textContent.split(' — ')[0];
+            let count = 0;
+            let sumCardPunch = 0;
+            let sumRequested = 0;
+            let sumWeekend = 0;
+            let sumHoliday = 0;
+            let sumTotal = 0;
+
+            tableRows.forEach(row => {
+                if (row.getAttribute('style') && row.getAttribute('style').includes('rgba')) {
+                    // Keep total row visible
+                    return;
+                }
+                const rowShift = row.getAttribute('data-shift');
+                if (rowShift === shift) {
+                    row.style.display = '';
+                    count++;
+
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 7) {
+                        sumCardPunch += parseFloat(cells[2].textContent.replace('h', '')) || 0;
+                        sumRequested += parseFloat(cells[3].textContent.replace('h', '')) || 0;
+                        sumWeekend += parseFloat(cells[4].textContent.replace('h', '')) || 0;
+                        sumHoliday += parseFloat(cells[5].textContent.replace('h', '')) || 0;
+                        sumTotal += parseFloat(cells[6].textContent.replace('h', '')) || 0;
+                    }
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            btnDayShift.className = shift === 'day' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
+            btnNightShift.className = shift === 'night' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
+            
+            otSectionTitle.textContent = `${baseTitle} — ${shift === 'day' ? '☀️ Day Shift' : '🌙 Night Shift'} OT`;
+            employeeCountText.textContent = `${count} employees`;
+
+            const totalRow = document.querySelector('#overtimeTableBody tr[style*="rgba"]');
+            if (totalRow) {
+                const totalCells = totalRow.querySelectorAll('td');
+                if (totalCells.length >= 6) {
+                    totalCells[2].querySelector('strong').textContent = sumCardPunch.toFixed(1) + 'h';
+                    totalCells[3].querySelector('strong').textContent = sumRequested.toFixed(1) + 'h';
+                    totalCells[4].querySelector('strong').textContent = sumWeekend.toFixed(1) + 'h';
+                    totalCells[5].querySelector('strong').textContent = sumHoliday.toFixed(1) + 'h';
+                    totalCells[6].querySelector('strong').textContent = sumTotal.toFixed(1) + 'h';
+                }
+            }
+        }
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
         const chartTextColor = '#94a3b8';
         const chartBorderColor = 'rgba(255, 255, 255, 0.08)';
 
-        // OT Breakdown Stacked Bar Chart
+        // 1. OT Breakdown Stacked Bar Chart
         const breakdownData = JSON.parse(document.getElementById('ot-breakdown-data').textContent);
         const ctxBar = document.getElementById('otBreakdownChart').getContext('2d');
         
@@ -610,6 +701,13 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                onClick: (event, elements, chart) => {
+                    if (elements && elements.length > 0) {
+                        const index = elements[0].index;
+                        const label = chart.data.labels[index];
+                        handleDrilldown('date', label);
+                    }
+                },
                 plugins: {
                     legend: {
                         position: 'top',
@@ -657,69 +755,280 @@
             }
         });
 
-        // Shift filtering for supervisor scope table
-        const btnDayShift = document.getElementById('btnDayShift');
-        const btnNightShift = document.getElementById('btnNightShift');
-        const otSectionTitle = document.getElementById('otSectionTitle');
-        const employeeCountText = document.getElementById('employeeCountText');
-        const tableRows = document.querySelectorAll('.scope-table tbody tr');
-
-        if (btnDayShift && btnNightShift && tableRows.length > 0) {
-            const baseTitle = otSectionTitle.textContent.split(' — ')[0];
-
-            function filterByShift(shift) {
-                let count = 0;
-                let sumCardPunch = 0;
-                let sumRequested = 0;
-                let sumWeekend = 0;
-                let sumHoliday = 0;
-                let sumTotal = 0;
-
-                tableRows.forEach(row => {
-                    // Check if it's the Scope Total row at the bottom
-                    if (row.getAttribute('style') && row.getAttribute('style').includes('rgba')) {
-                        // Keep total row visible
-                        return;
-                    }
-                    const rowShift = row.getAttribute('data-shift');
-                    if (rowShift === shift) {
-                        row.style.display = '';
-                        count++;
-
-                        // Parse values from cells
-                        const cells = row.querySelectorAll('td');
-                        if (cells.length >= 7) {
-                            sumCardPunch += parseFloat(cells[2].textContent.replace('h', '')) || 0;
-                            sumRequested += parseFloat(cells[3].textContent.replace('h', '')) || 0;
-                            sumWeekend += parseFloat(cells[4].textContent.replace('h', '')) || 0;
-                            sumHoliday += parseFloat(cells[5].textContent.replace('h', '')) || 0;
-                            sumTotal += parseFloat(cells[6].textContent.replace('h', '')) || 0;
+        // 2. OT Level Distribution (Doughnut Chart)
+        const employeesEl = document.getElementById('scope-employees-data');
+        if (employeesEl) {
+            const employees = JSON.parse(employeesEl.textContent);
+            const lowLimit = parseFloat(document.getElementById('active-ot-low-limit').textContent || 52);
+            const mediumLimit = parseFloat(document.getElementById('active-ot-medium-limit').textContent || 78);
+            
+            let lowCount = 0;
+            let mediumCount = 0;
+            let highCount = 0;
+            
+            employees.forEach(emp => {
+                const ot = parseFloat(emp.total_ot || 0);
+                if (ot < lowLimit) {
+                    lowCount++;
+                } else if (ot <= mediumLimit) {
+                    mediumCount++;
+                } else {
+                    highCount++;
+                }
+            });
+            
+            const ctxDist = document.getElementById('otDistributionChart').getContext('2d');
+            new Chart(ctxDist, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Low', 'Medium', 'High'],
+                    datasets: [{
+                        data: [lowCount, mediumCount, highCount],
+                        backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444'],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    onClick: (event, elements, chart) => {
+                        if (elements && elements.length > 0) {
+                            const index = elements[0].index;
+                            const label = chart.data.labels[index];
+                            handleDrilldown('overtime_level', label);
                         }
-                    } else {
-                        row.style.display = 'none';
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: chartTextColor,
+                                font: { size: 11 },
+                                padding: 15,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleColor: '#f8fafc',
+                            bodyColor: '#f8fafc',
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1
+                        }
                     }
-                });
-                btnDayShift.className = shift === 'day' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
-                btnNightShift.className = shift === 'night' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
-                
-                // Update header title and count
-                otSectionTitle.textContent = `${baseTitle} — ${shift === 'day' ? '☀️ Day Shift' : '🌙 Night Shift'} OT`;
-                employeeCountText.textContent = `${count} employees`;
+                }
+            });
+        }
 
-                // Update total row cells dynamically
-                const totalRow = document.querySelector('.scope-table tbody tr[style*="rgba"]');
-                if (totalRow) {
-                    const totalCells = totalRow.querySelectorAll('td');
-                    if (totalCells.length >= 6) {
-                        totalCells[1].querySelector('strong').textContent = sumCardPunch.toFixed(1) + 'h';
-                        totalCells[2].querySelector('strong').textContent = sumRequested.toFixed(1) + 'h';
-                        totalCells[3].querySelector('strong').textContent = sumWeekend.toFixed(1) + 'h';
-                        totalCells[4].querySelector('strong').textContent = sumHoliday.toFixed(1) + 'h';
-                        totalCells[5].querySelector('strong').textContent = sumTotal.toFixed(1) + 'h';
-                    }
+        // Drilldown Logic
+        let activeRequestController = null;
+        
+        const originalScopeTableBody = document.getElementById('overtimeTableBody');
+        const originalScopeTableHtml = originalScopeTableBody ? originalScopeTableBody.innerHTML : '';
+        
+        const originalDailyTableBody = document.getElementById('dailyOvertimeTableBody');
+        const originalDailyTableHtml = originalDailyTableBody ? originalDailyTableBody.innerHTML : '';
+
+        const activeStartDate = JSON.parse(document.getElementById('active-start-date').textContent);
+        const activeEndDate = JSON.parse(document.getElementById('active-end-date').textContent);
+        const isSupervisor = JSON.parse(document.getElementById('active-is-supervisor').textContent) === true || JSON.parse(document.getElementById('active-is-supervisor').textContent) === "True";
+
+        function handleDrilldown(filterType, filterValue) {
+            if (activeRequestController) {
+                activeRequestController.abort();
+            }
+            activeRequestController = new AbortController();
+
+            const scopeTable = document.getElementById('overtimeTableBody');
+            const dailyTable = document.getElementById('dailyOvertimeTableBody');
+            
+            const drilldownHeaderScope = document.getElementById('drilldownFilterHeaderScope');
+            const drilldownTextScope = document.getElementById('drilldownFilterTextScope');
+            const drilldownHeaderDaily = document.getElementById('drilldownFilterHeaderDaily');
+            const drilldownTextDaily = document.getElementById('drilldownFilterTextDaily');
+
+            if (scopeTable) {
+                scopeTable.innerHTML = `<tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></td></tr>`;
+                if (drilldownHeaderScope && drilldownTextScope) {
+                    drilldownTextScope.textContent = `Showing: ${filterType.replace('_', ' ')} — "${filterValue}"`;
+                    drilldownHeaderScope.classList.remove('d-none');
+                }
+            }
+            
+            if (dailyTable) {
+                dailyTable.innerHTML = `<tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></td></tr>`;
+                if (drilldownHeaderDaily && drilldownTextDaily) {
+                    drilldownTextDaily.textContent = `Showing: ${filterType.replace('_', ' ')} — "${filterValue}"`;
+                    drilldownHeaderDaily.classList.remove('d-none');
                 }
             }
 
+            const urlParams = new URLSearchParams(window.location.search);
+            const empId = urlParams.get('employee_id') || '';
+
+            const fetchUrl = `/api/attendance/chart-drilldown/?start_date=${activeStartDate}&end_date=${activeEndDate}&employee_id=${empId}&filter_type=${filterType}&filter_value=${encodeURIComponent(filterValue)}`;
+
+            fetch(fetchUrl, { signal: activeRequestController.signal })
+                .then(response => {
+                    if (!response.ok) throw new Error('API request failed');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        const recordsCount = data.count;
+                        
+                        if (scopeTable) {
+                            if (drilldownTextScope) {
+                                drilldownTextScope.textContent = `Showing: ${filterType.replace('_', ' ')} — "${filterValue}" (${recordsCount} records)`;
+                            }
+                            
+                            if (data.records.length === 0) {
+                                scopeTable.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-muted">No records found.</td></tr>`;
+                                return;
+                            }
+
+                            let rowsHtml = '';
+                            let sumCardPunch = 0;
+                            let sumRequested = 0;
+                            let sumWeekend = 0;
+                            let sumHoliday = 0;
+                            let sumTotal = 0;
+
+                            if (filterType === 'overtime_level') {
+                                data.records.forEach(emp => {
+                                    sumCardPunch += parseFloat(emp.card_punch_ot) || 0;
+                                    sumRequested += parseFloat(emp.requested_ot) || 0;
+                                    sumWeekend += parseFloat(emp.weekend_ot) || 0;
+                                    sumHoliday += parseFloat(emp.holiday_ot) || 0;
+                                    sumTotal += parseFloat(emp.total_ot) || 0;
+
+                                    rowsHtml += `
+                                        <tr data-shift="${emp.shift_label}">
+                                            <td><strong class="text-info">${emp.emp_id}</strong></td>
+                                            <td>${emp.emp_name}</td>
+                                            <td>${emp.card_punch_ot}h</td>
+                                            <td>${emp.requested_ot}h</td>
+                                            <td>${emp.weekend_ot}h</td>
+                                            <td>${emp.holiday_ot}h</td>
+                                            <td><strong>${emp.total_ot}h</strong></td>
+                                        </tr>
+                                    `;
+                                });
+                            } else {
+                                data.records.forEach(row => {
+                                    const cp = parseFloat(row["Card Punch OT"]) || 0;
+                                    const req = parseFloat(row["Requested OT"]) || 0;
+                                    const we = parseFloat(row["Weekend OT"]) || 0;
+                                    const hol = parseFloat(row["Holiday OT"]) || 0;
+                                    const tot = cp + req + we + hol;
+
+                                    sumCardPunch += cp;
+                                    sumRequested += req;
+                                    sumWeekend += we;
+                                    sumHoliday += hol;
+                                    sumTotal += tot;
+
+                                    rowsHtml += `
+                                        <tr data-shift="${row.shift_label}">
+                                            <td><strong class="text-info">${row.employee_id}</strong></td>
+                                            <td>${row.employee_name}</td>
+                                            <td>${cp > 0 ? cp + 'h' : '—'}</td>
+                                            <td>${req > 0 ? req + 'h' : '—'}</td>
+                                            <td>${we > 0 ? we + 'h' : '—'}</td>
+                                            <td>${hol > 0 ? hol + 'h' : '—'}</td>
+                                            <td><strong>${tot > 0 ? tot + 'h' : '—'}</strong></td>
+                                        </tr>
+                                    `;
+                                });
+                            }
+
+                            rowsHtml += `
+                                <tr style="background: rgba(99, 102, 241, 0.1);">
+                                    <td colspan="2"><strong>Scope Total</strong></td>
+                                    <td><strong class="text-info">${sumCardPunch.toFixed(1)}h</strong></td>
+                                    <td><strong class="text-warning">${sumRequested.toFixed(1)}h</strong></td>
+                                    <td><strong class="text-success">${sumWeekend.toFixed(1)}h</strong></td>
+                                    <td><strong class="text-danger">${sumHoliday.toFixed(1)}h</strong></td>
+                                    <td><strong>${sumTotal.toFixed(1)}h</strong></td>
+                                </tr>
+                            `;
+
+                            scopeTable.innerHTML = rowsHtml;
+                            filterByShift(currentShift);
+                        }
+
+                        if (dailyTable) {
+                            if (drilldownTextDaily) {
+                                drilldownTextDaily.textContent = `Showing: ${filterType.replace('_', ' ')} — "${filterValue}" (${recordsCount} records)`;
+                            }
+                            
+                            if (data.records.length === 0) {
+                                dailyTable.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-muted">No records found.</td></tr>`;
+                                return;
+                            }
+
+                            let rowsHtml = '';
+                            data.records.forEach(row => {
+                                const cp = parseFloat(row["Card Punch OT"]) || 0;
+                                const req = parseFloat(row["Requested OT"]) || 0;
+                                const we = parseFloat(row["Weekend OT"]) || 0;
+                                const hol = parseFloat(row["Holiday OT"]) || 0;
+                                const tot = cp + req + we + hol;
+
+                                rowsHtml += `
+                                    <tr>
+                                        <td><strong class="text-info">${row.raw_date || row.date}</strong></td>
+                                        <td>${row.day}</td>
+                                        <td>${cp > 0 ? cp + 'h' : '—'}</td>
+                                        <td>${req > 0 ? req + 'h' : '—'}</td>
+                                        <td>${we > 0 ? we + 'h' : '—'}</td>
+                                        <td>${hol > 0 ? hol + 'h' : '—'}</td>
+                                        <td><strong>${tot > 0 ? tot + 'h' : '—'}</strong></td>
+                                    </tr>
+                                `;
+                            });
+                            dailyTable.innerHTML = rowsHtml;
+                        }
+                    } else {
+                        throw new Error(data.error || 'Unknown error');
+                    }
+                })
+                .catch(err => {
+                    if (err.name === 'AbortError') return;
+                    console.error(err);
+                    const errMsg = `<tr><td colspan="7" class="text-center py-4 text-danger">⚠️ Error: ${err.message}</td></tr>`;
+                    if (scopeTable) scopeTable.innerHTML = errMsg;
+                    if (dailyTable) dailyTable.innerHTML = errMsg;
+                });
+        }
+
+        const clearBtnScope = document.getElementById('btnClearDrilldownScope');
+        if (clearBtnScope) {
+            clearBtnScope.addEventListener('click', function() {
+                if (activeRequestController) activeRequestController.abort();
+                if (scopeTable) scopeTable.innerHTML = originalScopeTableHtml;
+                if (drilldownHeaderScope) drilldownHeaderScope.classList.add('d-none');
+                filterByShift(currentShift);
+            });
+        }
+
+        const clearBtnDaily = document.getElementById('btnClearDrilldownDaily');
+        if (clearBtnDaily) {
+            clearBtnDaily.addEventListener('click', function() {
+                if (activeRequestController) activeRequestController.abort();
+                if (dailyTable) dailyTable.innerHTML = originalDailyTableHtml;
+                if (drilldownHeaderDaily) drilldownHeaderDaily.classList.add('d-none');
+            });
+        }
+
+        // 3. Day Shift / Night Shift toggle (Management)
+        const btnDayShift = document.getElementById('btnDayShift');
+        const btnNightShift = document.getElementById('btnNightShift');
+        const testRows = document.querySelectorAll('#overtimeTableBody tr');
+
+        if (btnDayShift && btnNightShift && testRows.length > 0) {
             btnDayShift.addEventListener('click', function () { filterByShift('day'); });
             btnNightShift.addEventListener('click', function () { filterByShift('night'); });
 

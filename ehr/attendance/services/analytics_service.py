@@ -119,6 +119,8 @@ def calculate_dashboard_stats(
     status_present = 0.0
     status_leave = 0.0
     status_rest = 0
+    status_mispunch = 0.0
+    status_cl = 0.0
 
     record_map = {}
     for r in attendance_records:
@@ -193,11 +195,14 @@ def calculate_dashboard_stats(
                 is_today = (
                     (date_obj.date() == datetime.now().date()) if date_obj else False
                 )
+                is_mispunch = False
                 if (has_check_in and not has_check_out) or (
                     has_check_out and not has_check_in
                 ):
                     if not is_today and not is_holiday:
                         mispunches += 1
+                        status_mispunch += 1.0
+                        is_mispunch = True
 
                 if not has_check_in:
                     if is_weekend or is_holiday:
@@ -207,7 +212,9 @@ def calculate_dashboard_stats(
                         leaves_taken += 1.0
                         status_leave += 1.0
                 else:
-                    if is_weekend:
+                    if is_mispunch:
+                        pass
+                    elif is_weekend:
                         if work_time >= 8.0 or is_today:
                             working_days += 1
                             days_present += 1.0
@@ -225,8 +232,7 @@ def calculate_dashboard_stats(
                         else:
                             days_present += 0.5
                             leaves_taken += 0.5
-                            status_leave += 0.5
-                            status_present += 0.5
+                            status_cl += 1.0
                             total_work_time += work_time
 
                     if in_time_str and ":" in in_time_str:
@@ -295,6 +301,8 @@ def calculate_dashboard_stats(
             status_present_val,
             int(status_leave) if status_leave.is_integer() else status_leave,
             status_rest,
+            int(status_mispunch) if status_mispunch.is_integer() else status_mispunch,
+            int(status_cl) if status_cl.is_integer() else status_cl,
         ],
         "employee_details": employee_details,
     }
@@ -352,7 +360,7 @@ def calculate_section_dashboard_stats(
             "avg_work_time": 0,
             "chart_labels": [],
             "chart_ot_data": [],
-            "breakdown_data": [0, 0, 0],
+            "breakdown_data": [0, 0, 0, 0, 0],
             "is_section": True,
             "employee_details": {
                 "name": name,
@@ -382,6 +390,11 @@ def calculate_section_dashboard_stats(
     total_work_time = 0.0
     work_time_records_count = 0
     total_mispunches = 0
+    status_present = 0
+    status_leave = 0
+    status_rest = 0
+    status_mispunch = 0
+    status_cl = 0
 
     # For charts, we can aggregate by Date
     date_aggregates = {}
@@ -432,25 +445,43 @@ def calculate_section_dashboard_stats(
             else False
         )
         is_today = date_obj and date_obj.date() == datetime.now().date()
+        is_mispunch = False
         if (has_in and not has_out) or (has_out and not has_in):
             if not is_today and not is_holiday:
                 total_mispunches += 1
+                status_mispunch += 1
+                is_mispunch = True
 
         is_weekend = False
         if date_obj and date_obj.weekday() == 6:
             is_weekend = True
 
-        if not in_time_str or in_time_str in ("00:00", "—", ""):
+        if not has_in:
             if not is_weekend and not is_holiday:
                 total_leaves += 1.0
+                status_leave += 1
                 date_aggregates[dt]["leave"] += 1.0
-        else:
-            if work_time >= 8.0:
-                total_present += 1
-                date_aggregates[dt]["present"] += 1
             else:
-                total_leaves += 0.5
-                date_aggregates[dt]["leave"] += 0.5
+                status_rest += 1
+        else:
+            if is_mispunch:
+                pass
+            elif is_weekend:
+                if work_time >= 8.0:
+                    total_present += 1
+                    status_present += 1
+                    date_aggregates[dt]["present"] += 1
+                else:
+                    status_rest += 1
+            else:
+                if work_time >= 8.0:
+                    total_present += 1
+                    status_present += 1
+                    date_aggregates[dt]["present"] += 1
+                else:
+                    total_leaves += 0.5
+                    status_cl += 1
+                    date_aggregates[dt]["leave"] += 0.5
 
             # Late check-in
             if in_time_str and ":" in in_time_str:
@@ -483,15 +514,11 @@ def calculate_section_dashboard_stats(
         avg_wt = date_aggregates[dt]["work_time"] / count if count > 0 else 0.0
         chart_worktime_data.append(round(avg_wt, 1))
 
-    status_present = total_present
-    status_leave = int(total_leaves) if total_leaves.is_integer() else total_leaves
-    status_rest = 0
-
     return {
         "total_employees": total_employees,
         "working_days": working_days,
         "days_present": total_present,
-        "leaves_taken": status_leave,
+        "leaves_taken": int(total_leaves) if total_leaves.is_integer() else total_leaves,
         "late_arrivals": total_late,
         "late_details": f"{total_late} late check-ins",
         "mispunches": total_mispunches,
@@ -502,7 +529,7 @@ def calculate_section_dashboard_stats(
         "avg_work_time": avg_work_time,
         "chart_labels": chart_labels,
         "chart_worktime_data": chart_worktime_data,
-        "breakdown_data": [status_present, status_leave, status_rest],
+        "breakdown_data": [status_present, status_leave, status_rest, status_mispunch, status_cl],
         "is_section": True,
         "employee_details": {
             "name": name,
