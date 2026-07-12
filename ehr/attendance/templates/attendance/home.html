@@ -624,10 +624,12 @@
                 <h4 class="fw-bold mb-0 text-white" id="dashboardSectionTitle">Attendance Logs ({{ period_text }})</h4>
                 <div class="d-flex gap-1 align-items-center flex-nowrap">
                     {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
+                    {% if is_superuser %}
                     <div class="d-flex gap-1 align-items-center border-end border-secondary pe-2 me-1">
                         <button type="button" id="btnS63" class="btn btn-accent btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">🏢 S63</button>
                         <button type="button" id="btnC39" class="btn btn-outline-custom btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">🏢 C39</button>
                     </div>
+                    {% endif %}
                     <button type="button" id="btnDayShift" class="btn btn-accent btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">☀️ Day Shift</button>
                     <button type="button" id="btnNightShift" class="btn btn-outline-custom btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">🌙 Night Shift</button>
                     {% else %}

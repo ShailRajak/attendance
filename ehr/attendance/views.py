@@ -357,9 +357,9 @@ def attendance_drilldown_api(request):
             else:
                 qs = qs.filter(employee_id__in=accessible_users)
 
-    # Filter by section code if provided (for superuser / dept admin)
+    # Filter by section code if provided (for superuser ONLY)
     section_param = request.GET.get("section", "").strip()
-    if section_param and scope != "OWN":
+    if section_param and is_superuser:
         if section_param == "s63":
             qs = qs.filter(models.Q(day__icontains="Sector 63") | models.Q(day__icontains="s63"))
         elif section_param == "c39":
