@@ -13,6 +13,18 @@ from attendance.services.role_service import get_expected_dtname4, resolve_user_
 from attendance.services.rbac_service import RBACService
 
 
+def resolve_department_key(day_field):
+    """Derives SMT_PD / ASSY_PD from a section string like 'Sector 63 - SMT PD'."""
+    if not day_field:
+        return "OTHER"
+    field_lower = str(day_field).lower()
+    if "smt" in field_lower:
+        return "SMT_PD"
+    elif "assy" in field_lower:
+        return "ASSY_PD"
+    return "OTHER"
+
+
 def compute_kpi_cards(attendance_records):
     """
     Computes 8 enterprise HRMS KPI values from the attendance dataset.
@@ -355,8 +367,16 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
                 "employee_name": record.get("Employee Name", "—"),
                 "department": org_path,
                 "shift_label": shift_label,
+                "dept_key": resolve_department_key(org_path),
             }
         )
+
+    departments_summary = {}
+    if is_superuser:
+        for row in formatted_attendance:
+            dept = row["dept_key"]
+            departments_summary.setdefault(dept, {"total": 0})
+            departments_summary[dept]["total"] += 1
 
     # Period text for display
     try:
@@ -473,5 +493,11 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
         "pending_ots": pending_ots_list,
         "pending_corrections": pending_corrections_list,
         "is_supervisor": is_supervisor,
+        "departments_summary": departments_summary,
+        "dept_panels": [
+            ("All", "Employees", "👥"),
+            ("SMT_PD", "SMT_PD", "🔧"),
+            ("ASSY_PD", "ASSY_PD", "⚙️"),
+        ] if is_superuser else [],
     }
 
