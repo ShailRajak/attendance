@@ -87,17 +87,26 @@ def compute_kpi_cards(attendance_records):
             night_shift_ids.add(emp_id)
 
         # Determine Present / Absent based on In Time and Work Hours (same logic as table formatting)
+        out_time = str(record.get("Out Time") or "").strip()
         has_check_in = bool(in_time) and in_time not in ("00:00", "—", "")
+        has_check_out = bool(out_time) and out_time not in ("00:00", "—", "")
         try:
             work_time = float(record.get("Working Hours") or 0.0)
         except (ValueError, TypeError):
             work_time = 0.0
 
-        # Check if weekend
+        # Check if weekend, holiday or today (to resolve mispunch status)
         date_obj = parse_date(record.get("Date", ""))
         is_weekend = date_obj and date_obj.weekday() == 6 if date_obj else False
+        is_holiday = date_obj and date_obj.year == 2026 and date_obj.month == 7 and date_obj.day == 1
+        is_today = date_obj and date_obj.date() == datetime.now().date()
 
-        is_present = bool(has_check_in and work_time >= 8.0)
+        is_mispunch = False
+        if (has_check_in and not has_check_out) or (has_check_out and not has_check_in):
+            if not is_today and not is_holiday:
+                is_mispunch = True
+
+        is_present = bool(has_check_in and work_time >= 8.0 and not is_mispunch)
         is_absent = bool(not has_check_in and not is_weekend and not leave_type)
         has_leave = bool(leave_type) and leave_type not in ("", "—", "None", "0")
 
@@ -116,23 +125,25 @@ def compute_kpi_cards(attendance_records):
         if has_leave:
             on_leave_ids.add(emp_id)
 
-        # --- Late Punch (check-in after 9:15 AM) ---
+        # --- Late Punch (no grace period, shift-aware) ---
+        late_min_val = 0.0
         try:
-            late_minutes = float(late_min_value)
+            late_min_val = float(late_min_value)
         except (ValueError, TypeError):
-            late_minutes = 0.0
+            late_min_val = 0.0
 
-        # Also derive late from in_time if Late Minutes is not available
-        if late_minutes == 0 and has_check_in and ":" in in_time:
+        late_by_time = 0.0
+        if has_check_in and ":" in in_time:
             try:
                 h, m = map(int, in_time.split(":"))
-                if h * 60 + m > 9 * 60 + 15:
-                    late_minutes = (h * 60 + m) - (9 * 60 + 15)
+                shift_start = 20 * 60 if is_night_shift else 9 * 60
+                if h * 60 + m > shift_start:
+                    late_by_time = float((h * 60 + m) - shift_start)
             except (ValueError, TypeError):
-                # Ignore invalid check-in time formats
                 pass
 
-        if late_minutes > 0:
+        late_minutes = max(late_min_val, late_by_time)
+        if late_minutes > 0.0:
             late_punch_ids.add(emp_id)
 
     return {
@@ -240,9 +251,87 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
             else:
                 attendance = [r for r in attendance if r.get("Employee ID") in accessible_users]
 
+    # Format the attendance log items
+    profiles = {
+        p.user.username: p 
+        for p in UserProfile.objects.select_related("department", "section").all()
+    }
+
     is_section_view = (
         scope != "OWN" and not query_employee_id
     )
+
+    if not is_section_view:
+        target_emp_id = query_employee_id if query_employee_id else user.username
+        # Find which dates are present in the fetched records
+        present_dates = set()
+        for r in attendance:
+            dt_str = r.get("Date") or r.get("attendance_date")
+            dt_obj = parse_date(dt_str)
+            if dt_obj:
+                present_dates.add(dt_obj.date())
+        
+        # Determine employee name, shift, day, and mobile to use for virtual records
+        emp_name = "—"
+        emp_shift = "Day Shift"
+        emp_day = "—"
+        emp_mobile = "—"
+        if attendance:
+            sorted_temp = sorted(
+                attendance,
+                key=lambda x: parse_date(x.get("Date") or x.get("attendance_date")) or datetime.min,
+                reverse=True
+            )
+            emp_name = sorted_temp[0].get("Employee Name") or sorted_temp[0].get("employee_name") or "—"
+            emp_shift = sorted_temp[0].get("Shift") or sorted_temp[0].get("shift") or "Day Shift"
+            emp_day = sorted_temp[0].get("Day") or sorted_temp[0].get("day") or "—"
+            emp_mobile = sorted_temp[0].get("Mobile") or sorted_temp[0].get("mobile") or "—"
+        else:
+            p = profiles.get(target_emp_id)
+            if p:
+                emp_name = p.user.get_full_name() or p.user.username
+                if p.section:
+                    emp_day = p.section.name
+                elif p.department:
+                    emp_day = p.department.name
+
+        try:
+            start_dt_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end_dt_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            start_dt_obj = None
+            end_dt_obj = None
+
+        if start_dt_obj and end_dt_obj:
+            curr_dt = start_dt_obj
+            while curr_dt <= end_dt_obj:
+                if curr_dt not in present_dates:
+                    # Find shift from the closest actual record by date
+                    closest_shift = emp_shift
+                    min_diff = None
+                    for r in attendance:
+                        r_dt = parse_date(r.get("Date") or r.get("attendance_date"))
+                        if r_dt:
+                            diff = abs((r_dt.date() - curr_dt).days)
+                            if min_diff is None or diff < min_diff:
+                                min_diff = diff
+                                closest_shift = r.get("Shift") or r.get("shift") or emp_shift
+                    
+                    virtual_rec = {
+                        "Employee ID": target_emp_id,
+                        "Employee Name": emp_name,
+                        "Date": curr_dt.strftime("%d-%m-%Y"),
+                        "In Time": "",
+                        "Out Time": "",
+                        "Working Hours": 0.0,
+                        "Card Punch OT": 0.0,
+                        "Shift": closest_shift,
+                        "Day": emp_day,
+                        "Mobile": emp_mobile,
+                        "Leave Type": "",
+                    }
+                    attendance.append(virtual_rec)
+                curr_dt += timedelta(days=1)
 
     if is_section_view:
         dashboard_stats = calculate_section_dashboard_stats(
@@ -253,7 +342,6 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
             attendance, query_employee_id or user.username, start_date, end_date
         )
 
-    # Format the attendance log items
     formatted_attendance = []
     sorted_for_table = sorted(
         attendance,
@@ -265,6 +353,26 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
         in_time = record.get("In Time", "").strip()
         if in_time in ("00:00", ""):
             in_time = "—"
+
+        shift_raw = str(record.get("Shift") or "").strip()
+        is_night_shift = bool(shift_raw) and "Night" in shift_raw
+        
+        has_in = bool(in_time) and in_time not in ("00:00", "—", "")
+        late_minutes = 0.0
+        if has_in and ":" in in_time:
+            try:
+                h, m = map(int, in_time.split(":"))
+                shift_start = 20 * 60 if is_night_shift else 9 * 60
+                if h * 60 + m > shift_start:
+                    late_minutes = float((h * 60 + m) - shift_start)
+            except (ValueError, TypeError):
+                pass
+        
+        if late_minutes == 0:
+            try:
+                late_minutes = float(record.get("Late Minutes") or 0.0)
+            except (ValueError, TypeError):
+                late_minutes = 0.0
 
         out_time = record.get("Out Time", "").strip()
         if out_time in ("00:00", ""):
@@ -344,13 +452,13 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
 
         emp_id = record.get("Employee ID")
         org_path = "—"
-        try:
-            p = UserProfile.objects.select_related("department", "section").get(user__username=emp_id)
+        p = profiles.get(emp_id)
+        if p:
             if p.section:
                 org_path = p.section.name
             elif p.department:
                 org_path = p.department.name
-        except UserProfile.DoesNotExist:
+        else:
             org_path = record.get("Day", "—")
 
         formatted_attendance.append(
@@ -368,6 +476,7 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
                 "department": org_path,
                 "shift_label": shift_label,
                 "dept_key": resolve_department_key(org_path),
+                "late_minutes": late_minutes,
             }
         )
 

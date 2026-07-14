@@ -25,8 +25,7 @@ SECRET_KEY = os.environ.get(
     "SECRET_KEY", "django-insecure-rgz@ir4onn6q^+puiei8&o#^$hy*5gjug-o$4)vj%oj2ag2^!+"
 )
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG", "True") == "True"
+DEBUG = False
 
 ALLOWED_HOSTS = ["*"]
 
@@ -57,7 +56,15 @@ ROOT_URLCONF = "ehr.urls"
 
 CSRF_TRUSTED_ORIGINS = [
     "https://shifting-gaining-crafter.ngrok-free.dev",
+    "http://shifting-gaining-crafter.ngrok-free.dev",
+    "https://*.ngrok-free.dev",
+    "http://*.ngrok-free.dev",
+    "https://*.ngrok-free.app",
+    "http://*.ngrok-free.app",
 ]
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
 
 TEMPLATES = [
     {
@@ -134,6 +141,57 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
         "LOCATION": "ehr-cache",
     }
+}
+
+# ==============================================================================
+# LOGGING CONFIGURATION
+# ==============================================================================
+# Create logs directory if it does not exist
+LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "{levelname} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "file": {
+            "level": "WARNING",
+            "class": "logging.FileHandler",
+            "filename": str(LOGS_DIR / "django.log"),
+            "formatter": "verbose",
+        },
+        "console": {
+            "level": "CRITICAL",
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+    },
+    "loggers": {
+        "": {  # Root logger to capture warnings/errors from all modules/dependencies
+            "handlers": ["file", "console"],
+            "level": "WARNING",
+        },
+        "django": {
+            "handlers": ["file", "console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "py.warnings": {
+            "handlers": ["file"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+    },
 }
 
 # ==============================================================================

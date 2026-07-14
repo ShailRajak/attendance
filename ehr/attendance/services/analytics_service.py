@@ -246,11 +246,22 @@ def calculate_dashboard_stats(
                             else:
                                 shift_start_minutes = 9 * 60
 
-                            if check_in_minutes > shift_start_minutes + 15:
+                            # Also check raw late minutes if present
+                            late_min_val = 0.0
+                            try:
+                                late_min_val = float(record.get("Late Minutes") or 0.0)
+                            except (ValueError, TypeError):
+                                late_min_val = 0.0
+
+                            late_by_time = 0.0
+                            if check_in_minutes > shift_start_minutes:
+                                late_by_time = float(check_in_minutes - shift_start_minutes)
+
+                            late_minutes = max(late_min_val, late_by_time)
+                            if late_minutes > 0.0:
                                 late_arrivals += 1
-                                late_minutes = check_in_minutes - shift_start_minutes
                                 if late_minutes > max_late_minutes:
-                                    max_late_minutes = late_minutes
+                                    max_late_minutes = int(late_minutes)
                                     max_late_date = chart_date
                         except (ValueError, TypeError):
                             # Ignore invalid check-in time formats
@@ -484,15 +495,27 @@ def calculate_section_dashboard_stats(
                     date_aggregates[dt]["leave"] += 0.5
 
             # Late check-in
+            late_min_val = 0.0
+            try:
+                late_min_val = float(r.get("Late Minutes") or 0.0)
+            except (ValueError, TypeError):
+                late_min_val = 0.0
+
+            late_by_time = 0.0
             if in_time_str and ":" in in_time_str:
                 try:
                     h, m = map(int, in_time_str.split(":"))
-                    if h * 60 + m > 9 * 60 + 15:
-                        total_late += 1
-                        date_aggregates[dt]["late"] += 1
+                    shift_name = r.get("Shift", "")
+                    shift_start_minutes = 20 * 60 if "Night" in shift_name else 9 * 60
+                    if h * 60 + m > shift_start_minutes:
+                        late_by_time = float((h * 60 + m) - shift_start_minutes)
                 except (ValueError, TypeError):
-                    # Ignore invalid check-in time formats
                     pass
+
+            is_late = late_min_val > 0.0 or late_by_time > 0.0
+            if is_late:
+                total_late += 1
+                date_aggregates[dt]["late"] += 1
 
     avg_work_time = (
         round(total_work_time / work_time_records_count, 1)
@@ -518,7 +541,7 @@ def calculate_section_dashboard_stats(
         "total_employees": total_employees,
         "working_days": working_days,
         "days_present": total_present,
-        "leaves_taken": int(total_leaves) if total_leaves.is_integer() else total_leaves,
+        "leaves_taken": status_leave,
         "late_arrivals": total_late,
         "late_details": f"{total_late} late check-ins",
         "mispunches": total_mispunches,

@@ -1,0 +1,2 @@
+WARNING 2026-07-14 11:03:26,513 log 23208 12976 Forbidden: /api/attendance/chart-drilldown/
+WARNING 2026-07-14 11:03:31,905 log 23208 12976 Bad Request: /api/attendance/chart-drilldown/

@@ -515,7 +515,13 @@
                     <h4 class="fw-bold mb-0 text-white" id="otSectionTitle">{{ scope_summary.dtname4_scope }} — Employee OT Summary</h4>
                     <div class="text-muted small" id="employeeCountText">{{ scope_summary.employees|length }} employees</div>
                 </div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 align-items-center">
+                    {% if is_superuser %}
+                    <div class="d-flex gap-2 me-2 border-end pe-2" style="border-color: rgba(255,255,255,0.1) !important;">
+                        <button type="button" id="btnS63" class="btn btn-accent btn-sm py-2 px-3" style="font-size: 0.8rem;">S63</button>
+                        <button type="button" id="btnC39" class="btn btn-outline-custom btn-sm py-2 px-3" style="font-size: 0.8rem;">C39</button>
+                    </div>
+                    {% endif %}
                     <button type="button" id="btnDayShift" class="btn btn-accent btn-sm py-2 px-3">☀️ Day Shift</button>
                     <button type="button" id="btnNightShift" class="btn btn-outline-custom btn-sm py-2 px-3">🌙 Night Shift</button>
                 </div>
@@ -541,7 +547,7 @@
                     </thead>
                     <tbody id="overtimeTableBody">
                         {% for emp in scope_summary.employees %}
-                        <tr data-shift="{{ emp.shift_label }}">
+                        <tr data-shift="{{ emp.shift_label }}" data-section="{% if 'Sector 63' in emp.department or 's63' in emp.department %}s63{% elif 'Phase 2' in emp.department or 'c39' in emp.department %}c39{% else %}other{% endif %}">
                             <td><strong class="text-info">{{ emp.emp_id }}</strong></td>
                             <td>{{ emp.emp_name }}</td>
                             <td>{{ emp.card_punch_ot }}h</td>
@@ -580,18 +586,20 @@
 {% endif %}
 
 <script>
-    // Define shift filtering globally so drill-down helper can access them
+    // Define shift and section filtering globally so drill-down helper can access them
     let currentShift = 'day';
-    function filterByShift(shift) {
-        currentShift = shift;
+    let currentSection = 's63';
+
+    function applyFilters() {
         const btnDayShift = document.getElementById('btnDayShift');
         const btnNightShift = document.getElementById('btnNightShift');
+        const btnS63 = document.getElementById('btnS63');
+        const btnC39 = document.getElementById('btnC39');
         const otSectionTitle = document.getElementById('otSectionTitle');
         const employeeCountText = document.getElementById('employeeCountText');
         const tableRows = document.querySelectorAll('#overtimeTableBody tr');
 
-        if (btnDayShift && btnNightShift && tableRows.length > 0) {
-            const baseTitle = otSectionTitle.textContent.split(' — ')[0];
+        if (tableRows.length > 0) {
             let count = 0;
             let sumCardPunch = 0;
             let sumRequested = 0;
@@ -605,7 +613,16 @@
                     return;
                 }
                 const rowShift = row.getAttribute('data-shift');
-                if (rowShift === shift) {
+                const rowSection = row.getAttribute('data-section');
+
+                let show = false;
+                if (btnS63) {
+                    show = (rowShift === currentShift && rowSection === currentSection);
+                } else {
+                    show = (rowShift === currentShift);
+                }
+
+                if (show) {
                     row.style.display = '';
                     count++;
 
@@ -621,10 +638,21 @@
                     row.style.display = 'none';
                 }
             });
-            btnDayShift.className = shift === 'day' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
-            btnNightShift.className = shift === 'night' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
+
+            if (btnDayShift && btnNightShift) {
+                btnDayShift.className = currentShift === 'day' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
+                btnNightShift.className = currentShift === 'night' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
+            }
+
+            if (btnS63 && btnC39) {
+                btnS63.className = currentSection === 's63' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
+                btnC39.className = currentSection === 'c39' ? 'btn btn-accent btn-sm py-2 px-3' : 'btn btn-outline-custom btn-sm py-2 px-3';
+            }
             
-            otSectionTitle.textContent = `${baseTitle} — ${shift === 'day' ? '☀️ Day Shift' : '🌙 Night Shift'} OT`;
+            const displaySection = currentSection === 's63' ? 'Sector 63' : 'Phase 2 (C39)';
+            const displayTitle = btnS63 ? displaySection : (otSectionTitle.textContent.split(' — ')[0]);
+            const displayShift = currentShift === 'day' ? '☀️ Day Shift' : '🌙 Night Shift';
+            otSectionTitle.textContent = `${displayTitle} — ${displayShift} OT`;
             employeeCountText.textContent = `${count} employees`;
 
             const totalRow = document.querySelector('#overtimeTableBody tr[style*="rgba"]');
@@ -1010,7 +1038,7 @@
                 if (activeRequestController) activeRequestController.abort();
                 if (scopeTable) scopeTable.innerHTML = originalScopeTableHtml;
                 if (drilldownHeaderScope) drilldownHeaderScope.classList.add('d-none');
-                filterByShift(currentShift);
+                applyFilters();
             });
         }
 
@@ -1023,17 +1051,41 @@
             });
         }
 
-        // 3. Day Shift / Night Shift toggle (Management)
+        // 3. Shift and Section toggles (Management)
         const btnDayShift = document.getElementById('btnDayShift');
         const btnNightShift = document.getElementById('btnNightShift');
+        const btnS63 = document.getElementById('btnS63');
+        const btnC39 = document.getElementById('btnC39');
         const testRows = document.querySelectorAll('#overtimeTableBody tr');
 
-        if (btnDayShift && btnNightShift && testRows.length > 0) {
-            btnDayShift.addEventListener('click', function () { filterByShift('day'); });
-            btnNightShift.addEventListener('click', function () { filterByShift('night'); });
+        if (testRows.length > 0) {
+            if (btnDayShift) {
+                btnDayShift.addEventListener('click', function () {
+                    currentShift = 'day';
+                    applyFilters();
+                });
+            }
+            if (btnNightShift) {
+                btnNightShift.addEventListener('click', function () {
+                    currentShift = 'night';
+                    applyFilters();
+                });
+            }
+            if (btnS63) {
+                btnS63.addEventListener('click', function () {
+                    currentSection = 's63';
+                    applyFilters();
+                });
+            }
+            if (btnC39) {
+                btnC39.addEventListener('click', function () {
+                    currentSection = 'c39';
+                    applyFilters();
+                });
+            }
 
-            // Apply default day shift filter on load
-            filterByShift('day');
+            // Apply default filters on load
+            applyFilters();
         }
     });
 </script>

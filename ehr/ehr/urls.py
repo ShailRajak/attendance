@@ -16,9 +16,12 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
+from django.contrib.staticfiles.views import serve
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("attendance.urls")),
+    # Serve static files when DEBUG = False in development/ngrok environments
+    re_path(r"^static/(?P<path>.*)$", serve, {"insecure": True}),
 ]

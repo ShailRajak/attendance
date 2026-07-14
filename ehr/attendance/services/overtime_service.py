@@ -396,7 +396,11 @@ def get_scope_overtime_summary(accessible_usernames, start_date, end_date, expec
                 "total_ot": 0.0,
                 "day_shift_count": 0,
                 "night_shift_count": 0,
+                "department": record.get("Day", "—"),
             }
+        else:
+            if record.get("Day") and record.get("Day") != "—":
+                employee_data[emp_id]["department"] = record.get("Day")
 
         if shift_label == "day":
             employee_data[emp_id]["day_shift_count"] += 1
@@ -654,9 +658,9 @@ def get_overtime_dashboard_data(user, get_params):
 
     is_supervisor = is_superuser or (scope in ("SECTION", "ALL"))
 
-    period = get_params.get("period", "weekly")
+    period = get_params.get("period", "daily")
     if period not in ("daily", "weekly", "monthly"):
-        period = "weekly"
+        period = "daily"
 
     custom_start = get_params.get("custom_start")
     custom_end = get_params.get("custom_end")

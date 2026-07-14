@@ -500,7 +500,7 @@
         <div class="summary-card h-100">
             <span class="summary-title">⏰ Late Punch</span>
             <div class="summary-number text-danger">{{ kpi_late_punch }}</div>
-            <span class="summary-detail">After grace period</span>
+            <span class="summary-detail">Total late check-ins</span>
         </div>
     </div>
 </div>
@@ -567,7 +567,8 @@
                 </div>
                 <div class="flex-grow-1" style="min-width: 0;">
                     <div class="d-flex flex-wrap align-items-center gap-2">
-                        <h4 class="fw-bold mb-0 text-white" style="word-break: break-word; overflow-wrap: break-word;">{{ stats.employee_details.name }}</h4>
+                        <h4 class="fw-bold mb-0 text-white" style="word-break: break-word; overflow-wrap: break-word;">
+                            {{ stats.employee_details.name }}</h4>
                         {% if is_section_view %}
                         <span class="badge-onroll">Section View</span>
                         {% else %}
@@ -576,7 +577,8 @@
                     </div>
                     <div class="text-muted small mt-1" style="word-break: break-word; overflow-wrap: break-word;">
                         {% if is_section_view %}
-                        Role: {{ role_display }} &middot; Section: {{ section_display }} &middot; Total Employees: {{ stats.total_employees }}
+                        Role: {{ role_display }} &middot; Section: {{ section_display }} &middot; Total Employees: {{
+                        stats.total_employees }}
                         {% else %}
                         Emp ID: {{ stats.employee_details.id }} &middot; Mobile: {{ stats.employee_details.mobile }}
                         &middot; {{ stats.employee_details.job_title }}
@@ -682,148 +684,164 @@
                     {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
                     {% if is_superuser %}
                     <div class="d-flex gap-1 align-items-center border-end border-secondary pe-2 me-1">
-                        <button type="button" id="btnS63" class="btn btn-accent btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">🏢 S63</button>
-                        <button type="button" id="btnC39" class="btn btn-outline-custom btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">🏢 C39</button>
+                        <button type="button" id="btnS63" class="btn btn-accent btn-sm py-1 px-2 fw-semibold"
+                            style="font-size: 0.75rem;">🏢 S63</button>
+                        <button type="button" id="btnC39" class="btn btn-outline-custom btn-sm py-1 px-2 fw-semibold"
+                            style="font-size: 0.75rem;">🏢 C39</button>
                     </div>
                     {% endif %}
-                    <button type="button" id="btnDayShift" class="btn btn-accent btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">☀️ Day Shift</button>
-                    <button type="button" id="btnNightShift" class="btn btn-outline-custom btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">🌙 Night Shift</button>
+                    <button type="button" id="btnDayShift" class="btn btn-accent btn-sm py-1 px-2 fw-semibold"
+                        style="font-size: 0.75rem;">☀️ Day Shift</button>
+                    <button type="button" id="btnNightShift" class="btn btn-outline-custom btn-sm py-1 px-2 fw-semibold"
+                        style="font-size: 0.75rem;">🌙 Night Shift</button>
                     {% else %}
-                    <button type="button" id="btnListView" class="btn btn-accent btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">📋 List View</button>
-                    <button type="button" id="btnCalendarView" class="btn btn-outline-custom btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">📅 Calendar View</button>
+                    <button type="button" id="btnListView" class="btn btn-accent btn-sm py-1 px-2 fw-semibold"
+                        style="font-size: 0.75rem;">📋 List View</button>
+                    <button type="button" id="btnCalendarView"
+                        class="btn btn-outline-custom btn-sm py-1 px-2 fw-semibold" style="font-size: 0.75rem;">📅
+                        Calendar View</button>
                     {% endif %}
                 </div>
             </div>
 
             <div id="listViewContainer">
-                <div id="drilldownFilterHeader" class="mb-3 d-none" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); padding: 10px 15px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                <div id="drilldownFilterHeader" class="mb-3 d-none"
+                    style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); padding: 10px 15px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
                     <span class="text-white fw-semibold" id="drilldownFilterText"></span>
-                    <button type="button" id="btnClearDrilldown" class="btn btn-outline-danger btn-sm py-1 px-3" style="font-size: 0.8rem;">✕ Clear Filter</button>
+                    <button type="button" id="btnClearDrilldown" class="btn btn-outline-danger btn-sm py-1 px-3"
+                        style="font-size: 0.8rem;">✕ Clear Filter</button>
                 </div>
 
                 {% if is_superuser %}
-                    {% if attendance %}
-                    <div class="dept-accordion">
-                        {% for panel_key, panel_label, panel_icon in dept_panels %}
-                        <div class="dept-accordion-item">
-                            <button type="button" class="dept-accordion-header" data-target="deptPanel{{ panel_key }}">
-                                <span>{{ panel_icon }} {{ panel_label }}</span>
-                                <span class="accordion-arrow">▸</span>
-                            </button>
-                            <div class="dept-accordion-panel" id="deptPanel{{ panel_key }}">
-                                <div class="table-responsive" style="max-height: 480px; overflow-y: auto; overflow-x: auto; border-radius: 10px;">
-                                    <table class="table table-custom" style="white-space: nowrap;">
-                                        <thead>
-                                            <tr>
-                                                <th>Emp ID</th>
-                                                <th>Name</th>
-                                                <th>Date</th>
-                                                <th>Day</th>
-                                                <th>Check-in</th>
-                                                <th>Check-out</th>
-                                                <th>Work hrs</th>
-                                                <th>OT hrs</th>
-                                                <th>Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="dept-table-body" data-panel="{{ panel_key }}">
-                                            {% for row in attendance %}
-                                            {% if panel_key == "All" or row.dept_key == panel_key %}
-                                            <tr data-shift="{{ row.shift_label }}" data-section="{% if 'Sector 63' in row.department or 's63' in row.department %}s63{% elif 'Phase 2' in row.department or 'c39' in row.department %}c39{% else %}other{% endif %}" data-dept="{{ row.dept_key }}">
-                                                <td><strong class="text-info">{{ row.employee_id }}</strong></td>
-                                                <td>{{ row.employee_name }}</td>
-                                                <td><strong>{{ row.date }}</strong></td>
-                                                <td class="fw-semibold">{{ row.day }}</td>
-                                                <td>{{ row.in_time }}</td>
-                                                <td>{{ row.out_time }}</td>
-                                                <td>{{ row.work_hrs }}</td>
-                                                <td>{{ row.ot_hrs }}</td>
-                                                <td>
-                                                    {% if row.status == "Present" %}
-                                                    <span class="badge badge-custom badge-active">Present</span>
-                                                    {% elif row.status == "Absent" %}
-                                                    <span class="badge badge-custom badge-absent">Absent</span>
-                                                    {% elif row.status == "Mispunch" %}
-                                                    <span class="badge badge-custom badge-absent" style="background-color: rgba(239, 68, 68, 0.12); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2);">Mispunch</span>
-                                                    {% elif row.status == "Rest Day" %}
-                                                    <span class="badge badge-status-rest badge-custom">Rest Day</span>
-                                                    {% else %}
-                                                    <span class="badge badge-status-cl badge-custom">{{ row.status }}</span>
-                                                    {% endif %}
-                                                </td>
-                                            </tr>
-                                            {% endif %}
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
+                {% if attendance %}
+                <div class="dept-accordion">
+                    {% for panel_key, panel_label, panel_icon in dept_panels %}
+                    <div class="dept-accordion-item">
+                        <button type="button" class="dept-accordion-header" data-target="deptPanel{{ panel_key }}">
+                            <span>{{ panel_icon }} {{ panel_label }}</span>
+                            <span class="accordion-arrow">▸</span>
+                        </button>
+                        <div class="dept-accordion-panel" id="deptPanel{{ panel_key }}">
+                            <div class="table-responsive"
+                                style="max-height: 480px; overflow-y: auto; overflow-x: auto; border-radius: 10px;">
+                                <table class="table table-custom" style="white-space: nowrap;">
+                                    <thead>
+                                        <tr>
+                                            <th>Emp ID</th>
+                                            <th>Name</th>
+                                            <th>Date</th>
+                                            <th>Day</th>
+                                            <th>Check-in</th>
+                                            <th>Check-out</th>
+                                            <th>Work hrs</th>
+                                            <th>OT hrs</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="dept-table-body" data-panel="{{ panel_key }}">
+                                        {% for row in attendance %}
+                                        {% if panel_key == "All" or row.dept_key == panel_key %}
+                                        <tr data-shift="{{ row.shift_label }}"
+                                            data-section="{% if 'Sector 63' in row.department or 's63' in row.department %}s63{% elif 'Phase 2' in row.department or 'c39' in row.department %}c39{% else %}other{% endif %}"
+                                            data-dept="{{ row.dept_key }}">
+                                            <td><strong class="text-info">{{ row.employee_id }}</strong></td>
+                                            <td>{{ row.employee_name }}</td>
+                                            <td><strong>{{ row.date }}</strong></td>
+                                            <td class="fw-semibold">{{ row.day }}</td>
+                                            <td>{{ row.in_time }}</td>
+                                            <td>{{ row.out_time }}</td>
+                                            <td>{{ row.work_hrs }}</td>
+                                            <td>{{ row.ot_hrs }}</td>
+                                            <td>
+                                                {% if row.status == "Present" %}
+                                                <span class="badge badge-custom badge-active">Present</span>
+                                                {% elif row.status == "Absent" %}
+                                                <span class="badge badge-custom badge-absent">Absent</span>
+                                                {% elif row.status == "Mispunch" %}
+                                                <span class="badge badge-custom badge-absent"
+                                                    style="background-color: rgba(239, 68, 68, 0.12); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2);">Mispunch</span>
+                                                {% elif row.status == "Rest Day" %}
+                                                <span class="badge badge-status-rest badge-custom">Rest Day</span>
+                                                {% else %}
+                                                <span class="badge badge-status-cl badge-custom">{{ row.status }}</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
-                        {% endfor %}
                     </div>
-                    {% else %}
-                    <div class="text-center py-5">
-                        <span class="fs-1 text-muted d-block mb-3">📭</span>
-                        <h5 class="text-muted fw-normal">No logs found for this period.</h5>
-                    </div>
-                    {% endif %}
+                    {% endfor %}
+                </div>
                 {% else %}
-                    <!-- ORIGINAL single flat table for non-superuser roles stays exactly as it was before -->
-                    {% if attendance %}
-                    <div class="table-responsive" style="max-height: 480px; overflow-y: auto; overflow-x: auto; border-radius: 10px;">
-                        <table class="table table-custom" style="white-space: nowrap;">
-                            <thead>
-                                <tr>
-                                    {% if role == 'smt_pd' or role == 'assy_pd' %}
-                                    <th>Emp ID</th>
-                                    <th>Name</th>
+                <div class="text-center py-5">
+                    <span class="fs-1 text-muted d-block mb-3">📭</span>
+                    <h5 class="text-muted fw-normal">No logs found for this period.</h5>
+                </div>
+                {% endif %}
+                {% else %}
+                <!-- ORIGINAL single flat table for non-superuser roles stays exactly as it was before -->
+                {% if attendance %}
+                <div class="table-responsive"
+                    style="max-height: 480px; overflow-y: auto; overflow-x: auto; border-radius: 10px;">
+                    <table class="table table-custom" style="white-space: nowrap;">
+                        <thead>
+                            <tr>
+                                {% if role == 'smt_pd' or role == 'assy_pd' %}
+                                <th>Emp ID</th>
+                                <th>Name</th>
+                                {% endif %}
+                                <th>Date</th>
+                                <th>Day</th>
+                                <th>Check-in</th>
+                                <th>Check-out</th>
+                                <th>Work hrs</th>
+                                <th>OT hrs</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceTableBody">
+                            {% for row in attendance %}
+                            <tr data-shift="{{ row.shift_label }}"
+                                data-section="{% if 'Sector 63' in row.department or 's63' in row.department %}s63{% elif 'Phase 2' in row.department or 'c39' in row.department %}c39{% else %}other{% endif %}">
+                                {% if role == 'smt_pd' or role == 'assy_pd' %}
+                                <td><strong class="text-info">{{ row.employee_id }}</strong></td>
+                                <td>{{ row.employee_name }}</td>
+                                {% endif %}
+                                <td><strong>{{ row.date }}</strong></td>
+                                <td class="fw-semibold">{{ row.day }}</td>
+                                <td>{{ row.in_time }}</td>
+                                <td>{{ row.out_time }}</td>
+                                <td>{{ row.work_hrs }}</td>
+                                <td>{{ row.ot_hrs }}</td>
+                                <td>
+                                    {% if row.status == "Present" %}
+                                    <span class="badge badge-custom badge-active">Present</span>
+                                    {% elif row.status == "Absent" %}
+                                    <span class="badge badge-custom badge-absent">Absent</span>
+                                    {% elif row.status == "Mispunch" %}
+                                    <span class="badge badge-custom badge-absent"
+                                        style="background-color: rgba(239, 68, 68, 0.12); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2);">Mispunch</span>
+                                    {% elif row.status == "Rest Day" %}
+                                    <span class="badge badge-status-rest badge-custom">Rest Day</span>
+                                    {% else %}
+                                    <span class="badge badge-status-cl badge-custom">{{ row.status }}</span>
                                     {% endif %}
-                                    <th>Date</th>
-                                    <th>Day</th>
-                                    <th>Check-in</th>
-                                    <th>Check-out</th>
-                                    <th>Work hrs</th>
-                                    <th>OT hrs</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="attendanceTableBody">
-                                {% for row in attendance %}
-                                <tr data-shift="{{ row.shift_label }}" data-section="{% if 'Sector 63' in row.department or 's63' in row.department %}s63{% elif 'Phase 2' in row.department or 'c39' in row.department %}c39{% else %}other{% endif %}">
-                                    {% if role == 'smt_pd' or role == 'assy_pd' %}
-                                    <td><strong class="text-info">{{ row.employee_id }}</strong></td>
-                                    <td>{{ row.employee_name }}</td>
-                                    {% endif %}
-                                    <td><strong>{{ row.date }}</strong></td>
-                                    <td class="fw-semibold">{{ row.day }}</td>
-                                    <td>{{ row.in_time }}</td>
-                                    <td>{{ row.out_time }}</td>
-                                    <td>{{ row.work_hrs }}</td>
-                                    <td>{{ row.ot_hrs }}</td>
-                                    <td>
-                                        {% if row.status == "Present" %}
-                                        <span class="badge badge-custom badge-active">Present</span>
-                                        {% elif row.status == "Absent" %}
-                                        <span class="badge badge-custom badge-absent">Absent</span>
-                                        {% elif row.status == "Mispunch" %}
-                                        <span class="badge badge-custom badge-absent" style="background-color: rgba(239, 68, 68, 0.12); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2);">Mispunch</span>
-                                        {% elif row.status == "Rest Day" %}
-                                        <span class="badge badge-status-rest badge-custom">Rest Day</span>
-                                        {% else %}
-                                        <span class="badge badge-status-cl badge-custom">{{ row.status }}</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <div class="text-center py-5">
-                        <span class="fs-1 text-muted d-block mb-3">📭</span>
-                        <h5 class="text-muted fw-normal">No logs found for this period.</h5>
-                    </div>
-                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <span class="fs-1 text-muted d-block mb-3">📭</span>
+                    <h5 class="text-muted fw-normal">No logs found for this period.</h5>
+                </div>
+                {% endif %}
                 {% endif %}
             </div>
 
@@ -875,12 +893,18 @@
 
     function applyFilters() {
         const dynamicRows = document.querySelectorAll('#attendanceTableBody tr, .dept-table-body tr');
+        const btnDayShift = document.getElementById('btnDayShift');
+        const btnS63 = document.getElementById('btnS63');
+
         dynamicRows.forEach(row => {
             const shiftLabel = row.getAttribute('data-shift');
             const sectionLabel = row.getAttribute('data-section');
-            
-            // Check if section buttons are present (for supervisor/superuser roles)
-            const btnS63 = document.getElementById('btnS63');
+
+            if (!btnDayShift) {
+                row.style.display = '';
+                return;
+            }
+
             if (btnS63) {
                 if (shiftLabel === currentShift && sectionLabel === currentSection) {
                     row.style.display = '';
@@ -897,7 +921,6 @@
         });
 
         // Update button classes dynamically
-        const btnDayShift = document.getElementById('btnDayShift');
         const btnNightShift = document.getElementById('btnNightShift');
         if (btnDayShift && btnNightShift) {
             btnDayShift.className = currentShift === 'day' ? 'btn btn-accent btn-sm py-1 px-2 fw-semibold' : 'btn btn-outline-custom btn-sm py-1 px-2 fw-semibold';
@@ -906,7 +929,6 @@
             btnNightShift.style.fontSize = '0.75rem';
         }
 
-        const btnS63 = document.getElementById('btnS63');
         const btnC39 = document.getElementById('btnC39');
         if (btnS63 && btnC39) {
             btnS63.className = currentSection === 's63' ? 'btn btn-accent btn-sm py-1 px-2 fw-semibold' : 'btn btn-outline-custom btn-sm py-1 px-2 fw-semibold';
@@ -917,12 +939,16 @@
 
         const titleEl = document.getElementById('dashboardSectionTitle');
         if (titleEl) {
-            const shiftText = currentShift === 'day' ? '☀️ Day Shift' : '🌙 Night Shift';
-            if (btnS63) {
-                const secText = currentSection === 's63' ? 'S63' : 'C39';
-                titleEl.textContent = `${secText} — ${shiftText} — {{ period_text|escapejs }}`;
+            if (!btnDayShift) {
+                titleEl.textContent = 'Attendance Logs (' + "{{ period_text|escapejs }}" + ')';
             } else {
-                titleEl.textContent = `${shiftText} — {{ period_text|escapejs }}`;
+                const shiftText = currentShift === 'day' ? '☀️ Day Shift' : '🌙 Night Shift';
+                if (btnS63) {
+                    const secText = currentSection === 's63' ? 'S63' : 'C39';
+                    titleEl.textContent = `${secText} — ${shiftText} — {{ period_text|escapejs }}`;
+                } else {
+                    titleEl.textContent = `${shiftText} — {{ period_text|escapejs }}`;
+                }
             }
         }
     }
@@ -1049,7 +1075,7 @@
         const drilldownHeader = document.getElementById('drilldownFilterHeader');
         const drilldownText = document.getElementById('drilldownFilterText');
         const clearBtn = document.getElementById('btnClearDrilldown');
-        
+
         const activeStartDate = JSON.parse(document.getElementById('active-start-date').textContent);
         const activeEndDate = JSON.parse(document.getElementById('active-end-date').textContent);
         const userRole = JSON.parse(document.getElementById('user-role').textContent);
@@ -1163,7 +1189,7 @@
         }
 
         if (clearBtn) {
-            clearBtn.addEventListener('click', function() {
+            clearBtn.addEventListener('click', function () {
                 if (activeRequestController) {
                     activeRequestController.abort();
                 }
@@ -1186,24 +1212,24 @@
         const testRows = document.querySelectorAll('#attendanceTableBody tr, .dept-table-body tr');
 
         if (btnDayShift && btnNightShift && testRows.length > 0) {
-            btnDayShift.addEventListener('click', function () { 
-                currentShift = 'day'; 
-                applyFilters(); 
+            btnDayShift.addEventListener('click', function () {
+                currentShift = 'day';
+                applyFilters();
             });
-            btnNightShift.addEventListener('click', function () { 
-                currentShift = 'night'; 
-                applyFilters(); 
+            btnNightShift.addEventListener('click', function () {
+                currentShift = 'night';
+                applyFilters();
             });
         }
 
         if (btnS63 && btnC39 && testRows.length > 0) {
-            btnS63.addEventListener('click', function () { 
-                currentSection = 's63'; 
-                applyFilters(); 
+            btnS63.addEventListener('click', function () {
+                currentSection = 's63';
+                applyFilters();
             });
-            btnC39.addEventListener('click', function () { 
-                currentSection = 'c39'; 
-                applyFilters(); 
+            btnC39.addEventListener('click', function () {
+                currentSection = 'c39';
+                applyFilters();
             });
         }
 
@@ -1330,12 +1356,14 @@
                     if (record.status === 'Present') {
                         const inTime = record.in_time;
                         let isLate = false;
-                        if (inTime && inTime !== '—') {
+                        if (record.late_minutes && parseFloat(record.late_minutes) > 0) {
+                            isLate = true;
+                        } else if (inTime && inTime !== '—') {
                             const parts = inTime.split(':');
                             if (parts.length === 2) {
                                 const checkInMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
                                 const shiftStartMin = (record.shift_label === 'night') ? 20 * 60 : 9 * 60;
-                                if (checkInMin > shiftStartMin + 15) {
+                                if (checkInMin > shiftStartMin) {
                                     isLate = true;
                                 }
                             }
