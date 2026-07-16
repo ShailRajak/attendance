@@ -1,6 +1,6 @@
+from attendance.services.attendance_service import get_attendance
 from attendance.services.role_service import resolve_user_role_and_section, get_expected_dtname4
 from attendance.services.rbac_service import RBACService
-from attendance.services.attendance_service import fetch_attendance, fetch_attendance_from_db
 
 def get_attendance_api_data(user, get_params):
     """
@@ -24,15 +24,7 @@ def get_attendance_api_data(user, get_params):
         return False, {"success": False, "message": "Missing Parameters"}, 400
 
     # Fetch attendance raw data
-    fetch_emp_id = employee_id if employee_id else ""
-    if is_supervisor:
-        attendance = fetch_attendance_from_db(
-            employee_id=fetch_emp_id, start_date=start_date, end_date=end_date
-        )
-    else:
-        attendance = fetch_attendance(
-            employee_id=fetch_emp_id, start_date=start_date, end_date=end_date
-        )
+    attendance = get_attendance(user, employee_id, start_date, end_date)
 
     # Filter data based on RBAC rules and resolved section names
     expected_dtname4 = get_expected_dtname4(role, section, user.username)

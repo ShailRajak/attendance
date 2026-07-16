@@ -2,13 +2,13 @@ from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 
 
-from attendance.services.attendance_service import fetch_attendance, fetch_attendance_from_db
+from attendance.services.attendance_service import get_attendance
 from attendance.services.role_service import resolve_user_role_and_section, get_expected_dtname4
 from attendance.services.rbac_service import RBACService
 from attendance.models import UserProfile
 
 
-def get_overtime_summary(emp_id, start_date, end_date, is_supervisor=False):
+def get_overtime_summary(user, emp_id, start_date, end_date):
     """
     Aggregates overtime data from cached attendance records for a single employee.
 
@@ -19,10 +19,7 @@ def get_overtime_summary(emp_id, start_date, end_date, is_supervisor=False):
         - anomalies: list of punch anomalies
     """
     # Fetch from cache or local DB depending on role
-    if is_supervisor:
-        attendance = fetch_attendance_from_db(emp_id, start_date, end_date)
-    else:
-        attendance = fetch_attendance(emp_id, start_date, end_date)
+    attendance = get_attendance(user, emp_id, start_date, end_date)
 
     # Initialize totals
     card_punch_ot = 0.0
@@ -349,7 +346,7 @@ def get_all_cycles_in_year(year=None):
     return cycles
 
 
-def get_scope_overtime_summary(accessible_usernames, start_date, end_date, expected_dtname4=None, is_all_scope=False):
+def get_scope_overtime_summary(user, accessible_usernames, start_date, end_date, expected_dtname4=None, is_all_scope=False):
     """
     Aggregates overtime data across all employees under a given dynamic scope.
 
@@ -360,7 +357,7 @@ def get_scope_overtime_summary(accessible_usernames, start_date, end_date, expec
         - dtname4_scope: scope name
     """
     # Fetch all attendance records (no employee filter) from local DB for supervisor scope
-    attendance = fetch_attendance_from_db("", start_date, end_date)
+    attendance = get_attendance(user, "", start_date, end_date)
 
     # Filter by section name if expected_dtname4 is provided, else fallback to accessible employee usernames
     if expected_dtname4:
@@ -731,10 +728,10 @@ def get_overtime_dashboard_data(user, get_params):
 
     if has_selected_employee and not is_superuser and scope != "ALL" and expected_dtname4:
         # Verify employee belongs to section
-        attendance_chk = fetch_attendance_from_db(emp_id, start_date_str, end_date_str)
+        attendance_chk = get_attendance(user, emp_id, start_date_str, end_date_str)
         belongs = any(r.get("Day") == expected_dtname4 for r in attendance_chk)
         if belongs:
-            summary = get_overtime_summary(emp_id, start_date_str, end_date_str, is_supervisor=is_supervisor)
+            summary = get_overtime_summary(user, emp_id, start_date_str, end_date_str)
         else:
             summary = {
                 "card_punch_ot": 0.0,
@@ -746,7 +743,7 @@ def get_overtime_dashboard_data(user, get_params):
                 "anomalies": [],
             }
     else:
-        summary = get_overtime_summary(emp_id, start_date_str, end_date_str, is_supervisor=is_supervisor)
+        summary = get_overtime_summary(user, emp_id, start_date_str, end_date_str)
 
     scope_summary = None
     if is_supervisor:
@@ -754,7 +751,7 @@ def get_overtime_dashboard_data(user, get_params):
             RBACService.get_accessible_employees(user).values_list("user__username", flat=True)
         )
         scope_summary = get_scope_overtime_summary(
-            accessible_users_set, start_date_str, end_date_str, expected_dtname4,
+            user, accessible_users_set, start_date_str, end_date_str, expected_dtname4,
             is_all_scope=(is_superuser or scope == "ALL")
         )
 

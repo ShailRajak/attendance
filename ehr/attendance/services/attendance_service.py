@@ -6,11 +6,7 @@ import requests
 
 from attendance.utils.formatter import filter_attendance_data
 
-from attendance.services.cache_service import (
-    generate_attendance_cache_key,
-    get_attendance_cache,
-    set_attendance_cache,
-)
+# Caching imports removed (handled by get_attendance)
 
 def get_attendance_api_url():
     """
@@ -103,7 +99,7 @@ def _fetch_single_date(date_obj, employee_id):
     return []
 
 
-def fetch_attendance_from_db(employee_id, start_date, end_date):
+def fetch_attendance_from_db(employee_id, start_date, end_date, user=None):
     """
     Retrieve attendance records from the local synchronized database.
     """
@@ -120,19 +116,94 @@ def fetch_attendance_from_db(employee_id, start_date, end_date):
         end_date = end_date.date()
 
     qs = AttendanceRecord.objects.filter(attendance_date__range=(start_date, end_date))
-    if employee_id:
-        qs = qs.filter(employee_id=employee_id)
+
+    if user and not user.is_superuser:
+        from attendance.services.rbac_service import RBACService
+        from attendance.services.role_service import resolve_user_role_and_section, get_expected_dtname4
+
+        scope = RBACService.get_scope(user)
+        role, section = resolve_user_role_and_section(user)
+        is_supervisor = (scope in ("TEAM", "SECTION", "DEPARTMENT", "PLANT", "COMPANY", "ALL"))
+
+        if scope == "OWN" or not is_supervisor:
+            qs = qs.filter(employee_id=user.username)
+        elif scope != "ALL":
+            expected_dtname4 = get_expected_dtname4(role, section, user.username)
+            if expected_dtname4:
+                qs = qs.filter(day=expected_dtname4)
+                if employee_id:
+                    qs = qs.filter(employee_id=employee_id)
+            else:
+                accessible_users = list(
+                    RBACService.get_accessible_employees(user).values_list("user__username", flat=True)
+                )
+                if employee_id:
+                    if employee_id in accessible_users:
+                        qs = qs.filter(employee_id=employee_id)
+                    else:
+                        return []
+                else:
+                    qs = qs.filter(employee_id__in=accessible_users)
+        else: # scope == "ALL"
+            if employee_id:
+                qs = qs.filter(employee_id=employee_id)
+    else:
+        if employee_id:
+            qs = qs.filter(employee_id=employee_id)
 
     # Sort descending by date
     qs = qs.order_by("-attendance_date", "employee_id")
 
-    return [record.to_dict() for record in qs]
+    fields = [
+        "attendance_date", "employee_id", "employee_name", "in_time", "out_time",
+        "working_hours", "card_punch_ot", "shift", "leave_type", "late_minutes", "day",
+        "requested_ot", "weekend_ot", "holiday_ot", "ot4", "total_ot_all", "req_overtime", "approved_ot",
+        "wt_id", "wt_type_no", "attendance_source", "attendance_status", "mobile", "workday", "weekday"
+    ]
+
+    def format_float(val):
+        if val is None:
+            return ""
+        if isinstance(val, float) and val.is_integer():
+            return str(int(val))
+        return str(val)
+
+    return [
+        {
+            "Date": r["attendance_date"].strftime("%d-%m-%Y") if r["attendance_date"] else "",
+            "Employee ID": r["employee_id"],
+            "Employee Name": r["employee_name"],
+            "In Time": r["in_time"],
+            "Out Time": r["out_time"],
+            "Working Hours": format_float(r["working_hours"]),
+            "Card Punch OT": format_float(r["card_punch_ot"]),
+            "Requested OT": format_float(r["requested_ot"]),
+            "Weekend OT": format_float(r["weekend_ot"]),
+            "Holiday OT": format_float(r["holiday_ot"]),
+            "OT4": format_float(r["ot4"]),
+            "Total OT All": format_float(r["total_ot_all"]),
+            "Req OverTime": format_float(r["req_overtime"]),
+            "Approved OT": format_float(r["approved_ot"]),
+            "WT ID": r["wt_id"],
+            "WT Type No": r["wt_type_no"],
+            "Attendance Source": r["attendance_source"],
+            "Day": r["day"],
+            "Attendance Status": r["attendance_status"],
+            "Shift": r["shift"],
+            "Mobile": r["mobile"],
+            "Late Minutes": format_float(r["late_minutes"]),
+            "Leave Type": r["leave_type"],
+            "WorkDay": r["workday"],
+            "Weekday": r["weekday"],
+        }
+        for r in qs.values(*fields)
+    ]
 
 
 def fetch_attendance(employee_id, start_date, end_date):
     """
     Fetch attendance data from Attendance REST API.
-    Uses cache_service for reading/writing cached records.
+    Pure fetcher: caching is managed centrally at get_attendance level.
     """
     if isinstance(start_date, str):
         start_date = datetime.strptime(start_date, "%Y-%m-%d")
@@ -140,18 +211,7 @@ def fetch_attendance(employee_id, start_date, end_date):
     if isinstance(end_date, str):
         end_date = datetime.strptime(end_date, "%Y-%m-%d")
 
-    cache_key = generate_attendance_cache_key(employee_id, start_date, end_date)
-    cached_data = get_attendance_cache(cache_key)
-
-    if cached_data is not None:
-        print("=" * 60)
-        print("Loaded attendance from CACHE")
-        print(f"Cache Key : {cache_key}")
-        print("=" * 60)
-        return cached_data
-
     print("=" * 60)
-    print("Cache MISS")
     print("Fetching attendance from API...")
     print("=" * 60)
 
@@ -179,12 +239,16 @@ def fetch_attendance(employee_id, start_date, end_date):
     print(f"\nTotal Records : {len(all_records)}")
 
     filtered_data = filter_attendance_data(all_records)
-
-    set_attendance_cache(cache_key, filtered_data, timeout=CACHE_TIMEOUT)
-
-    print("=" * 60)
-    print("Attendance cached successfully")
-    print(f"Cache Key : {cache_key}")
-    print("=" * 60)
-
     return filtered_data
+
+
+def get_attendance(user, employee_id, start_date, end_date):
+    """
+    Centralized service to retrieve attendance records.
+    Uses get_or_create_attendance_cache from the centralized cache service.
+    """
+    if user is None or not user.is_authenticated:
+        return []
+
+    from attendance.services.cache_service import get_or_create_attendance_cache
+    return get_or_create_attendance_cache(user, employee_id, start_date, end_date)

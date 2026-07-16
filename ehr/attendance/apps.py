@@ -13,3 +13,6 @@ class AttendanceConfig(AppConfig):
 
         User.add_to_class("has_permission", user_has_permission)
 
+        # Import signals to register them
+        import attendance.signals
+

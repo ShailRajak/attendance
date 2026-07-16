@@ -318,6 +318,11 @@ class AttendanceRecord(models.Model):
     class Meta:
         unique_together = ("employee_id", "attendance_date")
         ordering = ["-attendance_date", "employee_id"]
+        indexes = [
+            models.Index(fields=["attendance_date", "employee_id"]),
+            models.Index(fields=["attendance_date", "day"]),
+            models.Index(fields=["employee_id", "attendance_date"]),
+        ]
 
     def __str__(self):
         return f"{self.employee_id} - {self.attendance_date} - {self.attendance_status}"

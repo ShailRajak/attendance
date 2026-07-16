@@ -577,8 +577,7 @@
                     </div>
                     <div class="text-muted small mt-1" style="word-break: break-word; overflow-wrap: break-word;">
                         {% if is_section_view %}
-                        Role: {{ role_display }} &middot; Section: {{ section_display }} &middot; Total Employees: {{
-                        stats.total_employees }}
+                        Role: {{ role_display }} &middot; Section: {{ section_display }} &middot; Total Employees: {{ stats.total_employees }}
                         {% else %}
                         Emp ID: {{ stats.employee_details.id }} &middot; Mobile: {{ stats.employee_details.mobile }}
                         &middot; {{ stats.employee_details.job_title }}
@@ -1297,6 +1296,35 @@
             });
         }
 
+        function getShiftStartMinutes(wtId, isNightShift, inTime) {
+            if (!wtId) {
+                if (inTime && inTime.includes(':')) {
+                    const parts = inTime.split(':');
+                    const checkInMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+                    if (isNightShift) {
+                        return (checkInMin < 20 * 60 + 15) ? 20 * 60 : 20 * 60 + 30;
+                    } else {
+                        return (checkInMin < 8 * 60 + 30) ? 8 * 60 : 9 * 60;
+                    }
+                }
+                return isNightShift ? 20 * 60 : 9 * 60;
+            }
+            const wt = wtId.trim().toUpperCase();
+            if (wt === 'Z07') return 7 * 60;
+            if (wt === 'Z09') return 7 * 60 + 30;
+            if (['B02', 'F02', 'F03', 'Z11'].includes(wt)) return 8 * 60;
+            if (['B03', 'H11', 'H15', 'Y01'].includes(wt)) return 8 * 60 + 30;
+            if (['X01', 'Z01'].includes(wt)) return 9 * 60;
+            if (wt === 'Z03') return 9 * 60 + 30;
+            if (wt === 'Z08') return 19 * 60;
+            if (wt === 'Z10') return 19 * 60 + 30;
+            if (['D02', 'F04', 'H14'].includes(wt)) return 20 * 60;
+            if (['D03', 'F06', 'Y02', 'H16'].includes(wt)) return 20 * 60 + 30;
+            if (wt === 'Z04') return 21 * 60 + 30;
+            
+            return isNightShift ? 20 * 60 : 9 * 60;
+        }
+
         function generateCalendar(records, startDateStr, endDateStr) {
             const calendarContainer = document.getElementById('calendarGridContainer');
             calendarContainer.innerHTML = '';
@@ -1362,7 +1390,8 @@
                             const parts = inTime.split(':');
                             if (parts.length === 2) {
                                 const checkInMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
-                                const shiftStartMin = (record.shift_label === 'night') ? 20 * 60 : 9 * 60;
+                                const isNight = record.shift_label === 'night';
+                                const shiftStartMin = getShiftStartMinutes(record.wt_id, isNight, inTime);
                                 if (checkInMin > shiftStartMin) {
                                     isLate = true;
                                 }

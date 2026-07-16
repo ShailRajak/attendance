@@ -1,5 +1,9 @@
 from datetime import datetime, timedelta, date
 import re
+from attendance.utils.date_helpers import get_shift_start_minutes
+
+
+_parse_date_cache = {}
 
 
 def parse_date(date_str):
@@ -14,15 +18,24 @@ def parse_date(date_str):
         return datetime(date_str.year, date_str.month, date_str.day)
 
     date_str = str(date_str).strip()
+    if date_str in _parse_date_cache:
+        return _parse_date_cache[date_str]
+
     for fmt in ("%d-%m-%Y", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
         try:
-            return datetime.strptime(date_str, fmt)
+            res = datetime.strptime(date_str, fmt)
+            _parse_date_cache[date_str] = res
+            return res
         except ValueError:
             continue
     try:
-        return datetime.fromisoformat(date_str)
+        res = datetime.fromisoformat(date_str)
+        _parse_date_cache[date_str] = res
+        return res
     except ValueError:
+        _parse_date_cache[date_str] = None
         return None
+
 
 
 def extract_initials(name):
@@ -44,7 +57,10 @@ def calculate_dashboard_stats(
 ):
     """
     Calculates statistics and chart data from the filtered attendance records.
+    Simplified: only generates employee details and trend chart data.
     """
+    from django.db.models import QuerySet
+
     if not attendance_records:
         return {
             "working_days": 0,
@@ -58,7 +74,7 @@ def calculate_dashboard_stats(
             "avg_work_time": 0.0,
             "chart_labels": [],
             "chart_worktime_data": [],
-            "breakdown_data": [0, 0, 0],
+            "breakdown_data": [0, 0, 0, 0, 0],
             "employee_details": {
                 "name": "Employee",
                 "id": employee_id,
@@ -71,25 +87,38 @@ def calculate_dashboard_stats(
         }
 
     # Extract employee details from the first record
-    first_record = attendance_records[0]
-    raw_name = first_record.get("Employee Name", "Pankaj Khurana")
+    if isinstance(attendance_records, QuerySet):
+        first_record_obj = attendance_records.first()
+        if first_record_obj:
+            raw_name = first_record_obj.employee_name or "Pankaj Khurana"
+            mobile_value = str(first_record_obj.mobile or "").strip()
+            sector = first_record_obj.day or "Sector 63 - Marketing"
+            shift = first_record_obj.shift or "Day Shift"
+        else:
+            raw_name = "Pankaj Khurana"
+            mobile_value = "—"
+            sector = "Sector 63 - Marketing"
+            shift = "Day Shift"
+    else:
+        first_record = attendance_records[0]
+        raw_name = first_record.get("Employee Name", "Pankaj Khurana")
+        mobile_value = first_record.get("Mobile", "").strip()
+        sector = first_record.get("Day", "Sector 63 - Marketing")
+        shift = first_record.get("Shift", "Day Shift")
+
     name = raw_name
     if name == "PankajKhurana":
         name = "Pankaj Khurana"
 
     # Profile matching the screenshots & dynamic mobile retrieval
-    mobile_value = first_record.get("Mobile", "").strip()
     if not mobile_value or mobile_value in ("—", "None", "0"):
         mobile_mapping = {"19105203": "+91 98765 43210", "19105540": "+91 99999 88888"}
         mobile_value = mobile_mapping.get(employee_id, "—")
     job_title = "Assistant Manager" if employee_id == "19105203" else "Associate"
 
-    # dtName4 was mapped to Day in formatter
-    sector = first_record.get("Day", "Sector 63 - Marketing")
     if not sector or sector == "—":
         sector = "Sector 63 - Marketing"
 
-    shift = first_record.get("Shift", "Day Shift")
     if "09:00" not in shift:
         shift = "Day Shift (09:00-18:00)"
 
@@ -103,42 +132,37 @@ def calculate_dashboard_stats(
         "initials": extract_initials(name),
     }
 
-    working_days = 0
-    days_present = 0.0
-    leaves_taken = 0.0
-    late_arrivals = 0
-    total_ot = 0.0
-    total_work_time = 0.0
-    max_late_minutes = 0
-    max_late_date = ""
-    mispunches = 0
-
     chart_labels = []
     chart_worktime_data = []
 
-    status_present = 0.0
-    status_leave = 0.0
-    status_rest = 0
-    status_mispunch = 0.0
-    status_cl = 0.0
-
+    # Map record dates
     record_map = {}
-    for r in attendance_records:
-        d = parse_date(r.get("Date"))
-        if d:
-            record_map[d.date()] = r
+    if isinstance(attendance_records, QuerySet):
+        for r in attendance_records.values("attendance_date", "working_hours"):
+            d = r["attendance_date"]
+            if d:
+                record_map[d] = r["working_hours"] or 0.0
+    else:
+        for r in attendance_records:
+            d = parse_date(r.get("Date"))
+            if d:
+                try:
+                    work_time = float(r.get("Working Hours") or 0.0)
+                except (ValueError, TypeError):
+                    work_time = 0.0
+                record_map[d.date()] = work_time
 
     # Determine start and end dates
     if start_date and end_date:
         start_dt = parse_date(start_date)
         end_dt = parse_date(end_date)
     else:
-        # Fallback to sorting
-        sorted_records = sorted(
-            attendance_records,
-            key=lambda x: parse_date(x.get("Date", "")) or datetime(1900, 1, 1),
-        )
-        dates = [parse_date(r.get("Date")) for r in sorted_records if r.get("Date")]
+        if isinstance(attendance_records, QuerySet):
+            dates = list(attendance_records.values_list("attendance_date", flat=True))
+        else:
+            dates = [parse_date(r.get("Date")) for r in attendance_records if r.get("Date")]
+            dates = [d.date() for d in dates if d]
+        
         dates = [d for d in dates if d]
         if dates:
             start_dt = min(dates)
@@ -148,173 +172,34 @@ def calculate_dashboard_stats(
             end_dt = None
 
     if start_dt and end_dt:
+        if hasattr(start_dt, "date"):
+            start_dt = start_dt.date()
+        if hasattr(end_dt, "date"):
+            end_dt = end_dt.date()
+
         current_dt = start_dt
         while current_dt <= end_dt:
-            date_obj = current_dt
-            chart_date = date_obj.strftime("%m-%d")
+            chart_date = current_dt.strftime("%m-%d")
             chart_labels.append(chart_date)
 
-            record = record_map.get(date_obj.date())
-            is_weekend = date_obj.weekday() == 6
-
-            if record:
-                # Working hours
-                try:
-                    work_time = float(record.get("Working Hours") or 0.0)
-                except (ValueError, TypeError):
-                    work_time = 0.0
-
-                # Overtime
-                try:
-                    ot = float(record.get("Card Punch OT") or 0.0)
-                except (ValueError, TypeError):
-                    ot = 0.0
-
-                total_ot += ot
-                chart_worktime_data.append(work_time)
-
-                # Check-in time
-                in_time_str = record.get("In Time", "").strip()
-                out_time_str = record.get("Out Time", "").strip()
-                has_check_in = bool(in_time_str) and in_time_str not in (
-                    "00:00",
-                    "—",
-                    "",
-                )
-                has_check_out = bool(out_time_str) and out_time_str not in (
-                    "00:00",
-                    "—",
-                    "",
-                )
-
-                is_holiday = (
-                    date_obj.year == 2026 and date_obj.month == 7 and date_obj.day == 1
-                    if date_obj
-                    else False
-                )
-                is_today = (
-                    (date_obj.date() == datetime.now().date()) if date_obj else False
-                )
-                is_mispunch = False
-                if (has_check_in and not has_check_out) or (
-                    has_check_out and not has_check_in
-                ):
-                    if not is_today and not is_holiday:
-                        mispunches += 1
-                        status_mispunch += 1.0
-                        is_mispunch = True
-
-                if not has_check_in:
-                    if is_weekend or is_holiday:
-                        status_rest += 1
-                    else:
-                        working_days += 1
-                        leaves_taken += 1.0
-                        status_leave += 1.0
-                else:
-                    if is_mispunch:
-                        pass
-                    elif is_weekend:
-                        if work_time >= 8.0 or is_today:
-                            working_days += 1
-                            days_present += 1.0
-                            status_present += 1.0
-                            total_work_time += work_time
-                        else:
-                            status_rest += 1
-                            total_work_time += work_time
-                    else:
-                        working_days += 1
-                        if work_time >= 8.0 or is_today:
-                            days_present += 1.0
-                            status_present += 1.0
-                            total_work_time += work_time
-                        else:
-                            days_present += 0.5
-                            leaves_taken += 0.5
-                            status_cl += 1.0
-                            total_work_time += work_time
-
-                    if in_time_str and ":" in in_time_str:
-                        try:
-                            h, m = map(int, in_time_str.split(":"))
-                            check_in_minutes = h * 60 + m
-
-                            shift_name = record.get("Shift", "")
-                            if "Night" in shift_name:
-                                shift_start_minutes = 20 * 60
-                            else:
-                                shift_start_minutes = 9 * 60
-
-                            # Also check raw late minutes if present
-                            late_min_val = 0.0
-                            try:
-                                late_min_val = float(record.get("Late Minutes") or 0.0)
-                            except (ValueError, TypeError):
-                                late_min_val = 0.0
-
-                            late_by_time = 0.0
-                            if check_in_minutes > shift_start_minutes:
-                                late_by_time = float(check_in_minutes - shift_start_minutes)
-
-                            late_minutes = max(late_min_val, late_by_time)
-                            if late_minutes > 0.0:
-                                late_arrivals += 1
-                                if late_minutes > max_late_minutes:
-                                    max_late_minutes = int(late_minutes)
-                                    max_late_date = chart_date
-                        except (ValueError, TypeError):
-                            # Ignore invalid check-in time formats
-                            pass
-            else:
-                chart_worktime_data.append(0.0)
-                if is_weekend:
-                    status_rest += 1
-                else:
-                    working_days += 1
-                    leaves_taken += 1.0
-                    status_leave += 1.0
+            work_time = record_map.get(current_dt, 0.0)
+            chart_worktime_data.append(work_time)
 
             current_dt += timedelta(days=1)
 
-    avg_work_time = (
-        round(total_work_time / days_present, 1) if days_present > 0 else 0.0
-    )
-    total_ot = round(total_ot, 1)
-
-    if max_late_minutes > 0:
-        late_details = f"{max_late_minutes} min late ({max_late_date})"
-    else:
-        late_details = "No late arrivals"
-
-    days_present_val = int(days_present) if days_present.is_integer() else days_present
-    status_present_val = (
-        int(status_present) if status_present.is_integer() else status_present
-    )
-
     return {
-        "working_days": working_days,
-        "days_present": days_present_val,
-        "leaves_taken": (
-            int(leaves_taken) if leaves_taken.is_integer() else leaves_taken
-        ),
-        "late_arrivals": late_arrivals,
-        "late_details": late_details,
-        "mispunches": mispunches,
-        "mispunch_details": (
-            f"{mispunches} records" if mispunches > 0 else "No mispunches"
-        ),
-        "total_ot": total_ot,
-        "avg_work_time": avg_work_time,
+        "working_days": 0,
+        "days_present": 0,
+        "leaves_taken": 0.0,
+        "late_arrivals": 0,
+        "late_details": "",
+        "mispunches": 0,
+        "mispunch_details": "",
+        "total_ot": 0.0,
+        "avg_work_time": 0.0,
         "chart_labels": chart_labels,
         "chart_worktime_data": chart_worktime_data,
-        "breakdown_data": [
-            status_present_val,
-            int(status_leave) if status_leave.is_integer() else status_leave,
-            status_rest,
-            int(status_mispunch) if status_mispunch.is_integer() else status_mispunch,
-            int(status_cl) if status_cl.is_integer() else status_cl,
-        ],
+        "breakdown_data": [0, 0, 0, 0, 0],
         "employee_details": employee_details,
     }
 
@@ -324,15 +209,27 @@ def calculate_section_dashboard_stats(
 ):
     """
     Calculates aggregated statistics and charts for a section of multiple employees.
+    Simplified: only generates details and trend chart data.
     """
-    name = f"{role_display} ({section_display})"
-    sector = f"{role_display} - {section_display}"
+    from django.db.models import QuerySet, Avg
+
+    if section_display:
+        name = f"{role_display} ({section_display})"
+        sector = f"{role_display} - {section_display}"
+    else:
+        name = role_display
+        sector = role_display
 
     if username:
-        for r in attendance_records:
-            if r.get("Employee ID") == username:
-                name = r.get("Employee Name", name)
-                break
+        if isinstance(attendance_records, QuerySet):
+            matching_rec = attendance_records.filter(employee_id=username).first()
+            if matching_rec:
+                name = matching_rec.employee_name or name
+        else:
+            for r in attendance_records:
+                if r.get("Employee ID") == username:
+                    name = r.get("Employee Name", name)
+                    break
 
         if username == "19105540":
             sector = "Phase 2 - Marketing"
@@ -367,10 +264,10 @@ def calculate_section_dashboard_stats(
             "late_details": "No late arrivals",
             "mispunches": 0,
             "mispunch_details": "No mispunches",
-            "total_ot": 0,
-            "avg_work_time": 0,
+            "total_ot": 0.0,
+            "avg_work_time": 0.0,
             "chart_labels": [],
-            "chart_ot_data": [],
+            "chart_worktime_data": [],
             "breakdown_data": [0, 0, 0, 0, 0],
             "is_section": True,
             "employee_details": {
@@ -384,145 +281,52 @@ def calculate_section_dashboard_stats(
             },
         }
 
-    # Find unique employees
-    employees = set(
-        r.get("Employee ID") for r in attendance_records if r.get("Employee ID")
-    )
-    total_employees = len(employees)
-
-    # Group records by Date to find unique working dates
-    unique_dates = set(r.get("Date") for r in attendance_records if r.get("Date"))
-    working_days = len(unique_dates)
-
-    total_present = 0
-    total_leaves = 0.0
-    total_late = 0
-    total_ot = 0.0
-    total_work_time = 0.0
-    work_time_records_count = 0
-    total_mispunches = 0
-    status_present = 0
-    status_leave = 0
-    status_rest = 0
-    status_mispunch = 0
-    status_cl = 0
-
-    # For charts, we can aggregate by Date
+    # For charts, aggregate by Date
     date_aggregates = {}
-    for r in attendance_records:
-        dt = r.get("Date")
-        if not dt:
-            continue
-        if dt not in date_aggregates:
-            date_aggregates[dt] = {
-                "ot": 0.0,
-                "present": 0,
-                "leave": 0.0,
-                "late": 0,
-                "work_time": 0.0,
-                "count": 0,
-            }
 
-        # OT
-        try:
-            ot = float(r.get("Card Punch OT") or 0.0)
-        except (ValueError, TypeError):
-            ot = 0.0
-        date_aggregates[dt]["ot"] += ot
-        total_ot += ot
+    if isinstance(attendance_records, QuerySet):
+        # Database grouping: values() + annotate()
+        daily_avgs = attendance_records.filter(
+            working_hours__gt=0.0
+        ).values("attendance_date").annotate(
+            avg_wt=Avg("working_hours")
+        ).order_by("attendance_date")
 
-        # Work hours
-        try:
-            work_time = float(r.get("Working Hours") or 0.0)
-        except (ValueError, TypeError):
-            work_time = 0.0
-        if work_time > 0:
-            total_work_time += work_time
-            work_time_records_count += 1
-            date_aggregates[dt]["work_time"] += work_time
-            date_aggregates[dt]["count"] += 1
+        for r in daily_avgs:
+            dt = r["attendance_date"]
+            if dt:
+                dt_str = dt.strftime("%d-%m-%Y")
+                date_aggregates[dt_str] = {
+                    "avg_wt": r["avg_wt"] or 0.0
+                }
+    else:
+        # Loop over raw records
+        raw_aggregates = {}
+        for r in attendance_records:
+            dt = r.get("Date")
+            if not dt:
+                continue
+            if dt not in raw_aggregates:
+                raw_aggregates[dt] = {
+                    "work_time": 0.0,
+                    "count": 0,
+                }
 
-        # Check-in time / status
-        in_time_str = r.get("In Time", "").strip()
-        out_time_str = r.get("Out Time", "").strip()
-        has_in = bool(in_time_str) and in_time_str not in ("00:00", "—", "")
-        has_out = bool(out_time_str) and out_time_str not in ("00:00", "—", "")
-
-        # Parse date
-        date_obj = parse_date(dt)
-        is_holiday = (
-            date_obj.year == 2026 and date_obj.month == 7 and date_obj.day == 1
-            if date_obj
-            else False
-        )
-        is_today = date_obj and date_obj.date() == datetime.now().date()
-        is_mispunch = False
-        if (has_in and not has_out) or (has_out and not has_in):
-            if not is_today and not is_holiday:
-                total_mispunches += 1
-                status_mispunch += 1
-                is_mispunch = True
-
-        is_weekend = False
-        if date_obj and date_obj.weekday() == 6:
-            is_weekend = True
-
-        if not has_in:
-            if not is_weekend and not is_holiday:
-                total_leaves += 1.0
-                status_leave += 1
-                date_aggregates[dt]["leave"] += 1.0
-            else:
-                status_rest += 1
-        else:
-            if is_mispunch:
-                pass
-            elif is_weekend:
-                if work_time >= 8.0:
-                    total_present += 1
-                    status_present += 1
-                    date_aggregates[dt]["present"] += 1
-                else:
-                    status_rest += 1
-            else:
-                if work_time >= 8.0:
-                    total_present += 1
-                    status_present += 1
-                    date_aggregates[dt]["present"] += 1
-                else:
-                    total_leaves += 0.5
-                    status_cl += 1
-                    date_aggregates[dt]["leave"] += 0.5
-
-            # Late check-in
-            late_min_val = 0.0
+            # Work hours
             try:
-                late_min_val = float(r.get("Late Minutes") or 0.0)
+                work_time = float(r.get("Working Hours") or 0.0)
             except (ValueError, TypeError):
-                late_min_val = 0.0
+                work_time = 0.0
+            if work_time > 0:
+                raw_aggregates[dt]["work_time"] += work_time
+                raw_aggregates[dt]["count"] += 1
 
-            late_by_time = 0.0
-            if in_time_str and ":" in in_time_str:
-                try:
-                    h, m = map(int, in_time_str.split(":"))
-                    shift_name = r.get("Shift", "")
-                    shift_start_minutes = 20 * 60 if "Night" in shift_name else 9 * 60
-                    if h * 60 + m > shift_start_minutes:
-                        late_by_time = float((h * 60 + m) - shift_start_minutes)
-                except (ValueError, TypeError):
-                    pass
-
-            is_late = late_min_val > 0.0 or late_by_time > 0.0
-            if is_late:
-                total_late += 1
-                date_aggregates[dt]["late"] += 1
-
-    avg_work_time = (
-        round(total_work_time / work_time_records_count, 1)
-        if work_time_records_count > 0
-        else 0.0
-    )
-    total_ot = round(total_ot, 1)
+        for dt, info in raw_aggregates.items():
+            count = info["count"]
+            avg_wt = info["work_time"] / count if count > 0 else 0.0
+            date_aggregates[dt] = {
+                "avg_wt": avg_wt
+            }
 
     # Sort dates to build trend labels and data
     sorted_dates = sorted(date_aggregates.keys(), key=parse_date)
@@ -533,26 +337,23 @@ def calculate_section_dashboard_stats(
         date_obj = parse_date(dt)
         label = date_obj.strftime("%m-%d") if date_obj else dt
         chart_labels.append(label)
-        count = date_aggregates[dt]["count"]
-        avg_wt = date_aggregates[dt]["work_time"] / count if count > 0 else 0.0
+        avg_wt = date_aggregates[dt]["avg_wt"]
         chart_worktime_data.append(round(avg_wt, 1))
 
     return {
-        "total_employees": total_employees,
-        "working_days": working_days,
-        "days_present": total_present,
-        "leaves_taken": status_leave,
-        "late_arrivals": total_late,
-        "late_details": f"{total_late} late check-ins",
-        "mispunches": total_mispunches,
-        "mispunch_details": (
-            f"{total_mispunches} records" if total_mispunches > 0 else "No mispunches"
-        ),
-        "total_ot": total_ot,
-        "avg_work_time": avg_work_time,
+        "total_employees": 0,
+        "working_days": 0,
+        "days_present": 0,
+        "leaves_taken": 0,
+        "late_arrivals": 0,
+        "late_details": "",
+        "mispunches": 0,
+        "mispunch_details": "",
+        "total_ot": 0.0,
+        "avg_work_time": 0.0,
         "chart_labels": chart_labels,
         "chart_worktime_data": chart_worktime_data,
-        "breakdown_data": [status_present, status_leave, status_rest, status_mispunch, status_cl],
+        "breakdown_data": [0, 0, 0, 0, 0],
         "is_section": True,
         "employee_details": {
             "name": name,

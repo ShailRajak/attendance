@@ -608,11 +608,25 @@
 
         footer {
             flex-shrink: 0;
-            background: rgba(11, 15, 25, 0.8);
+            background: #000000;
             border-top: 1px solid var(--card-border);
             padding: 1.25rem 0;
-            color: var(--text-muted);
+            color: #ffffff;
             font-size: 0.85rem;
+        }
+
+        footer p {
+            color: #ffffff !important;
+        }
+
+        [data-theme="light"] footer {
+            background: #ffffff !important;
+            color: #000000 !important;
+            border-top: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        [data-theme="light"] footer p {
+            color: #000000 !important;
         }
 
         /* Micro-animations */

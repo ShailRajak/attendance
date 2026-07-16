@@ -4,8 +4,9 @@ import re
 from attendance.models import UserProfile
 from attendance.services.role_service import resolve_user_role_and_section, get_expected_dtname4
 from attendance.services.rbac_service import RBACService
-from attendance.services.attendance_service import fetch_attendance, fetch_attendance_from_db
+from attendance.services.attendance_service import get_attendance
 from attendance.services.analytics_service import parse_date
+from attendance.utils.date_helpers import get_shift_start_minutes
 from attendance.services.overtime_service import (
     get_all_cycles_in_year,
     get_all_weeks_in_year,
@@ -86,14 +87,7 @@ def get_leaves_dashboard_data(
     attendance = []
     try:
         fetch_emp_id = employee_id if employee_id else ""
-        if is_supervisor:
-            attendance = fetch_attendance_from_db(
-                employee_id=fetch_emp_id, start_date=start_str, end_date=end_str
-            )
-        else:
-            attendance = fetch_attendance(
-                employee_id=fetch_emp_id, start_date=start_str, end_date=end_str
-            )
+        attendance = get_attendance(user, fetch_emp_id, start_str, end_str)
     except Exception as e:
         print(f"Error fetching attendance in leaves dashboard: {e}")
 
@@ -168,22 +162,37 @@ def get_leaves_dashboard_data(
                 stats["leave"] += 1
         elif not go1 or not out1:
             if not is_sunday and not is_holiday and not record.get("Leave Type"):
-                if is_today:
-                    category = "Present"
+                if is_today and go1:
+                    # check shift timings to validate on time punch in
+                    shift_str = str(record.get("Shift") or "")
+                    wt_id = record.get("WT ID") or record.get("WTID")
+                    is_night_shift = "Night" in shift_str
+                    shift_in = get_shift_start_minutes(wt_id, is_night_shift, go1)
+                    def to_mins_local(t_str):
+                        try:
+                            h, m = map(int, t_str.split(":"))
+                            return h * 60 + m
+                        except (ValueError, TypeError, AttributeError):
+                            return 0
+                    actual_in = to_mins_local(go1)
+                    late_mins = actual_in - shift_in if actual_in >= shift_in else 0
+                    if late_mins == 0:
+                        category = "Present"
+                    else:
+                        category = "Mispunch"
+                        stats["mispunch"] += 1
                 else:
                     category = "Mispunch"
                     stats["mispunch"] += 1
         else:
             # Check shift timings to validate short leave
             shift_str = str(record.get("Shift") or "")
+            wt_id = record.get("WT ID") or record.get("WTID")
+            is_night_shift = "Night" in shift_str
 
-            # Default to 09:00 - 18:00 if no match
-            shift_in, shift_out = 9 * 60, 18 * 60
-            match = re.search(r"(\d{2}):(\d{2})\s*-\s*(\d{2}):(\d{2})", shift_str)
-            if match:
-                sh, sm, eh, em = map(int, match.groups())
-                shift_in = sh * 60 + sm
-                shift_out = eh * 60 + em
+            # Dynamically calculate shift start and end times (assuming standard 9-hour shift)
+            shift_in = get_shift_start_minutes(wt_id, is_night_shift, go1)
+            shift_out = shift_in + 9 * 60
 
             def to_mins(t_str):
                 try:

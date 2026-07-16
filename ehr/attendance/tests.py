@@ -413,7 +413,12 @@ class AttendanceDrilldownTests(TestCase):
         response = self.client.get("/api/attendance/chart-drilldown/")
         self.assertEqual(response.status_code, 302)
 
-    def test_employee_cannot_see_other_data(self):
+    @patch("attendance.services.attendance_service.get_attendance")
+    def test_employee_cannot_see_other_data(self, mock_get_attendance):
+        from attendance.models import AttendanceRecord
+        mock_get_attendance.return_value = [
+            r.to_dict() for r in AttendanceRecord.objects.filter(employee_id="emp456")
+        ]
         self.client.login(username="emp456", password="password")
         
         response = self.client.get("/api/attendance/chart-drilldown/", {
@@ -452,7 +457,12 @@ class AttendanceDrilldownTests(TestCase):
         self.assertEqual(data["count"], 1)
         self.assertEqual(data["records"][0]["employee_id"], "sup456")
 
-    def test_drilldown_filtering_date(self):
+    @patch("attendance.services.attendance_service.get_attendance")
+    def test_drilldown_filtering_date(self, mock_get_attendance):
+        from attendance.models import AttendanceRecord
+        mock_get_attendance.return_value = [
+            r.to_dict() for r in AttendanceRecord.objects.filter(employee_id="emp456")
+        ]
         self.client.login(username="emp456", password="password")
         
         response = self.client.get("/api/attendance/chart-drilldown/", {

@@ -91,6 +91,10 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
+        "OPTIONS": {
+            "timeout": 30,
+            "transaction_mode": "IMMEDIATE",
+        },
     }
 }
 
@@ -175,6 +179,17 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "simple",
         },
+        "dashboard_file": {
+            "level": "INFO",
+            "class": "logging.FileHandler",
+            "filename": str(LOGS_DIR / "dashboard.log"),
+            "formatter": "verbose",
+        },
+        "dashboard_console": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
     },
     "loggers": {
         "": {  # Root logger to capture warnings/errors from all modules/dependencies
@@ -189,6 +204,11 @@ LOGGING = {
         "py.warnings": {
             "handlers": ["file"],
             "level": "WARNING",
+            "propagate": False,
+        },
+        "attendance.services.dashboard_service": {
+            "handlers": ["dashboard_file", "dashboard_console"],
+            "level": "INFO",
             "propagate": False,
         },
     },

@@ -1,0 +1,49 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Databases
+db.sqlite3
+db.sqlite3-journal
+db.sqlite3-shm
+db.sqlite3-wal
+ehr/db.sqlite3
+ehr/db.sqlite3-journal
+ehr/db.sqlite3-shm
+ehr/db.sqlite3-wal
+
+# Virtual environments
+myenv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Log files
+*.log
+logs/
+ehr/logs/
+
+# Django collected static files (optional, but usually kept out of git if generated)
+staticfiles/
+ehr/staticfiles/
+
+# IDE / Editor configuration
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+
+__pycache__
+.pyc
