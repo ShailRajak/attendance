@@ -575,6 +575,43 @@ def compute_kpi_cards(attendance_records):
     }
 
 
+def compute_weekly_kpi_cards(attendance_records):
+    """
+    Computes weekly KPI card aggregations for Admin & Management roles.
+    Groups attendance records by date, computes daily KPI cards for each date using compute_kpi_cards,
+    and returns the sum of all daily KPIs across the week.
+    """
+    weekly_summary = {
+        "kpi_total_employees": 0,
+        "kpi_total_day_shift": 0,
+        "kpi_present_day_shift": 0,
+        "kpi_total_night_shift": 0,
+        "kpi_present_night_shift": 0,
+        "kpi_absent": 0,
+        "kpi_on_leave": 0,
+        "kpi_late_punch": 0,
+    }
+
+    if not attendance_records:
+        return weekly_summary
+
+    records_by_date = {}
+    for r in attendance_records:
+        dt = r.get("Date") or r.get("attendance_date")
+        if not dt:
+            continue
+        if dt not in records_by_date:
+            records_by_date[dt] = []
+        records_by_date[dt].append(r)
+
+    for dt, daily_records in records_by_date.items():
+        daily_kpi = compute_kpi_cards(daily_records)
+        for key in weekly_summary:
+            weekly_summary[key] += daily_kpi.get(key, 0)
+
+    return weekly_summary
+
+
 def get_home_dashboard_data(user, start_date, end_date, query_employee_id, active_tab, get_params=None):
     """
     Assembles the context needed to render the home page dashboard.
@@ -928,7 +965,7 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
 
     if is_section_view:
         dashboard_stats = calculate_section_dashboard_stats(
-            attendance, role_display, section_display, user.username
+            attendance, role_display, section_display, user.username, period=period
         )
     else:
         dashboard_stats = calculate_dashboard_stats(
@@ -1144,7 +1181,10 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
         late_punch_today = 0
 
     # Compute enterprise KPI cards from raw attendance (before formatting for table)
-    kpi_data = compute_kpi_cards(attendance)
+    if period == "weekly" and not is_employee_role:
+        kpi_data = compute_weekly_kpi_cards(attendance)
+    else:
+        kpi_data = compute_kpi_cards(attendance)
 
     # Set default values for removed features
     pending_tasks_count = 0

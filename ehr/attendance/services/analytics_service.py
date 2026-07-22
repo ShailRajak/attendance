@@ -419,7 +419,7 @@ def calculate_dashboard_stats(
 
 
 def calculate_section_dashboard_stats(
-    attendance_records, role_display, section_display, username=None
+    attendance_records, role_display, section_display, username=None, period=None
 ):
     """
     Calculates aggregated statistics and charts for a section of multiple employees.
@@ -487,11 +487,22 @@ def calculate_section_dashboard_stats(
             },
         }
 
-    # Find unique employees
-    employees = set(
-        r.get("Employee ID") for r in attendance_records if r.get("Employee ID")
-    )
-    total_employees = len(employees)
+    # Find total employees: For weekly period, sum each day's active employees
+    if period == "weekly":
+        records_by_date = {}
+        for r in attendance_records:
+            dt = r.get("Date") or r.get("attendance_date")
+            if dt:
+                if dt not in records_by_date:
+                    records_by_date[dt] = set()
+                if r.get("Employee ID"):
+                    records_by_date[dt].add(r.get("Employee ID"))
+        total_employees = sum(len(emps) for emps in records_by_date.values())
+    else:
+        employees = set(
+            r.get("Employee ID") for r in attendance_records if r.get("Employee ID")
+        )
+        total_employees = len(employees)
 
     # Group records by Date to find unique working dates
     unique_dates = set(r.get("Date") for r in attendance_records if r.get("Date"))

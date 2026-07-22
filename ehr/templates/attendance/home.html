@@ -1255,6 +1255,7 @@
 {{ role|json_script:"user-role" }}
 {{ is_superuser|json_script:"user-is-superuser" }}
 {{ is_admin|json_script:"user-is-admin" }}
+{{ period|json_script:"active-period" }}
 
 <script>
     // Define shift, section, and department filtering globally
@@ -1347,6 +1348,20 @@
                 const onLeaveIds = new Set();
                 const latePunchIds = new Set();
 
+                const activePeriodVal = JSON.parse(document.getElementById('active-period')?.textContent || '""');
+                const userRoleVal = JSON.parse(document.getElementById('user-role')?.textContent || '""');
+                const isAdminVal = JSON.parse(document.getElementById('user-is-admin')?.textContent || 'false');
+                const isWeeklySumMode = (activePeriodVal === 'weekly') && (userRoleVal === 'admin' || userRoleVal === 'management' || userRoleVal === 'smt_pd' || userRoleVal === 'assy_pd' || isAdminVal === true || isAdminVal === "True");
+
+                let totalEmployeesCountSum = 0;
+                let dayShiftCountSum = 0;
+                let nightShiftCountSum = 0;
+                let presentDayCountSum = 0;
+                let presentNightCountSum = 0;
+                let absentCountSum = 0;
+                let onLeaveCountSum = 0;
+                let latePunchCountSum = 0;
+
                 const uniqueDatesSet = new Set();
                 let daysPresentCount = 0;
                 let leavesTakenCount = 0;
@@ -1379,13 +1394,8 @@
                         return;
                     }
 
-                    totalEmployeesIds.add(empId);
-
                     const isDay = (shiftLabel === 'day');
                     const isNight = (shiftLabel === 'night');
-
-                    if (isDay) dayShiftIds.add(empId);
-                    if (isNight) nightShiftIds.add(empId);
 
                     const status = record.status;
                     const isPresent = (status === 'Present');
@@ -1394,13 +1404,29 @@
                     const isLate = record.is_unexcused_late || (record.late_minutes && parseFloat(record.late_minutes) > 0);
                     const isMispunch = (status === 'Mispunch');
 
-                    if (isPresent) {
-                        if (isDay) presentDayIds.add(empId);
-                        if (isNight) presentNightIds.add(empId);
+                    if (isWeeklySumMode) {
+                        totalEmployeesCountSum += 1;
+                        if (isDay) dayShiftCountSum += 1;
+                        if (isNight) nightShiftCountSum += 1;
+                        if (isPresent) {
+                            if (isDay) presentDayCountSum += 1;
+                            if (isNight) presentNightCountSum += 1;
+                        }
+                        if (isAbsent) absentCountSum += 1;
+                        if (isLeave) onLeaveCountSum += 1;
+                        if (isLate) latePunchCountSum += 1;
+                    } else {
+                        totalEmployeesIds.add(empId);
+                        if (isDay) dayShiftIds.add(empId);
+                        if (isNight) nightShiftIds.add(empId);
+                        if (isPresent) {
+                            if (isDay) presentDayIds.add(empId);
+                            if (isNight) presentNightIds.add(empId);
+                        }
+                        if (isAbsent) absentIds.add(empId);
+                        if (isLeave) onLeaveIds.add(empId);
+                        if (isLate) latePunchIds.add(empId);
                     }
-                    if (isAbsent) absentIds.add(empId);
-                    if (isLeave) onLeaveIds.add(empId);
-                    if (isLate) latePunchIds.add(empId);
 
                     if (record.raw_date) {
                         uniqueDatesSet.add(record.raw_date);
@@ -1448,18 +1474,27 @@
                 const elLeave = document.getElementById('kpiOnLeave');
                 const elLate = document.getElementById('kpiLatePunch');
 
-                if (elTotal) elTotal.textContent = totalEmployeesIds.size;
-                if (elTotalDay) elTotalDay.textContent = dayShiftIds.size;
-                if (elPresentDay) elPresentDay.textContent = presentDayIds.size;
-                if (elTotalNight) elTotalNight.textContent = nightShiftIds.size;
-                if (elPresentNight) elPresentNight.textContent = presentNightIds.size;
-                if (elAbsent) elAbsent.textContent = absentIds.size;
-                if (elLeave) elLeave.textContent = onLeaveIds.size;
-                if (elLate) elLate.textContent = latePunchIds.size;
+                const finalTotal = isWeeklySumMode ? totalEmployeesCountSum : totalEmployeesIds.size;
+                const finalTotalDay = isWeeklySumMode ? dayShiftCountSum : dayShiftIds.size;
+                const finalPresentDay = isWeeklySumMode ? presentDayCountSum : presentDayIds.size;
+                const finalTotalNight = isWeeklySumMode ? nightShiftCountSum : nightShiftIds.size;
+                const finalPresentNight = isWeeklySumMode ? presentNightCountSum : presentNightIds.size;
+                const finalAbsent = isWeeklySumMode ? absentCountSum : absentIds.size;
+                const finalLeave = isWeeklySumMode ? onLeaveCountSum : onLeaveIds.size;
+                const finalLate = isWeeklySumMode ? latePunchCountSum : latePunchIds.size;
+
+                if (elTotal) elTotal.textContent = finalTotal;
+                if (elTotalDay) elTotalDay.textContent = finalTotalDay;
+                if (elPresentDay) elPresentDay.textContent = finalPresentDay;
+                if (elTotalNight) elTotalNight.textContent = finalTotalNight;
+                if (elPresentNight) elPresentNight.textContent = finalPresentNight;
+                if (elAbsent) elAbsent.textContent = finalAbsent;
+                if (elLeave) elLeave.textContent = finalLeave;
+                if (elLate) elLate.textContent = finalLate;
 
                 // Also update the total employees counter in the header profile info card
                 const elHeaderTotal = document.getElementById('headerTotalEmployees');
-                if (elHeaderTotal) elHeaderTotal.textContent = totalEmployeesIds.size;
+                if (elHeaderTotal) elHeaderTotal.textContent = finalTotal;
 
                 // Lower KPI Grid elements
                 const elWorkingDays = document.getElementById('kpiWorkingDays');

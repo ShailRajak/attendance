@@ -1,4 +1,4 @@
-# Reload trigger for 30-minute block OT rounding policy implementation
+# Reload trigger for Weekly KPI aggregation implementation for Admin and Management roles
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
