@@ -4,6 +4,7 @@ from dateutil.relativedelta import relativedelta
 from django.contrib.auth.models import User
 from attendance.models import UserProfile
 from attendance.services.auth_service import resolve_user_role_and_section, get_expected_dtname4, RBACService
+from attendance.utils.formatter import calculate_validated_ot
 
 
 def parse_date(date_str):
@@ -269,9 +270,12 @@ def calculate_dashboard_stats(
 
                 # Overtime
                 try:
-                    ot = float(record.get("Card Punch OT") or 0.0)
+                    raw_ot = float(record.get("Card Punch OT") or 0.0)
                 except (ValueError, TypeError):
-                    ot = 0.0
+                    raw_ot = 0.0
+                out_t = record.get("Out Time", "").strip()
+                sh_t = record.get("Shift", "")
+                ot = calculate_validated_ot(out_t, sh_t, raw_ot)
 
                 total_ot += ot
                 chart_worktime_data.append(work_time)
@@ -532,9 +536,12 @@ def calculate_section_dashboard_stats(
 
         # OT
         try:
-            ot = float(r.get("Card Punch OT") or 0.0)
+            raw_ot = float(r.get("Card Punch OT") or 0.0)
         except (ValueError, TypeError):
-            ot = 0.0
+            raw_ot = 0.0
+        out_t = r.get("Out Time", "").strip()
+        sh_t = r.get("Shift", "")
+        ot = calculate_validated_ot(out_t, sh_t, raw_ot)
         date_aggregates[dt]["ot"] += ot
         total_ot += ot
 
@@ -836,9 +843,12 @@ def get_overtime_summary(emp_id, start_date, end_date, role=None, is_supervisor=
                 pass
 
         try:
-            cp_ot = float(record.get("Card Punch OT", 0) or 0)
+            raw_ot = float(record.get("Card Punch OT", 0) or 0)
         except (ValueError, TypeError):
-            cp_ot = 0.0
+            raw_ot = 0.0
+        out_t = record.get("Out Time", "").strip()
+        sh_t = record.get("Shift", "")
+        cp_ot = calculate_validated_ot(out_t, sh_t, raw_ot)
 
         try:
             req_ot = float(record.get("Requested OT", 0) or 0)

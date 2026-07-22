@@ -4,7 +4,7 @@ import requests
 from concurrent.futures import ThreadPoolExecutor
 from django.core.cache import cache
 from attendance.models import UserProfile
-from attendance.utils.formatter import filter_attendance_data
+from attendance.utils.formatter import filter_attendance_data, calculate_validated_ot
 from attendance.utils.date_helpers import get_attendance_date_range
 from attendance.services.auth_service import resolve_user_role_and_section, get_expected_dtname4, RBACService
 from attendance.services.analytics_service import (
@@ -937,12 +937,15 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
         else:
             work_hrs = "—"
 
+        out_time = record.get("Out Time", "").strip()
+        shift_raw = str(record.get("Shift") or "").strip()
         ot_str = record.get("Card Punch OT", "0.0")
         try:
-            ot = float(ot_str or 0.0)
+            raw_ot = float(ot_str or 0.0)
         except (ValueError, TypeError):
-            ot = 0.0
+            raw_ot = 0.0
 
+        ot = calculate_validated_ot(out_time, shift_raw, raw_ot)
         if ot > 0:
             ot_hrs = f"{int(ot)}h" if ot.is_integer() else f"{ot}h"
         else:

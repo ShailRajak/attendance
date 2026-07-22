@@ -88,6 +88,47 @@ def format_time(time_value):
     return f"{value[:2]}:{value[2:]}"
 
 
+def calculate_validated_ot(out_time, shift_name="", raw_ot=0.0):
+    """
+    Validates and calculates Overtime (OT).
+    OT is ONLY counted if the employee worked past their respective shift end time.
+    - Day Shift / General Shift: Shift End is 18:00 (6:00 PM).
+    - Night Shift: Shift End is 08:00 (8:00 AM).
+    If check-out time is before or at shift end time, OT is strictly 0.0.
+    If check-out time is after shift end time, OT is calculated as time worked after shift end.
+    """
+    if not out_time or str(out_time).strip() in ("00:00", "—", "", "None"):
+        return 0.0
+
+    out_str = str(out_time).strip()
+    if ":" not in out_str:
+        return 0.0
+
+    try:
+        parts = out_str.split(":")
+        out_mins = int(parts[0]) * 60 + int(parts[1])
+    except (ValueError, TypeError):
+        return 0.0
+
+    shift_str = str(shift_name or "").strip()
+    is_night = "Night" in shift_str
+
+    if is_night:
+        shift_end_mins = 8 * 60
+        if out_mins > shift_end_mins and out_mins < 12 * 60:
+            ot_mins = out_mins - shift_end_mins
+            return round(ot_mins / 60.0, 1)
+        else:
+            return 0.0
+    else:
+        shift_end_mins = 18 * 60
+        if out_mins > shift_end_mins:
+            ot_mins = out_mins - shift_end_mins
+            return round(ot_mins / 60.0, 1)
+        else:
+            return 0.0
+
+
 # ==========================================================
 # MAIN FORMATTER
 # ==========================================================
@@ -121,6 +162,12 @@ def filter_attendance_data(records):
                 value = ""
 
             formatted_row[display_name] = value
+
+        # Validate Card Punch OT: Only count OT if employee worked after shift end!
+        out_val = formatted_row.get("Out Time", "")
+        shift_val = formatted_row.get("Shift", "")
+        raw_ot_val = formatted_row.get("Card Punch OT", 0.0)
+        formatted_row["Card Punch OT"] = calculate_validated_ot(out_val, shift_val, raw_ot_val)
 
         formatted_data.append(formatted_row)
 

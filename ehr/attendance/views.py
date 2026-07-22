@@ -1,4 +1,4 @@
-# Reload trigger for section view present check-ins alignment fix
+# Reload trigger for validated OT check-out time calculation fix
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
