@@ -486,8 +486,8 @@ def calculate_section_dashboard_stats(
     unique_dates = set(r.get("Date") for r in attendance_records if r.get("Date"))
     working_days = len(unique_dates)
 
-    # Find total employees: For weekly/multi-day period, sum each day's active employees
-    if period in ("weekly", "custom") and working_days > 1:
+    # Find total employees: For weekly/monthly/multi-day period, sum each day's active employees
+    if period in ("weekly", "monthly", "custom") and working_days > 1:
         records_by_date = {}
         for r in attendance_records:
             dt = r.get("Date") or r.get("attendance_date")

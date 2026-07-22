@@ -403,7 +403,7 @@ def evaluate_monthly_late_policy(attendance_records):
     - If a late arrival falls within quota (< 3 occurrences AND cumulative <= 60 mins), it is marked as excused.
     - If a late arrival exceeds quota (>= 3 occurrences OR cumulative > 60 mins), it is marked as unexcused late.
     """
-    if not attendance_records:
+    if not attendance_records or "is_unexcused_late" in attendance_records[0]:
         return attendance_records
 
     emp_groups = {}
@@ -466,7 +466,7 @@ def evaluate_monthly_late_policy(attendance_records):
     return attendance_records
 
 
-def compute_kpi_cards(attendance_records):
+def compute_kpi_cards(attendance_records, skip_policy=False):
     """
     Calculate summary HRMS KPI metrics from raw attendance records.
     """
@@ -482,7 +482,8 @@ def compute_kpi_cards(attendance_records):
             "kpi_late_punch": 0,
         }
 
-    attendance_records = evaluate_monthly_late_policy(attendance_records)
+    if not skip_policy:
+        attendance_records = evaluate_monthly_late_policy(attendance_records)
 
     # Shift names that qualify as "Day Shift"
     DAY_SHIFT_NAMES = {"General Day Shift", "Day Shift", "Morning Shift", "General Day"}
@@ -497,7 +498,6 @@ def compute_kpi_cards(attendance_records):
     on_leave_ids = set()
     late_punch_ids = set()
 
-
     for record in attendance_records:
         emp_id = str(record.get("Employee ID") or "").strip()
         if not emp_id:
@@ -508,7 +508,6 @@ def compute_kpi_cards(attendance_records):
         shift = str(record.get("Shift") or "").strip()
         in_time = str(record.get("In Time") or "").strip()
         leave_type = str(record.get("Leave Type") or "").strip()
-        late_min_value = record.get("Late Minutes") or 0
 
         # Determine shift type
         is_day_shift = shift in DAY_SHIFT_NAMES
@@ -520,28 +519,12 @@ def compute_kpi_cards(attendance_records):
         if is_night_shift:
             night_shift_ids.add(emp_id)
 
-        # Determine Present / Absent based on In Time and Work Hours (same logic as table formatting)
+        # Determine Present / Absent based on In Time and Work Hours
         out_time = str(record.get("Out Time") or "").strip()
         has_check_in = bool(in_time) and in_time not in ("00:00", "—", "")
-        has_check_out = bool(out_time) and out_time not in ("00:00", "—", "")
-        try:
-            work_time = float(record.get("Working Hours") or 0.0)
-        except (ValueError, TypeError):
-            work_time = 0.0
-
-        # Check if weekend, holiday or today (to resolve mispunch status)
-        date_obj = parse_date(record.get("Date", ""))
-        is_weekend = date_obj and date_obj.weekday() == 6 if date_obj else False
-        is_holiday = date_obj and date_obj.year == 2026 and date_obj.month == 7 and date_obj.day == 1
-        is_today = date_obj and date_obj.date() == datetime.now().date()
-
-        is_mispunch = False
-        if (has_check_in and not has_check_out) or (has_check_out and not has_check_in):
-            if not is_today and not is_holiday:
-                is_mispunch = True
 
         is_present = bool(has_check_in)
-        is_absent = bool(not has_check_in and not is_weekend and not leave_type)
+        is_absent = bool(not has_check_in and leave_type not in ("", "—", "None", "0"))
         has_leave = bool(leave_type) and leave_type not in ("", "—", "None", "0")
 
         # --- Present counts (per record's shift) ---
@@ -551,7 +534,7 @@ def compute_kpi_cards(attendance_records):
             if is_night_shift:
                 present_night_ids.add(emp_id)
 
-        # --- Absent (no check-in, not weekend, no leave) ---
+        # --- Absent (no check-in, no leave) ---
         if is_absent:
             absent_ids.add(emp_id)
 
@@ -559,7 +542,7 @@ def compute_kpi_cards(attendance_records):
         if has_leave:
             on_leave_ids.add(emp_id)
 
-        # --- Late Punch (unexcused late per monthly policy: 3 late comings & 1hr total allowed) ---
+        # --- Late Punch (unexcused late per monthly policy) ---
         if record.get("is_unexcused_late"):
             late_punch_ids.add(emp_id)
 
@@ -595,6 +578,8 @@ def compute_weekly_kpi_cards(attendance_records):
     if not attendance_records:
         return weekly_summary
 
+    attendance_records = evaluate_monthly_late_policy(attendance_records)
+
     records_by_date = {}
     for r in attendance_records:
         dt = r.get("Date") or r.get("attendance_date")
@@ -605,7 +590,7 @@ def compute_weekly_kpi_cards(attendance_records):
         records_by_date[dt].append(r)
 
     for dt, daily_records in records_by_date.items():
-        daily_kpi = compute_kpi_cards(daily_records)
+        daily_kpi = compute_kpi_cards(daily_records, skip_policy=True)
         for key in weekly_summary:
             weekly_summary[key] += daily_kpi.get(key, 0)
 
@@ -1191,7 +1176,7 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
         late_punch_today = 0
 
     # Compute enterprise KPI cards from raw attendance (before formatting for table)
-    if period in ("weekly", "custom") and not is_employee_role and start_dt != end_dt:
+    if period in ("weekly", "monthly", "custom") and not is_employee_role and start_dt != end_dt:
         kpi_data = compute_weekly_kpi_cards(attendance)
     else:
         kpi_data = compute_kpi_cards(attendance)

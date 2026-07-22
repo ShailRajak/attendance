@@ -1,4 +1,4 @@
-# Reload trigger for Present count classification fix on single-punch records
+# Reload trigger for Monthly KPI sum aggregation implementation for Admin and Management roles
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
