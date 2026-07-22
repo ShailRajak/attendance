@@ -646,45 +646,55 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
     year = None
 
     params = get_params or {}
-    period = params.get("period")
-    if period not in ("daily", "weekly", "monthly", "custom"):
-        period = None
-
-    if start_date and end_date and not period:
-        period = "custom"
-        custom_start = start_date
-        custom_end = end_date
-    else:
-        custom_start = params.get("custom_start")
-        custom_end = params.get("custom_end")
-
     is_employee_role = role in ("own", "employee")
-    if period is None:
-        if custom_start and custom_end:
-            period = "custom"
-        elif is_employee_role:
-            period = "monthly"
-        else:
-            period = "daily"
 
-    week_num = params.get("week_num")
-    cycle_num = params.get("cycle_num")
-    year = params.get("year")
+    # 1. Custom Date Range Resolution (Highest Priority)
+    # Check if explicit custom start/end dates were passed via function arguments or GET params
+    c_start = (
+        params.get("custom_start")
+        or params.get("start_date")
+        or (start_date if start_date and str(start_date).strip() not in ("", "None") else None)
+    )
+    c_end = (
+        params.get("custom_end")
+        or params.get("end_date")
+        or (end_date if end_date and str(end_date).strip() not in ("", "None") else None)
+    )
 
-    today = datetime.now().date()
-    start_dt = today
-    end_dt = today
+    if c_start and isinstance(c_start, str):
+        c_start = c_start.strip()
+    if c_end and isinstance(c_end, str):
+        c_end = c_end.strip()
 
-    if period == "custom" and custom_start and custom_end:
+    has_custom_dates = False
+    if c_start and c_end and c_start not in ("", "None") and c_end not in ("", "None"):
         try:
-            start_dt = datetime.strptime(custom_start, "%Y-%m-%d").date()
-            end_dt = datetime.strptime(custom_end, "%Y-%m-%d").date()
+            start_dt = datetime.strptime(c_start, "%Y-%m-%d").date()
+            end_dt = datetime.strptime(c_end, "%Y-%m-%d").date()
+            period = "custom"
+            custom_start = c_start
+            custom_end = c_end
+            has_custom_dates = True
         except (ValueError, TypeError):
-            custom_start = None
-            custom_end = None
-            period = "daily"
+            has_custom_dates = False
 
-    if period != "custom":
+    # 2. Fall back to standard period / payroll cycle logic ONLY when no custom dates were selected
+    if not has_custom_dates:
+        period = params.get("period")
+        if period not in ("daily", "weekly", "monthly", "custom"):
+            period = None
+
+        if period is None:
+            if is_employee_role:
+                period = "monthly"
+            else:
+                period = "daily"
+
+        week_num = params.get("week_num")
+        cycle_num = params.get("cycle_num")
+        year = params.get("year")
+
+        today = datetime.now().date()
         if period == "daily":
             yesterday = today - timedelta(days=1)
             start_dt = yesterday
@@ -1181,7 +1191,7 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
         late_punch_today = 0
 
     # Compute enterprise KPI cards from raw attendance (before formatting for table)
-    if period == "weekly" and not is_employee_role:
+    if period in ("weekly", "custom") and not is_employee_role and start_dt != end_dt:
         kpi_data = compute_weekly_kpi_cards(attendance)
     else:
         kpi_data = compute_kpi_cards(attendance)

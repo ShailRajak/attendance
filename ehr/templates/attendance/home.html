@@ -1349,9 +1349,13 @@
                 const latePunchIds = new Set();
 
                 const activePeriodVal = JSON.parse(document.getElementById('active-period')?.textContent || '""');
+                const activeStartDateVal = JSON.parse(document.getElementById('active-start-date')?.textContent || '""');
+                const activeEndDateVal = JSON.parse(document.getElementById('active-end-date')?.textContent || '""');
                 const userRoleVal = JSON.parse(document.getElementById('user-role')?.textContent || '""');
                 const isAdminVal = JSON.parse(document.getElementById('user-is-admin')?.textContent || 'false');
-                const isWeeklySumMode = (activePeriodVal === 'weekly') && (userRoleVal === 'admin' || userRoleVal === 'management' || userRoleVal === 'smt_pd' || userRoleVal === 'assy_pd' || isAdminVal === true || isAdminVal === "True");
+
+                const isMultiDayCustom = (activePeriodVal === 'custom') && (activeStartDateVal !== activeEndDateVal);
+                const isWeeklySumMode = ((activePeriodVal === 'weekly') || isMultiDayCustom) && (userRoleVal === 'admin' || userRoleVal === 'management' || userRoleVal === 'smt_pd' || userRoleVal === 'assy_pd' || isAdminVal === true || isAdminVal === "True");
 
                 let totalEmployeesCountSum = 0;
                 let dayShiftCountSum = 0;

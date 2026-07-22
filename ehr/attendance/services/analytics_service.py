@@ -487,8 +487,12 @@ def calculate_section_dashboard_stats(
             },
         }
 
-    # Find total employees: For weekly period, sum each day's active employees
-    if period == "weekly":
+    # Group records by Date to find unique working dates
+    unique_dates = set(r.get("Date") for r in attendance_records if r.get("Date"))
+    working_days = len(unique_dates)
+
+    # Find total employees: For weekly/multi-day period, sum each day's active employees
+    if period in ("weekly", "custom") and working_days > 1:
         records_by_date = {}
         for r in attendance_records:
             dt = r.get("Date") or r.get("attendance_date")
@@ -503,10 +507,6 @@ def calculate_section_dashboard_stats(
             r.get("Employee ID") for r in attendance_records if r.get("Employee ID")
         )
         total_employees = len(employees)
-
-    # Group records by Date to find unique working dates
-    unique_dates = set(r.get("Date") for r in attendance_records if r.get("Date"))
-    working_days = len(unique_dates)
 
     from attendance.services.attendance_service import evaluate_monthly_late_policy
     attendance_records = evaluate_monthly_late_policy(attendance_records)
@@ -1221,36 +1221,31 @@ def get_overtime_dashboard_data(user, get_params):
 
     is_employee_role = role in ("own", "employee")
 
-    period = get_params.get("period")
-    if period not in ("daily", "weekly", "monthly", "custom"):
-        period = None
+    c_start = get_params.get("custom_start") or get_params.get("start_date")
+    c_end = get_params.get("custom_end") or get_params.get("end_date")
 
-    custom_start = get_params.get("custom_start")
-    custom_end = get_params.get("custom_end")
-
-    if period is None:
-        if custom_start and custom_end:
-            period = "custom"
-        elif is_employee_role:
-            period = "monthly"
-        else:
-            period = "daily"
-
-    week_num = get_params.get("week_num")
-    cycle_num = get_params.get("cycle_num")
-
-    today = datetime.now().date()
-    start_date = today
-    end_date = today
-
-    if period == "custom" and custom_start and custom_end:
+    has_custom_dates = False
+    if c_start and c_end and str(c_start).strip() not in ("", "None") and str(c_end).strip() not in ("", "None"):
         try:
-            start_date = datetime.strptime(custom_start, "%Y-%m-%d").date()
-            end_date = datetime.strptime(custom_end, "%Y-%m-%d").date()
+            start_date = datetime.strptime(str(c_start).strip(), "%Y-%m-%d").date()
+            end_date = datetime.strptime(str(c_end).strip(), "%Y-%m-%d").date()
+            period = "custom"
+            custom_start = str(c_start).strip()
+            custom_end = str(c_end).strip()
+            has_custom_dates = True
         except (ValueError, TypeError):
-            custom_start = None
-            custom_end = None
-            period = "daily"
+            has_custom_dates = False
+
+    if not has_custom_dates:
+        period = get_params.get("period")
+        if period not in ("daily", "weekly", "monthly", "custom"):
+            period = None
+
+        if period is None:
+            if is_employee_role:
+                period = "monthly"
+            else:
+                period = "daily"
 
     if period != "custom":
         if period == "daily":
