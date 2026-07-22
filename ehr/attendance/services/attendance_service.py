@@ -193,6 +193,9 @@ def fetch_attendance_from_db(employee_id, start_date, end_date, day=None, employ
     cache_key = generate_db_cache_key(employee_id, start_date, end_date, day, employee_ids)
     cached_data = cache.get(cache_key)
 
+    if cached_data is not None:
+        return cached_data
+
     qs = AttendanceRecord.objects.filter(attendance_date__range=(start_date, end_date))
     if employee_id:
         qs = qs.filter(employee_id=employee_id)
@@ -201,22 +204,51 @@ def fetch_attendance_from_db(employee_id, start_date, end_date, day=None, employ
     if employee_ids:
         qs = qs.filter(employee_id__in=employee_ids)
 
-    if cached_data is not None:
-        db_count = qs.count()
-        if len(cached_data) == db_count:
-            print("=" * 60)
-            print("Loaded DB attendance from CACHE (validated count matches)")
-            print(f"Cache Key : {cache_key}")
-            print("=" * 60)
-            return cached_data
-        else:
-            print("=" * 60)
-            print(f"Cache row count mismatch (cached: {len(cached_data)}, db: {db_count}). Reloading from DB...")
-            print("=" * 60)
-
     # Sort descending by date
     qs = qs.order_by("-attendance_date", "employee_id")
-    fresh_data = [record.to_dict() for record in qs]
+    raw_records = list(qs.values(
+        "employee_id", "employee_name", "attendance_date",
+        "in_time", "out_time", "working_hours", "work_time",
+        "card_punch_ot", "requested_ot", "weekend_ot", "holiday_ot",
+        "ot4", "total_ot_all", "req_overtime", "approved_ot",
+        "wt_id", "wt_type_no", "attendance_source", "day",
+        "attendance_status", "shift", "mobile", "late_minutes",
+        "leave_type", "workday", "weekday"
+    ))
+
+    fresh_data = []
+    for r in raw_records:
+        att_date = r["attendance_date"]
+        date_str = att_date.strftime("%Y-%m-%d") if att_date else ""
+        fresh_data.append({
+            "Employee ID": r["employee_id"],
+            "Employee Name": r["employee_name"],
+            "Date": date_str,
+            "In Time": r["in_time"] or "",
+            "Out Time": r["out_time"] or "",
+            "Working Hours": r["working_hours"] or 0.0,
+            "Work Time": r["work_time"] or 0.0,
+            "Card Punch OT": r["card_punch_ot"] or 0.0,
+            "Requested OT": r["requested_ot"] or 0.0,
+            "Weekend OT": r["weekend_ot"] or 0.0,
+            "Holiday OT": r["holiday_ot"] or 0.0,
+            "OT4": r["ot4"] or 0.0,
+            "Total OT All": r["total_ot_all"] or 0.0,
+            "Req Overtime": r["req_overtime"] or 0.0,
+            "Approved OT": r["approved_ot"] or 0.0,
+            "wt_id": r["wt_id"] or "",
+            "wt_type_no": r["wt_type_no"] or "",
+            "Attendance Source": r["attendance_source"] or "",
+            "Day": r["day"] or "",
+            "Attendance Status": r["attendance_status"] or "",
+            "Shift": r["shift"] or "",
+            "Mobile": r["mobile"] or "",
+            "Late Minutes": r["late_minutes"] or 0.0,
+            "Leave Type": r["leave_type"] or "",
+            "Workday": r["workday"] or "",
+            "Weekday": r["weekday"] or "",
+            "attendance_date": date_str,
+        })
 
     cache.set(cache_key, fresh_data, timeout=CACHE_TIMEOUT)
     return fresh_data
@@ -395,15 +427,55 @@ def resolve_department_key(day_field):
     return "OTHER"
 
 
+DEPT_ICON_MAP = {
+    "All": "👤",
+    "SMT_PD": "🔧",
+    "ASSY_PD": "⚙️",
+    "MARKETING": "💼",
+    "PRODUCTION": "🏭",
+    "OTHER": "🏢",
+}
+
+def build_dept_panels(formatted_rows):
+    """Builds section breakdown accordion panels for Admin role."""
+    dept_panels = [("All", "Employees", "👤")]
+    from attendance.models import Section
+    active_sections = list(Section.objects.filter(is_active=True).values_list("name", flat=True))
+    
+    unique_depts = []
+    seen_depts = set()
+    for sec_name in active_sections:
+        dk = resolve_department_key(sec_name)
+        if dk and dk != "All" and dk not in seen_depts:
+            seen_depts.add(dk)
+            unique_depts.append(dk)
+    
+    for row in formatted_rows:
+        dk = None
+        if isinstance(row, dict):
+            dk = row.get("dept_key") or resolve_department_key(row.get("department") or row.get("Day") or row.get("section") or "")
+        if dk and dk != "All" and dk not in seen_depts:
+            seen_depts.add(dk)
+            unique_depts.append(dk)
+    
+    priority = {"SMT_PD": 1, "ASSY_PD": 2}
+    def sort_key(x):
+        if x in priority: return (0, priority[x])
+        if x == "OTHER": return (2, x)
+        return (1, x)
+        
+    unique_depts.sort(key=sort_key)
+    for dk in unique_depts:
+        icon = DEPT_ICON_MAP.get(dk, "🏢")
+        dept_panels.append((dk, dk, icon))
+    return dept_panels
+
+
 def evaluate_monthly_late_policy(attendance_records):
     """
-    Applies the monthly late coming allowance policy across attendance records:
-    - Each employee gets up to 3 allowed late check-ins per monthly cycle (21st to 20th).
-    - Cumulative late time for allowed check-ins must NOT exceed 60.0 minutes (1 hour) per monthly cycle.
-    - If a late arrival falls within quota (< 3 occurrences AND cumulative <= 60 mins), it is marked as excused.
-    - If a late arrival exceeds quota (>= 3 occurrences OR cumulative > 60 mins), it is marked as unexcused late.
+    Applies the monthly late coming allowance policy across attendance records.
     """
-    if not attendance_records or "is_unexcused_late" in attendance_records[0]:
+    if not attendance_records or getattr(attendance_records, "_policy_evaluated", False):
         return attendance_records
 
     emp_groups = {}
@@ -416,9 +488,10 @@ def evaluate_monthly_late_policy(attendance_records):
         emp_groups[emp_id].append(r)
 
     for emp_id, logs in emp_groups.items():
+        # Fast ISO string date sorting (YYYY-MM-DD strings sort in chronological order natively)
         sorted_logs = sorted(
             logs,
-            key=lambda x: parse_date(x.get("Date") or x.get("date") or "") or datetime.min
+            key=lambda x: str(x.get("Date") or x.get("date") or "")
         )
 
         allowed_count = 0
@@ -458,11 +531,14 @@ def evaluate_monthly_late_policy(attendance_records):
                     r["is_unexcused_late"] = True
                     r["late_excused"] = False
                     r["effective_late_minutes"] = raw_late_minutes
-            else:
                 r["is_unexcused_late"] = False
                 r["late_excused"] = False
                 r["effective_late_minutes"] = 0.0
 
+    try:
+        setattr(attendance_records, "_policy_evaluated", True)
+    except Exception:
+        pass
     return attendance_records
 
 
@@ -633,8 +709,10 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
     params = get_params or {}
     is_employee_role = role in ("own", "employee")
 
-    # 1. Custom Date Range Resolution (Highest Priority)
-    # Check if explicit custom start/end dates were passed via function arguments or GET params
+    # 1. Custom Date Range Resolution
+    # Custom dates ONLY apply when period is explicitly 'custom' or no period is specified
+    req_period = params.get("period")
+    
     c_start = (
         params.get("custom_start")
         or params.get("start_date")
@@ -652,7 +730,7 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
         c_end = c_end.strip()
 
     has_custom_dates = False
-    if c_start and c_end and c_start not in ("", "None") and c_end not in ("", "None"):
+    if (req_period == "custom" or (not req_period and c_start and c_end)) and c_start and c_end and c_start not in ("", "None") and c_end not in ("", "None"):
         try:
             start_dt = datetime.strptime(c_start, "%Y-%m-%d").date()
             end_dt = datetime.strptime(c_end, "%Y-%m-%d").date()
@@ -829,10 +907,12 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
     if not is_section_view:
         emp_ids.add(target_emp_id)
 
-    profiles = {
-        p.user.username: p 
-        for p in UserProfile.objects.select_related("department", "section").filter(user__username__in=emp_ids)
-    }
+    profiles = {}
+    if not is_section_view:
+        profiles = {
+            p.user.username: p 
+            for p in UserProfile.objects.select_related("department", "section").filter(user__username__in=emp_ids)
+        }
 
     # Find which dates are present in the fetched records
     present_dates = set()
@@ -874,12 +954,12 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
         emp_day = sorted_temp[0].get("Day") or sorted_temp[0].get("day") or "—"
         emp_mobile = sorted_temp[0].get("Mobile") or sorted_temp[0].get("mobile") or "—"
 
-    if not emp_mobile or emp_mobile in ("—", "None", "0", ""):
+    if not is_section_view and (not emp_mobile or emp_mobile in ("—", "None", "0", "")):
         try:
             today_dt = datetime.now().date()
             past_s = (today_dt - timedelta(days=60)).strftime("%Y-%m-%d")
             past_e = today_dt.strftime("%Y-%m-%d")
-            past_logs = fetch_attendance(target_emp_id, past_s, past_e)
+            past_logs = fetch_attendance_from_db(target_emp_id, past_s, past_e)
             for rec in past_logs:
                 m = str(rec.get("Mobile") or rec.get("mobile") or "").strip()
                 if m and m not in ("—", "None", "0", ""):
@@ -925,7 +1005,7 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
         start_dt_obj = None
         end_dt_obj = None
 
-    if start_dt_obj and end_dt_obj:
+    if not is_section_view and start_dt_obj and end_dt_obj:
         curr_dt = start_dt_obj
         max_dt = end_dt_obj
         if role in ("own", "employee") and period in ("monthly", "weekly"):
@@ -1212,42 +1292,7 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
         "OTHER": "🏢",
     }
 
-    dept_panels = []
-    if is_admin:
-        dept_panels.append(("All", "Employees", "👥"))
-        
-        # Get active section names from database to dynamically resolve department keys
-        from attendance.models import Section
-        active_sections = list(Section.objects.filter(is_active=True).values_list("name", flat=True))
-        
-        unique_depts = []
-        seen_depts = set()
-        for sec_name in active_sections:
-            dk = resolve_department_key(sec_name)
-            if dk and dk != "All" and dk not in seen_depts:
-                seen_depts.add(dk)
-                unique_depts.append(dk)
-        
-        # Fallback to scan from current logs if any mismatch or extra section
-        for row in formatted_attendance:
-            dk = row["dept_key"]
-            if dk and dk != "All" and dk not in seen_depts:
-                seen_depts.add(dk)
-                unique_depts.append(dk)
-        
-        priority = {"SMT_PD": 1, "ASSY_PD": 2}
-        
-        def sort_key(x):
-            if x in priority:
-                return (0, priority[x])
-            if x == "OTHER":
-                return (2, x)
-            return (1, x)
-            
-        unique_depts.sort(key=sort_key)
-        for dk in unique_depts:
-            icon = DEPT_ICON_MAP.get(dk, "🏢")
-            dept_panels.append((dk, dk, icon))
+    dept_panels = build_dept_panels(formatted_attendance) if is_admin else []
 
     return {
         "active_tab": active_tab,

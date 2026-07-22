@@ -519,6 +519,11 @@ def calculate_section_dashboard_stats(
     status_mispunch = 0
     status_cl = 0
 
+    # Micro-optimization caches for high-performance processing
+    date_obj_cache = {}
+    ot_cache = {}
+    today_curr = datetime.now().date()
+
     # For charts, we can aggregate by Date
     date_aggregates = {}
     for r in attendance_records:
@@ -535,14 +540,17 @@ def calculate_section_dashboard_stats(
                 "count": 0,
             }
 
-        # OT
+        # OT with memoization
         try:
             raw_ot = float(r.get("Card Punch OT") or 0.0)
         except (ValueError, TypeError):
             raw_ot = 0.0
         out_t = r.get("Out Time", "").strip()
         sh_t = r.get("Shift", "")
-        ot = calculate_validated_ot(out_t, sh_t, raw_ot)
+        ot_key = (out_t, sh_t, raw_ot)
+        if ot_key not in ot_cache:
+            ot_cache[ot_key] = calculate_validated_ot(out_t, sh_t, raw_ot)
+        ot = ot_cache[ot_key]
         date_aggregates[dt]["ot"] += ot
         total_ot += ot
 
@@ -563,14 +571,17 @@ def calculate_section_dashboard_stats(
         has_in = bool(in_time_str) and in_time_str not in ("00:00", "—", "")
         has_out = bool(out_time_str) and out_time_str not in ("00:00", "—", "")
 
-        # Parse date
-        date_obj = parse_date(dt)
+        # Memoized parse_date
+        if dt not in date_obj_cache:
+            date_obj_cache[dt] = parse_date(dt)
+        date_obj = date_obj_cache[dt]
+
         is_holiday = (
             date_obj.year == 2026 and date_obj.month == 7 and date_obj.day == 1
             if date_obj
             else False
         )
-        is_today = date_obj and date_obj.date() == datetime.now().date()
+        is_today = date_obj and date_obj.date() == today_curr
         is_mispunch = False
         if (has_in and not has_out) or (has_out and not has_in):
             if not is_holiday:
@@ -1212,11 +1223,12 @@ def get_overtime_dashboard_data(user, get_params):
     custom_start = None
     custom_end = None
 
+    req_period = get_params.get("period")
     c_start = get_params.get("custom_start") or get_params.get("start_date")
     c_end = get_params.get("custom_end") or get_params.get("end_date")
 
     has_custom_dates = False
-    if c_start and c_end and str(c_start).strip() not in ("", "None") and str(c_end).strip() not in ("", "None"):
+    if (req_period == "custom" or (not req_period and c_start and c_end)) and c_start and c_end and str(c_start).strip() not in ("", "None") and str(c_end).strip() not in ("", "None"):
         try:
             start_date = datetime.strptime(str(c_start).strip(), "%Y-%m-%d").date()
             end_date = datetime.strptime(str(c_end).strip(), "%Y-%m-%d").date()
@@ -1396,6 +1408,16 @@ def get_overtime_dashboard_data(user, get_params):
     from attendance.models import OvertimeLimitConfig
     ot_config = OvertimeLimitConfig.load()
 
+    is_admin = is_superuser or (role.lower() == "admin")
+    is_section_view = (scope != "OWN" and not emp_id)
+
+    dept_panels = []
+    if is_admin and is_section_view and scope_summary and scope_summary.get("employees"):
+        from attendance.services.attendance_service import build_dept_panels, resolve_department_key
+        for emp in scope_summary["employees"]:
+            emp["dept_key"] = resolve_department_key(emp.get("department") or emp.get("day") or "")
+        dept_panels = build_dept_panels(scope_summary["employees"])
+
     return {
         "active_tab": "overtime",
         "summary": summary,
@@ -1406,6 +1428,9 @@ def get_overtime_dashboard_data(user, get_params):
         "scope_summary": scope_summary,
         "is_supervisor": is_supervisor,
         "is_superuser": is_superuser,
+        "is_admin": is_admin,
+        "is_section_view": is_section_view,
+        "dept_panels": dept_panels,
         "role": role,
         "section": section,
         "role_display": (
@@ -1455,11 +1480,12 @@ def get_leaves_dashboard_data(
     all_cycles = get_all_cycles_in_year(year_val)
     all_weeks = get_all_weeks_in_year(year_val)
 
+    req_period = period
     c_start = custom_start
     c_end = custom_end
 
     has_custom_dates = False
-    if c_start and c_end and str(c_start).strip() not in ("", "None") and str(c_end).strip() not in ("", "None"):
+    if (req_period == "custom" or (not req_period and c_start and c_end)) and c_start and c_end and str(c_start).strip() not in ("", "None") and str(c_end).strip() not in ("", "None"):
         try:
             start_date = datetime.strptime(str(c_start).strip(), "%Y-%m-%d").date()
             end_date = datetime.strptime(str(c_end).strip(), "%Y-%m-%d").date()
@@ -1729,12 +1755,25 @@ def get_leaves_dashboard_data(
                 selected_cycle = str(c["cycle_num"])
                 break
 
+    is_admin = is_superuser or (role.lower() == "admin")
+    is_section_view = (scope != "OWN" and not query_employee_id)
+
+    dept_panels = []
+    if is_admin and is_section_view:
+        from attendance.services.attendance_service import build_dept_panels, resolve_department_key
+        for item in records:
+            item["dept_key"] = resolve_department_key(item.get("department") or item.get("day") or "")
+        dept_panels = build_dept_panels(records)
+
     return {
         "active_tab": "leaves",
         "records": records,
         "stats": stats,
         "start_date": start_str,
         "end_date": end_str,
+        "is_admin": is_admin,
+        "is_section_view": is_section_view,
+        "dept_panels": dept_panels,
         "role_display": (
             user.profile.role.name
             if (hasattr(user, "profile") and user.profile.role)

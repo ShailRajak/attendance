@@ -5,61 +5,162 @@
 {% block auth_content %}
 <div class="row justify-content-center">
     <div class="col-sm-10 col-md-7 col-lg-5 col-xl-4">
-        <div class="card-custom text-center">
-            <div class="mb-3">
-                <span class="fs-2">🔒</span>
-                <h4 class="fw-bold mt-2">Employee Login</h4>
-                <p class="text-muted small">Access your attendance tracking dashboard</p>
-            </div>
+        <div class="card-custom text-center p-4">
 
-            <form method="POST">
-                {% csrf_token %}
-
-                <!-- Employee ID -->
-                <div class="mb-2 text-start">
-                    <label for="employee_id" class="form-label-custom">Employee ID</label>
-                    <input type="text" id="employee_id" name="employee_id"
-                        class="form-control form-control-custom w-100" placeholder="e.g., 19101234"
-                        value="{{ employee_id|default:'' }}" required autofocus>
+            <!-- 1. LOGIN BOX -->
+            <div id="loginBox" class="{% if show_reset_modal %}d-none{% endif %}">
+                <div class="mb-3">
+                    <span class="fs-2">🔒</span>
+                    <h4 class="fw-bold mt-2">Employee Login</h4>
+                    <p class="text-muted small">Access your attendance tracking dashboard</p>
                 </div>
 
-                <!-- Password -->
-                <div class="mb-3 text-start">
-                    <label for="password" class="form-label-custom">Password</label>
-                    <div class="position-relative">
-                        <input type="password" id="password" name="password" class="form-control form-control-custom w-100 pe-5"
-                            placeholder="••••••••" required>
-                        <button type="button" class="btn position-absolute top-50 end-0 translate-middle-y border-0 text-muted small" id="togglePassword" style="background: none; z-index: 10; padding-right: 15px;">
-                            👁️
-                        </button>
+                <form method="POST">
+                    {% csrf_token %}
+                    <!-- Employee ID -->
+                    <div class="mb-2 text-start">
+                        <label for="employee_id" class="form-label-custom">Employee ID</label>
+                        <input type="text" id="employee_id" name="employee_id"
+                            class="form-control form-control-custom w-100" placeholder="e.g., 19101234"
+                            value="{{ employee_id|default:'' }}" required autofocus>
+                    </div>
+
+                    <!-- Password -->
+                    <div class="mb-3 text-start">
+                        <label for="password" class="form-label-custom">Password</label>
+                        <div class="position-relative">
+                            <input type="password" id="password" name="password" class="form-control form-control-custom w-100 pe-5"
+                                placeholder="••••••••" required>
+                            <button type="button" class="btn position-absolute top-50 end-0 translate-middle-y border-0 text-muted small" id="togglePassword" style="background: none; z-index: 10; padding-right: 15px;">
+                                👁️
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" class="btn btn-accent w-100 py-2.5 mb-2">
+                        Sign In
+                    </button>
+                </form>
+
+                <div class="mt-3 text-muted small">
+                    <div class="d-flex flex-column align-items-center gap-2">
+                        <a href="javascript:void(0);" id="btnShowForgot" class="text-info fw-semibold text-decoration-none">Forgot Password?</a>
+                        <div>Don't have an account? <a href="{% url 'signup' %}" class="text-info fw-semibold text-decoration-none">Register Here</a></div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Submit -->
-                <button type="submit" class="btn btn-accent w-100 py-2.5 mb-2">
-                    Sign In
-                </button>
-            </form>
+            <!-- 2. INLINE FORGOT PASSWORD BOX -->
+            <div id="forgotBox" class="text-start {% if not show_reset_modal %}d-none{% endif %}">
+                <div class="mb-3 text-center">
+                    <span class="fs-2">🔑</span>
+                    <h4 class="fw-bold mt-2">Reset Password</h4>
+                    <p class="text-muted small mb-0">Enter your Employee ID and your new desired password</p>
+                </div>
 
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    const togglePassword = document.getElementById('togglePassword');
-                    const password = document.getElementById('password');
-                    togglePassword.addEventListener('click', function () {
-                        const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
-                        password.setAttribute('type', type);
-                        this.textContent = type === 'password' ? '👁️' : '🙈';
-                    });
-                });
-            </script>
+                <form method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="forgot_password">
+                    
+                    <div class="mb-3">
+                        <label for="reset_employee_id" class="form-label-custom">Employee ID</label>
+                        <input type="text" id="reset_employee_id" name="reset_employee_id"
+                            class="form-control form-control-custom w-100 py-2.5" placeholder="e.g., 19101234"
+                            value="{{ employee_id|default:'' }}" required style="pointer-events: auto !important; position: relative; z-index: 100;">
+                    </div>
 
-            <div class="mt-2 text-muted small">
-                Don't have an account yet?
-                <div class="mt-2">
-                    <a href="{% url 'signup' %}" class="text-info fw-semibold text-decoration-none">Register Here</a>
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label-custom">New Password</label>
+                        <div class="position-relative">
+                            <input type="password" id="new_password" name="new_password"
+                                class="form-control form-control-custom w-100 py-2.5 pe-5" placeholder="••••••••" required style="pointer-events: auto !important; position: relative; z-index: 100;">
+                            <button type="button" class="btn position-absolute top-50 end-0 translate-middle-y border-0 text-muted small me-2" id="toggleNewPassword" style="background: none; z-index: 110;">
+                                👁️
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label-custom">Confirm New Password</label>
+                        <div class="position-relative">
+                            <input type="password" id="confirm_password" name="confirm_password"
+                                class="form-control form-control-custom w-100 py-2.5 pe-5" placeholder="••••••••" required style="pointer-events: auto !important; position: relative; z-index: 100;">
+                            <button type="button" class="btn position-absolute top-50 end-0 translate-middle-y border-0 text-muted small me-2" id="toggleConfirmPassword" style="background: none; z-index: 110;">
+                                👁️
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-accent w-100 py-2.5 mb-3 fw-semibold">
+                        Reset Password
+                    </button>
+                </form>
+
+                <div class="text-center">
+                    <a href="javascript:void(0);" id="btnShowLogin" class="text-muted small text-decoration-none">
+                        ← Back to Login
+                    </a>
                 </div>
             </div>
+
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const loginBox = document.getElementById('loginBox');
+        const forgotBox = document.getElementById('forgotBox');
+        const btnShowForgot = document.getElementById('btnShowForgot');
+        const btnShowLogin = document.getElementById('btnShowLogin');
+
+        if (btnShowForgot && btnShowLogin) {
+            btnShowForgot.addEventListener('click', function() {
+                loginBox.classList.add('d-none');
+                forgotBox.classList.remove('d-none');
+                const resetInput = document.getElementById('reset_employee_id');
+                if (resetInput) resetInput.focus();
+            });
+
+            btnShowLogin.addEventListener('click', function() {
+                forgotBox.classList.add('d-none');
+                loginBox.classList.remove('d-none');
+                const empInput = document.getElementById('employee_id');
+                if (empInput) empInput.focus();
+            });
+        }
+
+        // Toggle Password Visibilities
+        const togglePassword = document.getElementById('togglePassword');
+        const password = document.getElementById('password');
+        if (togglePassword && password) {
+            togglePassword.addEventListener('click', function () {
+                const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+                password.setAttribute('type', type);
+                this.textContent = type === 'password' ? '👁️' : '🙈';
+            });
+        }
+
+        const toggleNewPassword = document.getElementById('toggleNewPassword');
+        const newPassword = document.getElementById('new_password');
+        if (toggleNewPassword && newPassword) {
+            toggleNewPassword.addEventListener('click', function () {
+                const type = newPassword.getAttribute('type') === 'password' ? 'text' : 'password';
+                newPassword.setAttribute('type', type);
+                this.textContent = type === 'password' ? '👁️' : '🙈';
+            });
+        }
+
+        const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
+        const confirmPassword = document.getElementById('confirm_password');
+        if (toggleConfirmPassword && confirmPassword) {
+            toggleConfirmPassword.addEventListener('click', function () {
+                const type = confirmPassword.getAttribute('type') === 'password' ? 'text' : 'password';
+                confirmPassword.setAttribute('type', type);
+                this.textContent = type === 'password' ? '👁️' : '🙈';
+            });
+        }
+    });
+</script>
 {% endblock %}

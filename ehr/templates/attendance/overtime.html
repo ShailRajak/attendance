@@ -475,7 +475,7 @@
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div class="filter-segment-group">
                     <!-- Daily -->
-                    <a href="?period=daily{% if request.GET.employee_id %}&employee_id={{ request.GET.employee_id }}{% endif %}{% if custom_start %}&custom_start={{ custom_start }}&custom_end={{ custom_end }}{% endif %}" 
+                    <a href="?period=daily{% if request.GET.employee_id %}&employee_id={{ request.GET.employee_id }}{% endif %}" 
                        class="period-btn {% if period == 'daily' %}active{% endif %}">
                         📅 Daily
                     </a>
@@ -854,6 +854,55 @@
                 <button type="button" id="btnClearDrilldownScope" class="btn btn-outline-danger btn-sm py-1 px-3" style="font-size: 0.8rem;">✕ Clear Filter</button>
             </div>
 
+            {% if is_admin and is_section_view and dept_panels %}
+            <!-- Admin Section Breakdown Accordion -->
+            <div class="dept-accordion">
+                {% for panel_key, panel_label, panel_icon in dept_panels %}
+                <div class="dept-accordion-item">
+                    <button type="button" class="dept-accordion-header" data-target="deptPanelOT{{ panel_key }}">
+                        <span>{{ panel_icon }} {{ panel_label }}</span>
+                        <span class="accordion-arrow">▸</span>
+                    </button>
+                    <div class="dept-accordion-panel" id="deptPanelOT{{ panel_key }}">
+                        <div class="table-responsive" style="max-height: 480px; overflow-y: auto; overflow-x: auto; border-radius: 10px;">
+                            <table class="table table-custom mb-0 text-nowrap">
+                                <thead style="position: sticky; top: 0; z-index: 10; background-color: var(--card-bg);">
+                                    <tr>
+                                        <th>Emp ID</th>
+                                        <th>Name</th>
+                                        <th>Working Hours</th>
+                                        <th>Card Punch OT</th>
+                                        <th>Requested OT</th>
+                                        <th>Weekend OT</th>
+                                        <th>Holiday OT</th>
+                                        <th>Total OT</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="dept-table-body" data-panel="{{ panel_key }}">
+                                    {% for emp in scope_summary.employees %}
+                                    {% if panel_key == "All" or emp.dept_key == panel_key %}
+                                    <tr data-shift="{{ emp.shift_label }}" data-section="{% if 'Sector 63' in emp.department or 's63' in emp.department %}s63{% elif 'Phase 2' in emp.department or 'c39' in emp.department %}c39{% else %}other{% endif %}" data-dept="{{ emp.dept_key }}">
+                                        <td><strong class="text-info">{{ emp.emp_id }}</strong></td>
+                                        <td>{{ emp.emp_name }}</td>
+                                        <td>{{ emp.work_time|default:"0" }}h</td>
+                                        <td>{{ emp.card_punch_ot }}h</td>
+                                        <td>{{ emp.requested_ot }}h</td>
+                                        <td>{{ emp.weekend_ot }}h</td>
+                                        <td>{{ emp.holiday_ot }}h</td>
+                                        <td><strong>{{ emp.total_ot }}h</strong></td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="paginationDeptPanelOT{{ panel_key }}"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <!-- Original single table for Management and non-Admin roles -->
             <div class="table-responsive" style="max-height: 500px; overflow-y: auto; overflow-x: auto;">
                 <table class="table table-custom mb-0 text-nowrap">
                     <thead style="position: sticky; top: 0; z-index: 10; background-color: var(--card-bg);">
@@ -897,6 +946,7 @@
             </div>
             <!-- Pagination Controls -->
             <div id="paginationScopeOT"></div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -1576,6 +1626,33 @@
                 applyFilters();
             });
         }
+
+        // Accordion panel toggle for Admin
+        document.querySelectorAll('.dept-accordion-header').forEach(header => {
+            header.addEventListener('click', function () {
+                const targetId = this.getAttribute('data-target');
+                const panel = document.getElementById(targetId);
+                if (panel) {
+                    const isOpen = panel.classList.contains('open');
+                    if (isOpen) {
+                        panel.classList.remove('open');
+                        this.classList.remove('active');
+                    } else {
+                        panel.classList.add('open');
+                        this.classList.add('active');
+                    }
+                }
+            });
+        });
+
+        // Initialize TablePaginator for Admin Section Panels
+        document.querySelectorAll('.dept-table-body').forEach(tbody => {
+            const panelKey = tbody.getAttribute('data-panel');
+            const paginationEl = document.getElementById('paginationDeptPanelOT' + panelKey);
+            if (tbody && paginationEl) {
+                new TablePaginator(tbody, paginationEl, 10);
+            }
+        });
 
         // Apply default filters on load
         applyFilters();

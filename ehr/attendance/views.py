@@ -1,4 +1,4 @@
-# Reload trigger for Monthly Date Capping at Today for Admin and Management roles
+# Reload trigger for Dot Removal on Login Page
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
@@ -146,6 +146,33 @@ def login_view(request):
         return redirect("home")
 
     if request.method == "POST":
+        action = request.POST.get("action")
+
+        if action == "forgot_password":
+            employee_id = request.POST.get("reset_employee_id", "").strip()
+            new_password = request.POST.get("new_password", "")
+            confirm_password = request.POST.get("confirm_password", "")
+
+            if not employee_id or not new_password or not confirm_password:
+                messages.error(request, "All fields are required to reset password.")
+                return render(request, "attendance/login.html", {"employee_id": employee_id, "show_reset_modal": True})
+
+            if new_password != confirm_password:
+                messages.error(request, "New passwords do not match.")
+                return render(request, "attendance/login.html", {"employee_id": employee_id, "show_reset_modal": True})
+
+            try:
+                from django.contrib.auth.models import User
+                user_obj = User.objects.get(username=employee_id)
+                user_obj.set_password(new_password)
+                user_obj.save()
+                messages.success(request, f"Password reset successfully for Employee ID '{employee_id}'! You can now log in.")
+                return redirect("login")
+            except User.DoesNotExist:
+                messages.error(request, f"No employee account found with ID '{employee_id}'. Please check your ID or register.")
+                return render(request, "attendance/login.html", {"employee_id": employee_id, "show_reset_modal": True})
+
+        # Standard Sign In Action
         employee_id = request.POST.get("employee_id", "").strip()
         password = request.POST.get("password", "")
 

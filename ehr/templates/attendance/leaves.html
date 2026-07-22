@@ -487,11 +487,75 @@
                 <span class="badge badge-custom"
                     style="background-color: rgba(255, 255, 255, 0.05); color: var(--text-muted); border: 1px solid var(--card-border);">{{ start_date }} to {{ end_date }}</span>
             </div>
+            {% if is_admin and is_section_view and dept_panels %}
+            <!-- Admin Section Breakdown Accordion -->
+            <div class="dept-accordion p-3">
+                {% for panel_key, panel_label, panel_icon in dept_panels %}
+                <div class="dept-accordion-item">
+                    <button type="button" class="dept-accordion-header" data-target="deptPanelLeaves{{ panel_key }}">
+                        <span>{{ panel_icon }} {{ panel_label }}</span>
+                        <span class="accordion-arrow">▸</span>
+                    </button>
+                    <div class="dept-accordion-panel" id="deptPanelLeaves{{ panel_key }}">
+                        <div class="table-responsive" style="max-height: 450px; overflow-y: auto; overflow-x: auto; border-radius: 10px;">
+                            <table class="table table-custom mb-0 text-nowrap">
+                                <thead style="position: sticky; top: 0; z-index: 10; background-color: var(--card-bg);">
+                                    <tr>
+                                        <th class="ps-4">Emp ID</th>
+                                        <th>Name</th>
+                                        <th>Date</th>
+                                        <th>Day</th>
+                                        <th>In Time</th>
+                                        <th>Out Time</th>
+                                        <th>Work Hours</th>
+                                        <th>Classification</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="dept-table-body" data-panel="{{ panel_key }}">
+                                    {% for item in records %}
+                                    {% if panel_key == "All" or item.dept_key == panel_key %}
+                                    <tr data-shift="{{ item.shift_label }}" data-section="{{ item.section_label }}" data-dept="{{ item.dept_key }}">
+                                        <td class="ps-4"><strong class="text-info">{{ item.employee_id }}</strong></td>
+                                        <td>{{ item.employee_name }}</td>
+                                        <td>{{ item.date }}</td>
+                                        <td>{{ item.day }}</td>
+                                        <td class="{% if item.in_time == '—' %}text-danger{% endif %}">{{ item.in_time }}</td>
+                                        <td class="{% if item.out_time == '—' %}text-danger{% endif %}">{{ item.out_time }}</td>
+                                        <td>{{ item.working_hours }}</td>
+                                        <td>
+                                            {% if item.category == 'Absent' %}
+                                            <span class="badge badge-custom badge-absent"
+                                                style="background-color: rgba(239, 68, 68, 0.12); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2);">{{ item.category }}</span>
+                                            {% elif item.category == 'Mispunch' %}
+                                            <span class="badge badge-custom badge-absent">{{ item.category }}</span>
+                                            {% elif item.category == 'Short Leave' %}
+                                            <span class="badge badge-custom"
+                                                style="background-color: rgba(245, 158, 11, 0.12); color: var(--warning-color); border: 1px solid rgba(245, 158, 11, 0.2);">{{ item.category }}</span>
+                                            {% elif item.category == 'Half Day' %}
+                                            <span class="badge badge-custom"
+                                                style="background-color: rgba(56, 189, 248, 0.12); color: var(--secondary-accent); border: 1px solid rgba(56, 189, 248, 0.2);">{{ item.category }}</span>
+                                            {% else %}
+                                            <span class="badge badge-custom badge-active">{{ item.category }}</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="paginationDeptPanelLeaves{{ panel_key }}"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <!-- Original single table for Management and non-Admin roles -->
             <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
                 <table class="table table-custom mb-0 text-nowrap">
                     <thead style="position: sticky; top: 0; z-index: 10; background-color: var(--card-bg);">
                         <tr>
-                            {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
+                            {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser or is_admin %}
                             <th class="ps-4">Emp ID</th>
                             <th>Name</th>
                             <th>Date</th>
@@ -508,7 +572,7 @@
                     <tbody id="leavesTableBody">
                         {% for item in records %}
                         <tr data-shift="{{ item.shift_label }}" data-section="{{ item.section_label }}">
-                            {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
+                            {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser or is_admin %}
                             <td class="ps-4"><strong class="text-info">{{ item.employee_id }}</strong></td>
                             <td>{{ item.employee_name }}</td>
                             <td>{{ item.date }}</td>
@@ -538,7 +602,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="{% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}8{% else %}6{% endif %}"
+                            <td colspan="{% if role == 'smt_pd' or role == 'assy_pd' or is_superuser or is_admin %}8{% else %}6{% endif %}"
                                 class="text-center text-muted py-4">No records found for this period.</td>
                         </tr>
                         {% endfor %}
@@ -547,6 +611,7 @@
             </div>
             <!-- Pagination Controls -->
             <div id="paginationLeavesTable"></div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -690,6 +755,33 @@
                 applyFilters();
             });
         }
+
+        // Accordion panel toggle for Admin
+        document.querySelectorAll('.dept-accordion-header').forEach(header => {
+            header.addEventListener('click', function () {
+                const targetId = this.getAttribute('data-target');
+                const panel = document.getElementById(targetId);
+                if (panel) {
+                    const isOpen = panel.classList.contains('open');
+                    if (isOpen) {
+                        panel.classList.remove('open');
+                        this.classList.remove('active');
+                    } else {
+                        panel.classList.add('open');
+                        this.classList.add('active');
+                    }
+                }
+            });
+        });
+
+        // Initialize TablePaginator for Admin Section Panels
+        document.querySelectorAll('.dept-table-body').forEach(tbody => {
+            const panelKey = tbody.getAttribute('data-panel');
+            const paginationEl = document.getElementById('paginationDeptPanelLeaves' + panelKey);
+            if (tbody && paginationEl) {
+                new TablePaginator(tbody, paginationEl, 10);
+            }
+        });
 
         // Apply filters on load
         applyFilters();
