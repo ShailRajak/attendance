@@ -1,4 +1,4 @@
-# Reload trigger for 10-minute check-out relaxation policy implementation
+# Reload trigger for 30-minute block OT rounding policy implementation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse

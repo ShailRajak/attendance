@@ -117,16 +117,24 @@ def calculate_validated_ot(out_time, shift_name="", raw_ot=0.0):
         shift_end_mins = 8 * 60
         if out_mins > shift_end_mins and out_mins < 12 * 60:
             ot_mins = out_mins - shift_end_mins
-            return round(ot_mins / 60.0, 1)
         else:
             return 0.0
     else:
         shift_end_mins = 18 * 60
         if out_mins > shift_end_mins:
             ot_mins = out_mins - shift_end_mins
-            return round(ot_mins / 60.0, 1)
         else:
             return 0.0
+
+    if ot_mins < 15:
+        return 0.0
+
+    # OT Rounding Policy:
+    # 20 mins past shift end (e.g. 18:20) -> 0.5h
+    # 50 mins past shift end (e.g. 18:50) -> 1.0h
+    # 80 mins (1h 20m) past shift end (e.g. 19:20) -> 1.5h
+    blocks = (ot_mins + 10) // 30
+    return round(blocks * 0.5, 1)
 
 
 def is_full_day_present(work_time, out_time="", shift_name="", is_today=False):
