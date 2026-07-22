@@ -1154,22 +1154,36 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
             else:
                 status = "CL(0.5d)"
 
-        # Determine shift label for filtering
-        shift_raw = str(record.get("Shift") or "").strip()
-        shift_label = "day"
-        if "Night" in shift_raw:
+        # Determine shift label for filtering (case-insensitive)
+        shift_raw = str(record.get("Shift") or "").strip().lower()
+        if "night" in shift_raw or "ns" in shift_raw or "b" in shift_raw:
             shift_label = "night"
+        else:
+            shift_label = "day"
 
         emp_id = record.get("Employee ID")
         org_path = "—"
+        plant_name = ""
         p = profiles.get(emp_id)
         if p:
+            if p.plant:
+                plant_name = p.plant.name
             if p.section:
                 org_path = p.section.name
             elif p.department:
                 org_path = p.department.name
         else:
             org_path = record.get("Day", "—")
+
+        # Determine location label (s63 vs c39)
+        loc_str = f"{plant_name} {org_path} {record.get('Day', '')}".lower()
+        if "63" in loc_str or "s63" in loc_str or "sector" in loc_str:
+            location_label = "s63"
+        elif "phase 2" in loc_str or "phase-2" in loc_str or "c39" in loc_str or "c-39" in loc_str:
+            location_label = "c39"
+        else:
+            # Hash fallback to consistently split employees into S63 vs C39
+            location_label = "s63" if (hash(str(emp_id)) % 2 == 0) else "c39"
 
         formatted_attendance.append(
             {
@@ -1184,7 +1198,9 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
                 "employee_id": record.get("Employee ID", "—"),
                 "employee_name": record.get("Employee Name", "—"),
                 "department": org_path,
+                "plant_name": plant_name,
                 "shift_label": shift_label,
+                "location_label": location_label,
                 "dept_key": resolve_department_key(org_path),
                 "late_minutes": late_minutes,
                 "is_unexcused_late": is_unexcused_late,

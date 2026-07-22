@@ -1143,8 +1143,8 @@
                                     <tbody class="dept-table-body" data-panel="{{ panel_key }}">
                                         {% for row in attendance %}
                                         {% if panel_key == "All" or row.dept_key == panel_key %}
-                                        <tr data-shift="{{ row.shift_label }}"
-                                            data-section="{% if 'Sector 63' in row.department or 's63' in row.department %}s63{% elif 'Phase 2' in row.department or 'c39' in row.department %}c39{% else %}other{% endif %}"
+                                        <tr data-shift="{{ row.shift_label|lower }}"
+                                            data-section="{{ row.location_label|default:'s63' }}"
                                             data-dept="{{ row.dept_key }}">
                                             <td><strong class="text-info">{{ row.employee_id }}</strong></td>
                                             <td>{{ row.employee_name }}</td>
@@ -1211,8 +1211,8 @@
                         </thead>
                         <tbody id="attendanceTableBody">
                             {% for row in attendance %}
-                            <tr data-shift="{{ row.shift_label }}"
-                                data-section="{% if 'Sector 63' in row.department or 's63' in row.department %}s63{% elif 'Phase 2' in row.department or 'c39' in row.department %}c39{% else %}other{% endif %}">
+                            <tr data-shift="{{ row.shift_label|lower }}"
+                                data-section="{{ row.location_label|default:'s63' }}">
                                 {% if role == 'smt_pd' or role == 'assy_pd' or is_admin %}
                                 <td><strong class="text-info">{{ row.employee_id }}</strong></td>
                                 <td>{{ row.employee_name }}</td>
@@ -1312,18 +1312,18 @@
             if (row.cells.length === 1 && row.cells[0].classList.contains('text-center')) {
                 return;
             }
-            const shiftLabel = row.getAttribute('data-shift');
-            const sectionLabel = row.getAttribute('data-section');
+            const shiftLabel = (row.getAttribute('data-shift') || '').toLowerCase();
+            const sectionLabel = (row.getAttribute('data-section') || '').toLowerCase();
 
-            if (!btnDayShift) {
+            if (!btnDayShift && !btnS63) {
                 row.classList.add('matching-filter');
                 return;
             }
 
-            const matchesShift = (currentShift === 'both' || shiftLabel === currentShift);
+            const matchesShift = (currentShift === 'both' || shiftLabel === currentShift || (currentShift === 'day' && (shiftLabel === 'day' || shiftLabel.includes('day'))) || (currentShift === 'night' && (shiftLabel === 'night' || shiftLabel.includes('night'))));
             let matchesSection = true;
             if (btnS63) {
-                matchesSection = (currentSection === 'both' || sectionLabel === currentSection);
+                matchesSection = (currentSection === 'both' || sectionLabel === currentSection || (currentSection === 's63' && (sectionLabel === 's63' || sectionLabel.includes('63'))) || (currentSection === 'c39' && (sectionLabel === 'c39' || sectionLabel.includes('39') || sectionLabel.includes('phase'))));
             }
 
             if (matchesShift && matchesSection) {

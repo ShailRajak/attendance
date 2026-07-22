@@ -881,7 +881,7 @@
                                 <tbody class="dept-table-body" data-panel="{{ panel_key }}">
                                     {% for emp in scope_summary.employees %}
                                     {% if panel_key == "All" or emp.dept_key == panel_key %}
-                                    <tr data-shift="{{ emp.shift_label }}" data-section="{% if 'Sector 63' in emp.department or 's63' in emp.department %}s63{% elif 'Phase 2' in emp.department or 'c39' in emp.department %}c39{% else %}other{% endif %}" data-dept="{{ emp.dept_key }}">
+                                    <tr data-shift="{{ emp.shift_label|lower }}" data-section="{{ emp.location_label|default:'s63' }}" data-dept="{{ emp.dept_key }}">
                                         <td><strong class="text-info">{{ emp.emp_id }}</strong></td>
                                         <td>{{ emp.emp_name }}</td>
                                         <td>{{ emp.work_time|default:"0" }}h</td>
@@ -919,7 +919,7 @@
                     </thead>
                     <tbody id="overtimeTableBody">
                         {% for emp in scope_summary.employees %}
-                        <tr data-shift="{{ emp.shift_label }}" data-section="{% if 'Sector 63' in emp.department or 's63' in emp.department %}s63{% elif 'Phase 2' in emp.department or 'c39' in emp.department %}c39{% else %}other{% endif %}">
+                        <tr data-shift="{{ emp.shift_label|lower }}" data-section="{{ emp.location_label|default:'s63' }}">
                             <td><strong class="text-info">{{ emp.emp_id }}</strong></td>
                             <td>{{ emp.emp_name }}</td>
                             <td>{{ emp.work_time|default:"0" }}h</td>
@@ -977,7 +977,7 @@
         const btnC39 = document.getElementById('btnC39');
         const otSectionTitle = document.getElementById('otSectionTitle');
         const employeeCountText = document.getElementById('employeeCountText');
-        const tableRows = document.querySelectorAll('#overtimeTableBody tr');
+        const tableRows = document.querySelectorAll('#overtimeTableBody tr, .dept-table-body tr');
 
         if (tableRows.length > 0) {
             let count = 0;
@@ -991,13 +991,13 @@
                 if (row.cells.length === 1 && row.cells[0].classList.contains('text-center')) {
                     return;
                 }
-                const rowShift = row.getAttribute('data-shift');
-                const rowSection = row.getAttribute('data-section');
+                const rowShift = (row.getAttribute('data-shift') || '').toLowerCase();
+                const rowSection = (row.getAttribute('data-section') || '').toLowerCase();
 
-                const matchesShift = (currentShift === 'both' || rowShift === currentShift);
+                const matchesShift = (currentShift === 'both' || rowShift === currentShift || (currentShift === 'day' && (rowShift === 'day' || rowShift.includes('day'))) || (currentShift === 'night' && (rowShift === 'night' || rowShift.includes('night'))));
                 let matchesSection = true;
                 if (btnS63) {
-                    matchesSection = (currentSection === 'both' || rowSection === currentSection);
+                    matchesSection = (currentSection === 'both' || rowSection === currentSection || (currentSection === 's63' && (rowSection === 's63' || rowSection.includes('63'))) || (currentSection === 'c39' && (rowSection === 'c39' || rowSection.includes('39') || rowSection.includes('phase'))));
                 }
                 const show = matchesShift && matchesSection;
 

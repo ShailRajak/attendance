@@ -514,7 +514,7 @@
                                 <tbody class="dept-table-body" data-panel="{{ panel_key }}">
                                     {% for item in records %}
                                     {% if panel_key == "All" or item.dept_key == panel_key %}
-                                    <tr data-shift="{{ item.shift_label }}" data-section="{{ item.section_label }}" data-dept="{{ item.dept_key }}">
+                                    <tr data-shift="{{ item.shift_label|lower }}" data-section="{{ item.location_label|default:'s63' }}" data-dept="{{ item.dept_key }}">
                                         <td class="ps-4"><strong class="text-info">{{ item.employee_id }}</strong></td>
                                         <td>{{ item.employee_name }}</td>
                                         <td>{{ item.date }}</td>
@@ -571,7 +571,7 @@
                     </thead>
                     <tbody id="leavesTableBody">
                         {% for item in records %}
-                        <tr data-shift="{{ item.shift_label }}" data-section="{{ item.section_label }}">
+                        <tr data-shift="{{ item.shift_label|lower }}" data-section="{{ item.location_label|default:'s63' }}">
                             {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser or is_admin %}
                             <td class="ps-4"><strong class="text-info">{{ item.employee_id }}</strong></td>
                             <td>{{ item.employee_name }}</td>
@@ -621,7 +621,7 @@
     let currentSection = 'both';
 
     function applyFilters() {
-        const tableRows = document.querySelectorAll('#leavesTableBody tr');
+        const tableRows = document.querySelectorAll('#leavesTableBody tr, .dept-table-body tr');
         const btnDayShift = document.getElementById('btnDayShift');
         const btnS63 = document.getElementById('btnS63');
 
@@ -638,13 +638,13 @@
             if (row.cells.length === 1 && row.cells[0].classList.contains('text-center')) {
                 return;
             }
-            const rowShift = row.getAttribute('data-shift');
-            const rowSection = row.getAttribute('data-section');
+            const rowShift = (row.getAttribute('data-shift') || '').toLowerCase();
+            const rowSection = (row.getAttribute('data-section') || '').toLowerCase();
 
-            const matchesShift = (currentShift === 'both' || rowShift === currentShift);
+            const matchesShift = (currentShift === 'both' || rowShift === currentShift || (currentShift === 'day' && (rowShift === 'day' || rowShift.includes('day'))) || (currentShift === 'night' && (rowShift === 'night' || rowShift.includes('night'))));
             let matchesSection = true;
             if (btnS63) {
-                matchesSection = (currentSection === 'both' || rowSection === currentSection);
+                matchesSection = (currentSection === 'both' || rowSection === currentSection || (currentSection === 's63' && (rowSection === 's63' || rowSection.includes('63'))) || (currentSection === 'c39' && (rowSection === 'c39' || rowSection.includes('39') || rowSection.includes('phase'))));
             }
             const show = matchesShift && matchesSection;
 

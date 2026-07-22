@@ -1,4 +1,4 @@
-# Reload trigger for Dot Removal on Login Page
+# Reload trigger for Shift & Location Filter Buttons Fix across Admin and Management
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse

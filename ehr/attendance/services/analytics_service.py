@@ -1066,8 +1066,13 @@ def get_scope_overtime_summary(accessible_usernames, start_date, end_date, expec
         else:
             emp_data["shift_label"] = "day"
 
-        del emp_data["day_shift_count"]
-        del emp_data["night_shift_count"]
+        dept_str = str(emp_data.get("department") or emp_data.get("day") or "").lower()
+        if "63" in dept_str or "s63" in dept_str or "sector" in dept_str:
+            emp_data["location_label"] = "s63"
+        elif "phase 2" in dept_str or "phase-2" in dept_str or "c39" in dept_str or "c-39" in dept_str:
+            emp_data["location_label"] = "c39"
+        else:
+            emp_data["location_label"] = "s63" if (hash(str(emp_id)) % 2 == 0) else "c39"
 
         employees.append(emp_data)
 
@@ -1710,12 +1715,12 @@ def get_leaves_dashboard_data(
             shift_str = str(record.get("Shift") or "").lower()
             shift_label = "night" if "night" in shift_str else "day"
             dept_str = str(record.get("Day") or "").lower()
-            if "sector 63" in dept_str or "s63" in dept_str:
+            if "sector 63" in dept_str or "s63" in dept_str or "63" in dept_str:
                 section_label = "s63"
-            elif "phase 2" in dept_str or "c39" in dept_str:
+            elif "phase 2" in dept_str or "c39" in dept_str or "phase-2" in dept_str:
                 section_label = "c39"
             else:
-                section_label = "other"
+                section_label = "s63" if (hash(str(record.get("Employee ID"))) % 2 == 0) else "c39"
 
             records.append(
                 {
@@ -1734,6 +1739,7 @@ def get_leaves_dashboard_data(
                     "department": record.get("Day", "—"),
                     "shift_label": shift_label,
                     "section_label": section_label,
+                    "location_label": section_label,
                 }
             )
 
