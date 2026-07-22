@@ -351,13 +351,84 @@
         margin-bottom: 1rem;
     }
     
+    .filter-control-panel {
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.7) 100%);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(99, 102, 241, 0.25);
+        border-radius: 20px;
+        padding: 1rem 1.25rem;
+        box-shadow: 0 12px 40px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+        margin-bottom: 2rem;
+        position: relative;
+        z-index: 100;
+    }
+    
+    .filter-pill-group {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(15, 23, 42, 0.65);
+        padding: 4px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+
+    .segmented-pill-bar {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(15, 23, 42, 0.65);
+        padding: 4px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+
+    .period-toggle {
+        display: flex;
+        gap: 10px;
+        position: relative;
+    }
+    .period-btn {
+        background: transparent;
+        border: 1px solid transparent;
+        color: #94a3b8;
+        padding: 0.5rem 1rem;
+        border-radius: 10px;
+        font-weight: 500;
+        font-size: 0.82rem;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        position: relative;
+    }
+    .period-btn:hover {
+        color: #f8fafc;
+        background: rgba(255, 255, 255, 0.08);
+        transform: translateY(-1px);
+    }
+    .period-btn.active {
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+        color: #ffffff !important;
+        font-weight: 600;
+        border-color: rgba(129, 140, 248, 0.5);
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+    }
+
     /* Override Bootstrap dropdown styles for proper visibility */
     div.custom-dropdown {
-        background: #151c2c !important;
-        border: 1px solid var(--card-border) !important;
-        border-radius: 12px !important;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
-        padding: 1rem !important;
+        background: rgba(15, 23, 42, 0.95) !important;
+        backdrop-filter: blur(24px) !important;
+        -webkit-backdrop-filter: blur(24px) !important;
+        border: 1px solid rgba(99, 102, 241, 0.3) !important;
+        border-radius: 16px !important;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 20px rgba(99, 102, 241, 0.15) !important;
+        padding: 1.25rem !important;
         margin-top: 0.5rem !important;
     }
     
@@ -387,13 +458,21 @@
 
 {% block content %}
 
+<!-- Welcome Header Banner -->
+<div class="welcome-banner fade-in-el">
+    <div class="d-flex align-items-center gap-2">
+        <span class="fs-4">⏰</span>
+        <div>
+            <div class="fw-semibold">Overtime Analytics & Tracking</div>
+            <div class="small opacity-75">Card Punch OT, Approvals, and Weekend/Holiday Aggregations</div>
+        </div>
+    </div>
+</div>
+
 <!-- Page Header -->
 <div class="row mb-4 fade-in-el align-items-center">
     <div class="col-12">
-        <div class="page-header">
-            <span class="page-header-icon">⏱️</span>
-            <h3 class="fw-bold mb-0 text-white">Overtime Dashboard</h3>
-        </div>
+        <h3 class="fw-bold mb-0 text-white">Overtime Dashboard</h3>
     </div>
 </div>
 
@@ -434,122 +513,133 @@
 </div>
 {% endif %}
 
-<!-- Period Toggle & Date Picker -->
-<div class="row mb-4 fade-in-el" style="position: relative; z-index: 100;">
-    <div class="col-12">
-        <div class="period-toggle">
-            <a href="?period=daily{% if request.GET.employee_id %}&employee_id={{ request.GET.employee_id }}{% endif %}{% if custom_start %}&custom_start={{ custom_start }}&custom_end={{ custom_end }}{% endif %}" class="period-btn {% if period == 'daily' %}active{% endif %}">
-                📅 Daily
-            </a>
-             
-            <!-- Weekly button -->
-            <div class="dropdown d-flex align-items-center" 
-                 style="border: 1px solid {% if period == 'weekly' %}var(--text-main){% else %}var(--card-border){% endif %}; border-radius: 8px; background: rgba(255, 255, 255, 0.03); overflow: visible; height: 38px;">
-                <!-- Main link button -->
-                <a href="?period=weekly{% if request.GET.employee_id %}&employee_id={{ request.GET.employee_id }}{% endif %}" 
-                   class="px-3 text-decoration-none d-flex align-items-center gap-2" 
-                   style="color: {% if period == 'weekly' %}var(--text-main){% else %}var(--text-muted){% endif %}; font-weight: {% if period == 'weekly' %}600{% else %}500{% endif %}; font-size: 0.85rem; border-right: 1px solid {% if period == 'weekly' %}var(--text-main){% else %}var(--card-border){% endif %}; height: 100%; transition: all 0.2s; border-top-left-radius: 7px; border-bottom-left-radius: 7px;"
-                   onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">
-                    📊 Weekly
+<!-- Ultra-Modern Floating Control Center -->
+<div class="filter-control-panel fade-in-el">
+    <div class="d-flex flex-column gap-3">
+        <!-- Row 1: Time Period & Filter Pills -->
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div class="filter-pill-group">
+                <a href="?period=daily{% if request.GET.employee_id %}&employee_id={{ request.GET.employee_id }}{% endif %}{% if custom_start %}&custom_start={{ custom_start }}&custom_end={{ custom_end }}{% endif %}" class="period-btn {% if period == 'daily' %}active{% endif %}">
+                    📅 Daily
                 </a>
-                <!-- Dropdown toggle arrow -->
-                <button class="px-2 d-flex align-items-center justify-content-center" 
-                        type="button" 
-                        data-bs-toggle="dropdown" 
-                        data-bs-auto-close="outside"
-                        style="background: none; border: none; color: {% if period == 'weekly' %}var(--text-main){% else %}var(--text-muted){% endif %}; height: 100%; font-size: 0.7rem; transition: all 0.2s; border-top-right-radius: 7px; border-bottom-right-radius: 7px;"
-                        onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">
-                    ▼
-                </button>
-                <div class="dropdown-menu custom-dropdown" style="min-width: 320px; z-index: 999999;">
-                    <div class="dropdown-header">Select Week</div>
-                    <form method="GET" style="min-width: 300px;">
-                        <input type="hidden" name="period" value="weekly">
-                        {% if request.GET.employee_id %}
-                        <input type="hidden" name="employee_id" value="{{ request.GET.employee_id }}">
-                        {% endif %}
-                        <div class="mb-3">
-                            <label class="form-label-custom" style="font-size: 0.75rem;">Year</label>
-                            <select name="year" class="form-select form-control-custom" style="font-size: 0.85rem;">
-                                <option value="{{ current_year }}" selected>{{ current_year }}</option>
-                                <option value="{{ current_year|add:'-1' }}">{{ current_year|add:'-1' }}</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label-custom" style="font-size: 0.75rem;">Week</label>
-                            <select name="week_num" class="form-select form-control-custom" style="font-size: 0.85rem; max-height: 200px; overflow-y: auto;">
-                                {% for week in all_weeks %}
-                                <option value="{{ week.week_num }}" {% if selected_week == week.week_num|stringformat:"s" %}selected{% endif %}>{{ week.label }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-accent w-100 py-2">Apply Week</button>
-                    </form>
+                 
+                <!-- Weekly button -->
+                <div class="dropdown d-inline-flex align-items-center">
+                    <a href="?period=weekly{% if request.GET.employee_id %}&employee_id={{ request.GET.employee_id }}{% endif %}" 
+                       class="period-btn {% if period == 'weekly' %}active{% endif %}"
+                       style="{% if period == 'weekly' %}border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 0.5rem;{% endif %}">
+                        📊 Weekly
+                    </a>
+                    <button class="period-btn {% if period == 'weekly' %}active{% endif %}" 
+                            type="button" 
+                            data-bs-toggle="dropdown" 
+                            data-bs-auto-close="outside"
+                            style="{% if period == 'weekly' %}border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 0.25rem; padding-right: 0.6rem; font-size: 0.65rem;{% endif %}">
+                        ▼
+                    </button>
+                    <div class="dropdown-menu custom-dropdown" style="min-width: 320px; z-index: 999999;">
+                        <div class="dropdown-header">Select Week</div>
+                        <form method="GET" style="min-width: 300px;">
+                            <input type="hidden" name="period" value="weekly">
+                            {% if request.GET.employee_id %}
+                            <input type="hidden" name="employee_id" value="{{ request.GET.employee_id }}">
+                            {% endif %}
+                            <div class="mb-3">
+                                <label class="form-label-custom" style="font-size: 0.75rem;">Year</label>
+                                <select name="year" class="form-select form-control-custom" style="font-size: 0.85rem;">
+                                    <option value="{{ current_year }}" selected>{{ current_year }}</option>
+                                    <option value="{{ current_year|add:'-1' }}">{{ current_year|add:'-1' }}</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label-custom" style="font-size: 0.75rem;">Week</label>
+                                <select name="week_num" class="form-select form-control-custom" style="font-size: 0.85rem; max-height: 200px; overflow-y: auto;">
+                                    {% for week in all_weeks %}
+                                    <option value="{{ week.week_num }}" {% if selected_week == week.week_num|stringformat:"s" %}selected{% endif %}>{{ week.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-accent w-100 py-2">Apply Week</button>
+                        </form>
+                    </div>
                 </div>
-            </div>
-            
-            <!-- Monthly button -->
-            <div class="dropdown d-flex align-items-center" 
-                 style="border: 1px solid {% if period == 'monthly' %}var(--text-main){% else %}var(--card-border){% endif %}; border-radius: 8px; background: rgba(255, 255, 255, 0.03); overflow: visible; height: 38px;">
-                <!-- Main link button -->
-                <a href="?period=monthly{% if request.GET.employee_id %}&employee_id={{ request.GET.employee_id }}{% endif %}" 
-                   class="px-3 text-decoration-none d-flex align-items-center gap-2" 
-                   style="color: {% if period == 'monthly' %}var(--text-main){% else %}var(--text-muted){% endif %}; font-weight: {% if period == 'monthly' %}600{% else %}500{% endif %}; font-size: 0.85rem; border-right: 1px solid {% if period == 'monthly' %}var(--text-main){% else %}var(--card-border){% endif %}; height: 100%; transition: all 0.2s; border-top-left-radius: 7px; border-bottom-left-radius: 7px;"
-                   onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">
-                    💰 Monthly (21-20)
-                </a>
-                <!-- Dropdown toggle arrow -->
-                <button class="px-2 d-flex align-items-center justify-content-center" 
-                        type="button" 
-                        data-bs-toggle="dropdown" 
-                        data-bs-auto-close="outside"
-                        style="background: none; border: none; color: {% if period == 'monthly' %}var(--text-main){% else %}var(--text-muted){% endif %}; height: 100%; font-size: 0.7rem; transition: all 0.2s; border-top-right-radius: 7px; border-bottom-right-radius: 7px;"
-                        onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">
-                    ▼
-                </button>
-                <div class="dropdown-menu custom-dropdown" style="min-width: 320px; max-height: 80vh; overflow-y: auto; z-index: 999999;">
-                    <div class="dropdown-header">Select Billing Cycle (21-20)</div>
-                    <form method="GET">
-                        <input type="hidden" name="period" value="monthly">
-                        {% if request.GET.employee_id %}
-                        <input type="hidden" name="employee_id" value="{{ request.GET.employee_id }}">
-                        {% endif %}
-                        <div class="mb-3">
-                            <label class="form-label-custom" style="font-size: 0.75rem;">Year</label>
-                            <select name="year" class="form-select form-control-custom" style="font-size: 0.85rem;">
-                                <option value="{{ current_year }}" selected>{{ current_year }}</option>
-                                <option value="{{ current_year|add:'-1' }}">{{ current_year|add:'-1' }}</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label-custom" style="font-size: 0.75rem;">Billing Cycle</label>
-                            <select name="cycle_num" class="form-select form-control-custom" style="font-size: 0.85rem; max-height: 200px; overflow-y: auto;">
-                                {% for cycle in all_cycles %}
-                                <option value="{{ cycle.cycle_num }}" {% if selected_cycle == cycle.cycle_num|stringformat:"s" %}selected{% endif %}>{{ cycle.label }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-accent w-100 py-2">Apply Cycle</button>
-                    </form>
+                
+                <!-- Monthly button -->
+                <div class="dropdown d-inline-flex align-items-center">
+                    <a href="?period=monthly{% if request.GET.employee_id %}&employee_id={{ request.GET.employee_id }}{% endif %}" 
+                       class="period-btn {% if period == 'monthly' %}active{% endif %}"
+                       style="{% if period == 'monthly' %}border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 0.5rem;{% endif %}">
+                        💰 Monthly (21-20)
+                    </a>
+                    <button class="period-btn {% if period == 'monthly' %}active{% endif %}" 
+                            type="button" 
+                            data-bs-toggle="dropdown" 
+                            data-bs-auto-close="outside"
+                            style="{% if period == 'monthly' %}border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 0.25rem; padding-right: 0.6rem; font-size: 0.65rem;{% endif %}">
+                        ▼
+                    </button>
+                    <div class="dropdown-menu custom-dropdown" style="min-width: 320px; max-height: 80vh; overflow-y: auto; z-index: 999999;">
+                        <div class="dropdown-header">Select Billing Cycle (21-20)</div>
+                        <form method="GET">
+                            <input type="hidden" name="period" value="monthly">
+                            {% if request.GET.employee_id %}
+                            <input type="hidden" name="employee_id" value="{{ request.GET.employee_id }}">
+                            {% endif %}
+                            <div class="mb-3">
+                                <label class="form-label-custom" style="font-size: 0.75rem;">Year</label>
+                                <select name="year" class="form-select form-control-custom" style="font-size: 0.85rem;">
+                                    <option value="{{ current_year }}" selected>{{ current_year }}</option>
+                                    <option value="{{ current_year|add:'-1' }}">{{ current_year|add:'-1' }}</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label-custom" style="font-size: 0.75rem;">Billing Cycle</label>
+                                <select name="cycle_num" class="form-select form-control-custom" style="font-size: 0.85rem; max-height: 200px; overflow-y: auto;">
+                                    {% for cycle in all_cycles %}
+                                    <option value="{{ cycle.cycle_num }}" {% if selected_cycle == cycle.cycle_num|stringformat:"s" %}selected{% endif %}>{{ cycle.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-accent w-100 py-2">Apply Cycle</button>
+                        </form>
+                    </div>
                 </div>
-            </div>
-            
-            <!-- Custom Range button -->
-            <button type="button" class="period-btn {% if period == 'custom' %}active{% endif %}" data-bs-toggle="collapse" data-bs-target="#customRangeCollapse" aria-expanded="{% if period == 'custom' %}true{% else %}false{% endif %}" aria-controls="customRangeCollapse">
-                📅 Custom Range
-            </button>
 
+                <!-- Custom Range button -->
+                <button type="button" class="period-btn {% if period == 'custom' %}active{% endif %}" data-bs-toggle="collapse" data-bs-target="#customRangeCollapse" aria-expanded="{% if period == 'custom' %}true{% else %}false{% endif %}" aria-controls="customRangeCollapse">
+                    🗓️ Custom Range
+                </button>
+
+                {% if role != 'own' and role != 'employee' %}
+                <!-- Search Employee button -->
+                <button type="button" class="period-btn" data-bs-toggle="collapse" data-bs-target="#empSearchCollapse" aria-expanded="false" aria-controls="empSearchCollapse">
+                    🔍 Search Employee
+                </button>
+                {% endif %}
+            </div>
+
+            <!-- Shift & Section Filters -->
             {% if role != 'own' and role != 'employee' %}
-            <!-- Search Employee button -->
-            <button type="button" class="period-btn" data-bs-toggle="collapse" data-bs-target="#empSearchCollapse" aria-expanded="false" aria-controls="empSearchCollapse">
-                🔍 Search Employee
-            </button>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                {% if is_superuser %}
+                <div class="segmented-pill-bar">
+                    <button type="button" id="btnS63" class="period-btn">🏢 S63</button>
+                    <button type="button" id="btnC39" class="period-btn">🏢 C39</button>
+                    <button type="button" id="btnBothSections" class="period-btn active">🌐 Both</button>
+                </div>
+                {% endif %}
+                <div class="segmented-pill-bar">
+                    <button type="button" id="btnDayShift" class="period-btn">☀️ Day Shift</button>
+                    <button type="button" id="btnNightShift" class="period-btn">🌙 Night Shift</button>
+                    <button type="button" id="btnBothShifts" class="period-btn active">☀️🌙 Both</button>
+                </div>
+            </div>
             {% endif %}
         </div>
         
         <!-- Custom Date Range Picker (Collapsible) -->
-        <div class="collapse {% if period == 'custom' %}show{% endif %} mt-3" id="customRangeCollapse">
-            <div class="card-custom">
+        <div class="collapse {% if period == 'custom' %}show{% endif %} mt-2" id="customRangeCollapse">
+            <div class="card-custom border border-indigo-500/30">
                 <h6 class="fw-semibold mb-3 text-white">Custom Date Range</h6>
                 <form method="GET" class="row g-3">
                     <input type="hidden" name="period" value="custom">
@@ -570,23 +660,6 @@
                 </form>
             </div>
         </div>
-        {% if role != 'own' and role != 'employee' %}
-        <!-- Shift and Section Filters -->
-        <div class="d-flex align-items-center gap-3 mt-3 mb-2 flex-wrap">
-            <div class="d-flex gap-2 align-items-center flex-wrap">
-                {% if is_superuser %}
-                <div class="d-flex gap-2 me-2 border-end pe-2 border-secondary" style="border-color: rgba(255,255,255,0.1) !important;">
-                    <button type="button" id="btnS63" class="period-btn">🏢 S63</button>
-                    <button type="button" id="btnC39" class="period-btn">🏢 C39</button>
-                    <button type="button" id="btnBothSections" class="period-btn active">🏢 Both</button>
-                </div>
-                {% endif %}
-                <button type="button" id="btnDayShift" class="period-btn">☀️ Day Shift</button>
-                <button type="button" id="btnNightShift" class="period-btn">🌙 Night Shift</button>
-                <button type="button" id="btnBothShifts" class="period-btn active">☀️🌙 Both</button>
-            </div>
-        </div>
-        {% endif %}
     </div>
 </div>
 

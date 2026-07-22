@@ -1,4 +1,4 @@
-# Reload trigger for Monthly KPI sum aggregation implementation for Admin and Management roles
+# Reload trigger for Ultra-Modern Glassmorphic Control Bar UI upgrade
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
