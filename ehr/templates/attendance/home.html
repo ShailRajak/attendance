@@ -1486,6 +1486,18 @@
                     const avgWorkTime = daysPresentCount > 0 ? (totalWorkHoursSum / daysPresentCount).toFixed(1) : '0.0';
                     elAvgWorkTime.textContent = avgWorkTime + 'h';
                 }
+
+                // Update Day Status Breakdown Doughnut Chart dynamically
+                if (window.breakdownChart) {
+                    window.breakdownChart.data.datasets[0].data = [
+                        daysPresentCount,
+                        absentIds.size,
+                        0,
+                        mispunchesCount,
+                        onLeaveIds.size
+                    ];
+                    window.breakdownChart.update();
+                }
             }
         } catch (e) {
             console.error('Error computing dashboard KPIs:', e);

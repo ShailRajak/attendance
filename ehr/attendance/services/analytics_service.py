@@ -567,7 +567,7 @@ def calculate_section_dashboard_stats(
         is_today = date_obj and date_obj.date() == datetime.now().date()
         is_mispunch = False
         if (has_in and not has_out) or (has_out and not has_in):
-            if not is_today and not is_holiday:
+            if not is_holiday:
                 total_mispunches += 1
                 status_mispunch += 1
                 is_mispunch = True
@@ -632,7 +632,7 @@ def calculate_section_dashboard_stats(
         "total_employees": total_employees,
         "working_days": working_days,
         "days_present": total_present,
-        "leaves_taken": status_leave,
+        "leaves_taken": status_leave + status_cl,
         "late_arrivals": total_late,
         "late_details": f"{total_late} late check-ins",
         "mispunches": total_mispunches,

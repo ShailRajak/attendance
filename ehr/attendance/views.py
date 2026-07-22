@@ -1,4 +1,4 @@
-# Reload trigger for monthly 3 late comings & 1hr total limit policy
+# Reload trigger for chart status breakdown and KPI leaves alignment fix
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
