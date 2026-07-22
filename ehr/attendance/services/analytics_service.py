@@ -1220,6 +1220,11 @@ def get_overtime_dashboard_data(user, get_params):
     is_supervisor = is_superuser or (scope in ("SECTION", "ALL"))
 
     is_employee_role = role in ("own", "employee")
+    today = datetime.now().date()
+    week_num = get_params.get("week_num")
+    cycle_num = get_params.get("cycle_num")
+    custom_start = None
+    custom_end = None
 
     c_start = get_params.get("custom_start") or get_params.get("start_date")
     c_end = get_params.get("custom_end") or get_params.get("end_date")
@@ -1450,17 +1455,6 @@ def get_leaves_dashboard_data(
 
     is_employee_role = role in ("own", "employee")
 
-    if period not in ("daily", "weekly", "monthly", "custom"):
-        period = None
-
-    if period is None:
-        if custom_start and custom_end:
-            period = "custom"
-        elif is_employee_role:
-            period = "monthly"
-        else:
-            period = "daily"
-
     today = datetime.now().date()
     current_year = today.year
 
@@ -1472,17 +1466,30 @@ def get_leaves_dashboard_data(
     all_cycles = get_all_cycles_in_year(year_val)
     all_weeks = get_all_weeks_in_year(year_val)
 
-    start_date = today
-    end_date = today
+    c_start = custom_start
+    c_end = custom_end
 
-    if period == "custom" and custom_start and custom_end:
+    has_custom_dates = False
+    if c_start and c_end and str(c_start).strip() not in ("", "None") and str(c_end).strip() not in ("", "None"):
         try:
-            start_date = datetime.strptime(custom_start, "%Y-%m-%d").date()
-            end_date = datetime.strptime(custom_end, "%Y-%m-%d").date()
+            start_date = datetime.strptime(str(c_start).strip(), "%Y-%m-%d").date()
+            end_date = datetime.strptime(str(c_end).strip(), "%Y-%m-%d").date()
+            period = "custom"
+            custom_start = str(c_start).strip()
+            custom_end = str(c_end).strip()
+            has_custom_dates = True
         except (ValueError, TypeError):
-            custom_start = None
-            custom_end = None
-            period = "daily"
+            has_custom_dates = False
+
+    if not has_custom_dates:
+        if period not in ("daily", "weekly", "monthly", "custom"):
+            period = None
+
+        if period is None:
+            if is_employee_role:
+                period = "monthly"
+            else:
+                period = "daily"
 
     if period != "custom":
         if period == "daily":

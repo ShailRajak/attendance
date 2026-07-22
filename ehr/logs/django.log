@@ -1,12 +1,13 @@
-WARNING 2026-07-22 11:07:36,099 log 22056 38880 Not Found: /favicon.ico
-WARNING 2026-07-22 11:07:36,101 log 22056 38880 "GET /favicon.ico HTTP/1.1" 404 179
-WARNING 2026-07-22 11:14:08,749 log 22056 32476 Not Found: /favicon.ico
-WARNING 2026-07-22 11:14:08,751 log 22056 32476 "GET /favicon.ico HTTP/1.1" 404 179
-WARNING 2026-07-22 11:23:27,063 log 11144 38596 Not Found: /favicon.ico
-WARNING 2026-07-22 11:23:27,065 log 11144 38596 "GET /favicon.ico HTTP/1.1" 404 179
-WARNING 2026-07-22 11:29:27,552 log 25752 36092 Not Found: /favicon.ico
-WARNING 2026-07-22 11:29:27,554 log 25752 36092 "GET /favicon.ico HTTP/1.1" 404 179
-WARNING 2026-07-22 11:50:41,534 log 24704 38372 Not Found: /favicon.ico
-WARNING 2026-07-22 11:50:41,536 log 24704 38372 "GET /favicon.ico HTTP/1.1" 404 179
-WARNING 2026-07-22 12:08:02,439 log 23112 37908 Not Found: /favicon.ico
-WARNING 2026-07-22 12:08:02,441 log 23112 37908 "GET /favicon.ico HTTP/1.1" 404 179
+ERROR 2026-07-22 12:38:40,087 log 34596 31760 Internal Server Error: /overtime/
+Traceback (most recent call last):
+  File "C:\Users\shailendra.rajak\AppData\Local\Programs\Python\Python314\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\shailendra.rajak\AppData\Local\Programs\Python\Python314\Lib\site-packages\django\core\handlers\base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\shailendra.rajak\Documents\GitHub\attendance\ehr\attendance\views.py", line 183, in overtime_dashboard
+    context = get_overtime_dashboard_data(user=request.user, get_params=request.GET)
+  File "C:\Users\shailendra.rajak\Documents\GitHub\attendance\ehr\attendance\services\analytics_service.py", line 1252, in get_overtime_dashboard_data
+    yesterday = today - timedelta(days=1)
+                ^^^^^
+NameError: name 'today' is not defined
+ERROR 2026-07-22 12:38:40,091 log 34596 31760 "GET /overtime/ HTTP/1.1" 500 145
