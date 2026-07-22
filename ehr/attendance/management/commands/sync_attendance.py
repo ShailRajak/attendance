@@ -1,6 +1,5 @@
 import json
 import time
-import traceback
 from datetime import date, datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 
@@ -158,6 +157,7 @@ class Command(BaseCommand):
         total_created = 0
         total_updated = 0
         total_unchanged = 0
+        total_deleted_stale = 0
         failed_dates = []
 
         # 5. Fetch and synchronize in parallel
@@ -190,10 +190,11 @@ class Command(BaseCommand):
                             continue
 
                         # Sync to DB
-                        created, updated, unchanged = self.sync_date_records(dt, records)
+                        created, updated, unchanged, deleted_by_sync = self.sync_date_records(dt, records)
                         total_created += created
                         total_updated += updated
                         total_unchanged += unchanged
+                        total_deleted_stale += deleted_by_sync
 
                         # Update SyncLog
                         SyncLog.objects.update_or_create(
@@ -208,7 +209,6 @@ class Command(BaseCommand):
 
                     except Exception as e:
                         failed_dates.append(dt)
-                        traceback.print_exc()
                         SyncLog.objects.update_or_create(
                             sync_date=dt,
                             defaults={"status": "FAILED"}
@@ -236,11 +236,12 @@ class Command(BaseCommand):
             "============================================================\n"
             f"Previous cycle: {prev_start} → {prev_end}\n"
             f"Active cycle:   {curr_start} → {curr_end}\n\n"
-            f"Created:    {total_created}\n"
-            f"Updated:     {total_updated}\n"
-            f"Unchanged: {total_unchanged}\n"
-            f"Failed:       {len(failed_dates)}\n"
-            f"Deleted:    {deleted_count}\n"
+            f"Created:           {total_created}\n"
+            f"Updated:            {total_updated}\n"
+            f"Unchanged:        {total_unchanged}\n"
+            f"Stale Deleted:    {total_deleted_stale}\n"
+            f"Failed:              {len(failed_dates)}\n"
+            f"Retention Deleted: {deleted_count}\n"
         )
         if failed_dates:
             summary += "\nFailed dates:\n"
@@ -259,6 +260,7 @@ class Command(BaseCommand):
         created_count = 0
         updated_count = 0
         unchanged_count = 0
+        deleted_count = 0
 
         # Get existing records for this date to avoid N+1 queries
         existing_records = {
@@ -268,77 +270,58 @@ class Command(BaseCommand):
         # Format incoming raw records
         formatted_records = filter_attendance_data(records)
 
-        to_create = []
-        to_update = []
-        update_fields = [
-            "employee_name", "in_time", "out_time", "working_hours",
-            "card_punch_ot", "requested_ot", "weekend_ot", "holiday_ot",
-            "ot4", "total_ot_all", "req_overtime", "approved_ot",
-            "wt_id", "wt_type_no", "attendance_source", "day",
-            "attendance_status", "shift", "mobile", "late_minutes",
-            "leave_type", "workday", "weekday"
-        ]
+        with transaction.atomic():
+            seen_employee_ids = set()
+            for row in formatted_records:
+                emp_id = row.get("Employee ID")
+                if not emp_id:
+                    continue
 
-        seen_employee_ids = set()
-        for row in formatted_records:
-            emp_id = row.get("Employee ID")
-            if not emp_id:
-                continue
+                if emp_id in seen_employee_ids:
+                    continue
+                seen_employee_ids.add(emp_id)
 
-            if emp_id in seen_employee_ids:
-                continue
-            seen_employee_ids.add(emp_id)
+                emp_name = row.get("Employee Name", "")
+                in_time = row.get("In Time", "")
+                out_time = row.get("Out Time", "")
+                work_time = safe_float(row.get("Work Time"))
+                working_hours = safe_float(row.get("Working Hours"))
+                card_punch_ot = safe_float(row.get("Card Punch OT"))
+                requested_ot = safe_float(row.get("Requested OT"))
+                weekend_ot = safe_float(row.get("Weekend OT"))
+                holiday_ot = safe_float(row.get("Holiday OT"))
+                ot4 = safe_float(row.get("OT4"))
+                total_ot_all = safe_float(row.get("Total OT All"))
+                req_overtime = safe_float(row.get("Req OverTime") or row.get("Req Overtime"))
+                approved_ot = safe_float(row.get("Approved OT"))
+                wt_id = row.get("WT ID", "")
+                wt_type_no = row.get("WT Type No", "")
+                attendance_source = row.get("Attendance Source", "")
+                day = row.get("Day", "")
+                attendance_status = row.get("Attendance Status", "")
+                shift = row.get("Shift", "")
+                mobile = row.get("Mobile", "")
+                late_minutes = safe_float(row.get("Late Minutes"))
+                leave_type = row.get("Leave Type", "")
+                workday = str(row.get("WorkDay")) if row.get("WorkDay") is not None else ""
+                weekday = str(row.get("Weekday")) if row.get("Weekday") is not None else ""
 
-            emp_name = row.get("Employee Name", "")
-            in_time = row.get("In Time", "")
-            out_time = row.get("Out Time", "")
-            working_hours = safe_float(row.get("Working Hours"))
-            card_punch_ot = safe_float(row.get("Card Punch OT"))
-            requested_ot = safe_float(row.get("Requested OT"))
-            weekend_ot = safe_float(row.get("Weekend OT"))
-            holiday_ot = safe_float(row.get("Holiday OT"))
-            ot4 = safe_float(row.get("OT4"))
-            total_ot_all = safe_float(row.get("Total OT All"))
-            req_overtime = safe_float(row.get("Req OverTime") or row.get("Req Overtime"))
-            approved_ot = safe_float(row.get("Approved OT"))
-            wt_id = row.get("WT ID", "")
-            wt_type_no = row.get("WT Type No", "")
-            attendance_source = row.get("Attendance Source", "")
-            day = row.get("Day", "")
-            attendance_status = row.get("Attendance Status", "")
-            shift = row.get("Shift", "")
-            mobile = row.get("Mobile", "")
-            from attendance.utils.date_helpers import get_shift_start_minutes
-            in_time_str = str(in_time or "").strip()
-            has_check_in = bool(in_time_str) and in_time_str not in ("00:00", "—", "")
-            computed_late_minutes = 0.0
-            if has_check_in and ":" in in_time_str:
-                try:
-                    h, m = map(int, in_time_str.split(":"))
-                    is_night_shift = "Night" in str(shift)
-                    shift_start = get_shift_start_minutes(wt_id, is_night_shift, in_time_str)
-                    if h * 60 + m > shift_start:
-                        computed_late_minutes = float((h * 60 + m) - shift_start)
-                except Exception:
-                    pass
-            if computed_late_minutes == 0:
-                computed_late_minutes = safe_float(row.get("Late Minutes"))
-            late_minutes = computed_late_minutes
-            leave_type = row.get("Leave Type", "")
-            workday_val = row.get("WorkDay") or row.get("Workday")
-            workday = str(workday_val).strip() if workday_val is not None else ""
-            weekday_val = row.get("Weekday")
-            weekday = str(weekday_val).strip() if weekday_val is not None else ""
+                # NOTE: All OT fields are stored exactly as the biometric API
+                # computes them. The API's own engine already correctly classifies
+                # OT into card_punch (OverTime), requested (OverTime1),
+                # weekend (OverTime2), holiday (OverTime3), and total (OverTimeAll).
+                # Do NOT apply any local overrides or caps here.
 
-            existing = existing_records.get(emp_id)
-            if not existing:
-                to_create.append(
-                    AttendanceRecord(
+                existing = existing_records.get(emp_id)
+                if not existing:
+                    # INSERT
+                    AttendanceRecord.objects.create(
                         employee_id=emp_id,
                         employee_name=emp_name,
                         attendance_date=dt,
                         in_time=in_time,
                         out_time=out_time,
+                        work_time=work_time,
                         working_hours=working_hours,
                         card_punch_ot=card_punch_ot,
                         requested_ot=requested_ot,
@@ -360,77 +343,77 @@ class Command(BaseCommand):
                         workday=workday,
                         weekday=weekday,
                     )
-                )
-                created_count += 1
-            else:
-                changed = (
-                    existing.employee_name != emp_name or
-                    existing.in_time != in_time or
-                    existing.out_time != out_time or
-                    existing.working_hours != working_hours or
-                    existing.card_punch_ot != card_punch_ot or
-                    existing.requested_ot != requested_ot or
-                    existing.weekend_ot != weekend_ot or
-                    existing.holiday_ot != holiday_ot or
-                    existing.ot4 != ot4 or
-                    existing.total_ot_all != total_ot_all or
-                    existing.req_overtime != req_overtime or
-                    existing.approved_ot != approved_ot or
-                    existing.wt_id != wt_id or
-                    existing.wt_type_no != wt_type_no or
-                    existing.attendance_source != attendance_source or
-                    existing.day != day or
-                    existing.attendance_status != attendance_status or
-                    existing.shift != shift or
-                    existing.mobile != mobile or
-                    existing.late_minutes != late_minutes or
-                    existing.leave_type != leave_type or
-                    existing.workday != workday or
-                    existing.weekday != weekday
-                )
-
-                if changed:
-                    existing.employee_name = emp_name
-                    existing.in_time = in_time
-                    existing.out_time = out_time
-                    existing.working_hours = working_hours
-                    existing.card_punch_ot = card_punch_ot
-                    existing.requested_ot = requested_ot
-                    existing.weekend_ot = weekend_ot
-                    existing.holiday_ot = holiday_ot
-                    existing.ot4 = ot4
-                    existing.total_ot_all = total_ot_all
-                    existing.req_overtime = req_overtime
-                    existing.approved_ot = approved_ot
-                    existing.wt_id = wt_id
-                    existing.wt_type_no = wt_type_no
-                    existing.attendance_source = attendance_source
-                    existing.day = day
-                    existing.attendance_status = attendance_status
-                    existing.shift = shift
-                    existing.mobile = mobile
-                    existing.late_minutes = late_minutes
-                    existing.leave_type = leave_type
-                    existing.workday = workday
-                    existing.weekday = weekday
-                    to_update.append(existing)
-                    updated_count += 1
+                    created_count += 1
                 else:
-                    unchanged_count += 1
+                    # UPDATE check
+                    changed = (
+                        existing.employee_name != emp_name or
+                        existing.in_time != in_time or
+                        existing.out_time != out_time or
+                        existing.work_time != work_time or
+                        existing.working_hours != working_hours or
+                        existing.card_punch_ot != card_punch_ot or
+                        existing.requested_ot != requested_ot or
+                        existing.weekend_ot != weekend_ot or
+                        existing.holiday_ot != holiday_ot or
+                        existing.ot4 != ot4 or
+                        existing.total_ot_all != total_ot_all or
+                        existing.req_overtime != req_overtime or
+                        existing.approved_ot != approved_ot or
+                        existing.wt_id != wt_id or
+                        existing.wt_type_no != wt_type_no or
+                        existing.attendance_source != attendance_source or
+                        existing.day != day or
+                        existing.attendance_status != attendance_status or
+                        existing.shift != shift or
+                        existing.mobile != mobile or
+                        existing.late_minutes != late_minutes or
+                        existing.leave_type != leave_type or
+                        existing.workday != workday or
+                        existing.weekday != weekday
+                    )
 
-        # Batch writes in smaller transactions of 100 records to prevent long-running write locks
-        transaction_chunk_size = 100
+                    if changed:
+                        existing.employee_name = emp_name
+                        existing.in_time = in_time
+                        existing.out_time = out_time
+                        existing.work_time = work_time
+                        existing.working_hours = working_hours
+                        existing.card_punch_ot = card_punch_ot
+                        existing.requested_ot = requested_ot
+                        existing.weekend_ot = weekend_ot
+                        existing.holiday_ot = holiday_ot
+                        existing.ot4 = ot4
+                        existing.total_ot_all = total_ot_all
+                        existing.req_overtime = req_overtime
+                        existing.approved_ot = approved_ot
+                        existing.wt_id = wt_id
+                        existing.wt_type_no = wt_type_no
+                        existing.attendance_source = attendance_source
+                        existing.day = day
+                        existing.attendance_status = attendance_status
+                        existing.shift = shift
+                        existing.mobile = mobile
+                        existing.late_minutes = late_minutes
+                        existing.leave_type = leave_type
+                        existing.workday = workday
+                        existing.weekday = weekday
+                        existing.save()
+                        updated_count += 1
+                    else:
+                        unchanged_count += 1
 
-        if to_create:
-            for i in range(0, len(to_create), transaction_chunk_size):
-                chunk = to_create[i:i + transaction_chunk_size]
-                with transaction.atomic():
-                    AttendanceRecord.objects.bulk_create(chunk, batch_size=15)
+            # Delete stale records: any DB record for this date whose employee_id
+            # was NOT returned by the latest API batch. This prevents previously
+            # synced records (now removed from the source system) from inflating
+            # aggregates like Card Punch OT.
+            if seen_employee_ids:
+                stale_ids = set(existing_records.keys()) - seen_employee_ids
+                if stale_ids:
+                    del_result = AttendanceRecord.objects.filter(
+                        attendance_date=dt, employee_id__in=stale_ids
+                    ).delete()
+                    deleted_count = del_result[0]
 
-        if to_update:
-            for i in range(0, len(to_update), transaction_chunk_size):
-                chunk = to_update[i:i + transaction_chunk_size]
-                with transaction.atomic():
-                    AttendanceRecord.objects.bulk_update(chunk, fields=update_fields, batch_size=15)
+        return created_count, updated_count, unchanged_count, deleted_count
 
-        return created_count, updated_count, unchanged_count

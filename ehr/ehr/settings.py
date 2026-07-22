@@ -69,7 +69,7 @@ USE_X_FORWARDED_HOST = True
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -91,10 +91,6 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
-        "OPTIONS": {
-            "timeout": 30,
-            "transaction_mode": "IMMEDIATE",
-        },
     }
 }
 
@@ -134,6 +130,10 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
 
 # Authentication Configuration
 LOGIN_URL = "login"
@@ -179,17 +179,6 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "simple",
         },
-        "dashboard_file": {
-            "level": "INFO",
-            "class": "logging.FileHandler",
-            "filename": str(LOGS_DIR / "dashboard.log"),
-            "formatter": "verbose",
-        },
-        "dashboard_console": {
-            "level": "INFO",
-            "class": "logging.StreamHandler",
-            "formatter": "simple",
-        },
     },
     "loggers": {
         "": {  # Root logger to capture warnings/errors from all modules/dependencies
@@ -204,11 +193,6 @@ LOGGING = {
         "py.warnings": {
             "handlers": ["file"],
             "level": "WARNING",
-            "propagate": False,
-        },
-        "attendance.services.dashboard_service": {
-            "handlers": ["dashboard_file", "dashboard_console"],
-            "level": "INFO",
             "propagate": False,
         },
     },

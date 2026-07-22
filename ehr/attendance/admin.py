@@ -2,7 +2,7 @@ from django.contrib import admin
 
 # pyrefly: ignore [missing-import]
 from .models import (
-    UserProfile, LeaveRequest, OvertimeRequest, CorrectionRequest,
+    UserProfile,
     AttendanceAPIConfig, Role, Permission, RolePermission,
     OvertimeLimitConfig, Feedback, AttendanceRecord, SyncLog
 )
@@ -39,39 +39,6 @@ class UserProfileAdmin(admin.ModelAdmin):
     search_fields = ("user__username",)
 
 
-@admin.register(LeaveRequest)
-class LeaveRequestAdmin(admin.ModelAdmin):
-    list_display = (
-        "user",
-        "category",
-        "start_date",
-        "end_date",
-        "status",
-        "created_at",
-    )
-    list_filter = ("category", "status")
-    search_fields = ("user__username", "reason")
-
-
-@admin.register(OvertimeRequest)
-class OvertimeRequestAdmin(admin.ModelAdmin):
-    list_display = ("user", "date", "hours", "status", "created_at")
-    list_filter = ("status",)
-    search_fields = ("user__username", "reason")
-
-
-@admin.register(CorrectionRequest)
-class CorrectionRequestAdmin(admin.ModelAdmin):
-    list_display = (
-        "user",
-        "date",
-        "correct_in_time",
-        "correct_out_time",
-        "status",
-        "created_at",
-    )
-    list_filter = ("status",)
-    search_fields = ("user__username", "reason")
 
 
 @admin.register(Role)

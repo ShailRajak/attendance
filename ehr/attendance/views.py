@@ -1,3 +1,4 @@
+# Reload trigger for section view present check-ins alignment fix
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
@@ -10,12 +11,9 @@ from attendance.services.auth_service import (
     register_user,
     validate_signup,
 )
-from attendance.services.api_service import get_attendance_api_data
-from attendance.services.dashboard_service import get_home_dashboard_data
-from attendance.services.overtime_service import get_overtime_dashboard_data
-from attendance.services.leaves_service import get_leaves_dashboard_data
-from attendance.services.pwa_service import get_pwa_manifest, get_pwa_service_worker
-from attendance.utils.date_helpers import get_shift_start_minutes
+from attendance.services.attendance_service import get_attendance_api_data, get_home_dashboard_data
+from attendance.services.analytics_service import get_overtime_dashboard_data, get_leaves_dashboard_data
+from attendance.services.organization_service import get_pwa_manifest, get_pwa_service_worker
 
 
 @login_required
@@ -23,14 +21,22 @@ def home(request):
     """
     Home Page - Secured with login_required and shows the EHR Portals (Dashboard, Leaves, OT, Corrections, Approvals)
     """
+    # Purge any flash messages on home load to prevent duplicate alert banners
+    storage = messages.get_messages(request)
+    for m in list(storage):
+        pass
+    for s in getattr(storage, "storages", []):
+        if hasattr(s, "_queued_messages"):
+            s._queued_messages = []
+
     # Handle POST Submissions (Dashboard Filter)
     if request.method == "POST":
         action = request.POST.get("action")
 
         if action == "filter_dashboard":
             query_employee_id = request.POST.get("employee_id", "").strip()
-            start_date = request.POST.get("start_date")
-            end_date = request.POST.get("end_date")
+            start_date = request.POST.get("start_date") or request.POST.get("custom_start")
+            end_date = request.POST.get("end_date") or request.POST.get("custom_end")
             url = f"/?tab=dashboard&start_date={start_date}&end_date={end_date}"
             if query_employee_id:
                 url += f"&employee_id={query_employee_id}"
@@ -49,6 +55,7 @@ def home(request):
         end_date=end_date,
         query_employee_id=query_employee_id,
         active_tab=active_tab,
+        get_params=request.GET,
     )
 
     return render(request, "attendance/home.html", context)
@@ -207,6 +214,8 @@ def leaves_dashboard(request):
         week_num=request.GET.get("week_num"),
         year=request.GET.get("year"),
         query_employee_id=request.GET.get("employee_id"),
+        custom_start=request.GET.get("custom_start"),
+        custom_end=request.GET.get("custom_end"),
     )
     return render(request, "attendance/leaves.html", context)
 
@@ -291,8 +300,9 @@ def attendance_drilldown_api(request):
     from datetime import datetime
     from django.db import models
     from attendance.models import AttendanceRecord, OvertimeLimitConfig
-    from attendance.services.rbac_service import RBACService
-    from attendance.services.overtime_service import get_scope_overtime_summary
+    from attendance.services.auth_service import RBACService, resolve_user_role_and_section, get_expected_dtname4
+    from attendance.services.attendance_service import fetch_attendance, fetch_attendance_from_db
+    from attendance.services.analytics_service import get_scope_overtime_summary
 
     # 1. Enforce RBAC bounds and resolve user scope
     accessible_users = set(
@@ -301,6 +311,7 @@ def attendance_drilldown_api(request):
     scope = RBACService.get_scope(request.user)
     is_superuser = request.user.is_superuser
     is_supervisor = is_superuser or (scope in ("TEAM", "SECTION", "DEPARTMENT", "PLANT", "COMPANY", "ALL"))
+    role, section = resolve_user_role_and_section(request.user)
 
     # Determine target employee ID
     employee_id = request.GET.get("employee_id", "").strip()
@@ -330,30 +341,27 @@ def attendance_drilldown_api(request):
         else:
             from attendance.utils.date_helpers import get_attendance_date_range
             start_dt, _ = get_attendance_date_range()
-            start_date = start_dt.date() if isinstance(start_dt, datetime) else start_dt
+            start_date = start_dt.date()
 
         if end_date_str:
             end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
         else:
             from attendance.utils.date_helpers import get_attendance_date_range
             _, end_dt = get_attendance_date_range()
-            end_date = end_dt.date() if isinstance(end_dt, datetime) else end_dt
+            end_date = end_dt.date()
     except ValueError:
         return JsonResponse({"success": False, "error": "Invalid date format"}, status=400)
 
-    # 3. Handle overtime_level filtering (returns early)
-    from attendance.services.role_service import resolve_user_role_and_section, get_expected_dtname4
-    role, section = resolve_user_role_and_section(request.user)
-    expected_dtname4 = get_expected_dtname4(role, section, request.user.username)
-
+    # 4. Handle overtime_level filtering
     if filter_type == "overtime_level":
         ot_config = OvertimeLimitConfig.load()
         low_limit = ot_config.ot_low_limit
         medium_limit = ot_config.ot_medium_limit
+
+        expected_dtname4 = get_expected_dtname4(role, section, request.user.username)
         is_all_scope = is_superuser or scope == "ALL"
 
         scope_summary = get_scope_overtime_summary(
-            request.user,
             accessible_usernames=accessible_users,
             start_date=start_date_str,
             end_date=end_date_str,
@@ -380,175 +388,53 @@ def attendance_drilldown_api(request):
             "records": filtered_employees
         })
 
-    # 4. Fetch attendance data from centralized service
-    from attendance.services.attendance_service import get_attendance
-    from attendance.management.commands.sync_attendance import safe_float
-    from datetime import date
+    # 3. Base Fetching: Fetch raw records as dicts depending on role
+    if role.lower() in ("own", "employee"):
+        raw_records = fetch_attendance(target_emp_id, start_date_str, end_date_str)
+    else:
+        raw_records = fetch_attendance_from_db(target_emp_id, start_date_str, end_date_str)
 
-    section_param = request.GET.get("section", "").strip()
-    fetch_emp_id = target_emp_id if target_emp_id else ""
-    attendance = get_attendance(request.user, fetch_emp_id, start_date, end_date)
-
-    from attendance.models import UserProfile
-    emp_ids = {r.get("Employee ID") for r in attendance if r.get("Employee ID")}
-    if target_emp_id:
-        emp_ids.add(target_emp_id)
-    profiles = {
-        p.user.username: p
-        for p in UserProfile.objects.filter(user__username__in=emp_ids).select_related("department", "section")
-    }
-
-    # Filter by scope & section code
-    filtered_records = []
-    for r in attendance:
-        from attendance.services.analytics_service import parse_date
-        date_str = r.get("Date", "")
-        date_obj = parse_date(date_str)
-        if not date_obj:
-            continue
-        if not (start_date <= date_obj.date() <= end_date):
-            continue
-
-        emp_id = r.get("Employee ID")
-
-        # Apply scope filters
-        if not is_superuser and scope != "ALL":
-            if scope == "OWN":
-                if emp_id != request.user.username:
-                    continue
-            else:
-                if expected_dtname4:
-                    if r.get("Day") != expected_dtname4:
-                        continue
-                else:
-                    if emp_id not in accessible_users:
-                        continue
-
-        # Filter by section code if provided (for superuser ONLY)
-        if section_param and is_superuser:
-            day_val = str(r.get("Day") or "").lower()
-            if section_param == "s63":
-                if not ("sector 63" in day_val or "s63" in day_val):
-                    continue
-            elif section_param == "c39":
-                if not ("phase 2" in day_val or "c39" in day_val):
-                    continue
-
-        # Apply employee filter if requested and permitted
-        if target_emp_id and emp_id != target_emp_id:
-            continue
-
-        filtered_records.append(r)
-
-    # 5. Handle standard filters in Python
-    final_records = []
-    for record in filtered_records:
-        date_str = record.get("Date", "")
-        from attendance.services.analytics_service import parse_date
-        date_obj = parse_date(date_str)
-
-        in_time = record.get("In Time", "").strip()
-        out_time = record.get("Out Time", "").strip()
-        working_hours = safe_float(record.get("Working Hours"))
-        late_minutes = safe_float(record.get("Late Minutes"))
-        leave_type = record.get("Leave Type", "")
-        attendance_status = record.get("Attendance Status", "")
-
-        has_in = bool(in_time) and in_time not in ("00:00", "—", "")
-        has_out = bool(out_time) and out_time not in ("00:00", "—", "")
-        is_weekend = date_obj and date_obj.weekday() == 6 if date_obj else False
-        is_holiday = (
-            date_obj.year == 2026 and date_obj.month == 7 and date_obj.day == 1
-            if date_obj
-            else False
-        )
-        is_today = date_obj and date_obj.date() == datetime.now().date()
-        is_late = late_minutes > 0.0
-
-        if is_holiday:
-            if not has_in and not has_out:
-                computed_status = "Holiday"
-            else:
-                computed_status = "Present"
-        elif is_today and has_in and not is_late and not has_out:
-            computed_status = "Present"
-        elif (has_in and not has_out) or (has_out and not has_in):
-            computed_status = "Mispunch"
-        elif not has_in and not has_out:
-            if is_weekend:
-                computed_status = "Rest Day"
-            else:
-                computed_status = "Absent"
+    # Apply RBAC filtering on raw records
+    if not is_superuser and scope != "ALL":
+        if scope == "OWN":
+            raw_records = [r for r in raw_records if r.get("Employee ID") == request.user.username]
         else:
-            if working_hours >= 8.0:
-                computed_status = "Present"
+            expected_dtname4 = get_expected_dtname4(role, section, request.user.username)
+            if expected_dtname4:
+                raw_records = [r for r in raw_records if r.get("Day") == expected_dtname4]
             else:
-                computed_status = "CL(0.5d)"
+                raw_records = [r for r in raw_records if r.get("Employee ID") in accessible_users]
 
-        if filter_type == "date":
-            if len(filter_value) == 5:
-                filter_value_parsed = f"{start_date.year}-{filter_value}"
-            else:
-                filter_value_parsed = filter_value
-            try:
-                target_date = datetime.strptime(filter_value_parsed, "%Y-%m-%d").date()
-                if not date_obj or date_obj.date() != target_date:
-                    continue
-            except ValueError:
-                return JsonResponse({"success": False, "error": "Invalid date value"}, status=400)
+    # Filter by section code if provided (for admin/superuser ONLY)
+    section_param = request.GET.get("section", "").strip()
+    is_admin = is_superuser or role == "admin"
+    if section_param and is_admin:
+        if section_param == "s63":
+            raw_records = [
+                r for r in raw_records 
+                if "sector 63" in (r.get("Day") or "").lower() or "s63" in (r.get("Day") or "").lower()
+            ]
+        elif section_param == "c39":
+            raw_records = [
+                r for r in raw_records 
+                if "phase 2" in (r.get("Day") or "").lower() or "c39" in (r.get("Day") or "").lower()
+            ]
 
-        elif filter_type == "attendance_status":
-            if filter_value == "Present":
-                if computed_status != "Present":
-                    continue
-            elif filter_value in ["Leaves", "Absent"]:
-                if not (not has_in and (date_obj and date_obj.weekday() != 6)):
-                    continue
-            elif filter_value == "Rest Days":
-                if not (not has_in and (date_obj and (date_obj.weekday() == 6 or (date_obj.year == 2026 and date_obj.month == 7 and date_obj.day == 1)))):
-                    continue
-            elif filter_value == "Mispunches":
-                if computed_status != "Mispunch":
-                    continue
-            elif filter_value == "CL(0.5d)":
-                if computed_status != "CL(0.5d)":
-                    continue
-            else:
-                if attendance_status != filter_value:
-                    continue
+    # Apply employee filter if requested
+    if target_emp_id:
+        raw_records = [r for r in raw_records if r.get("Employee ID") == target_emp_id]
 
-        elif filter_type == "late":
-            if late_minutes <= 0:
-                continue
-
-        elif filter_type == "leave_type":
-            if leave_type != filter_value:
-                continue
-
-        elif filter_type == "department" or filter_type == "section":
-            emp_id = record.get("Employee ID")
-            org_path = "—"
-            p = profiles.get(emp_id)
-            if p:
-                if p.section:
-                    org_path = p.section.name
-                elif p.department:
-                    org_path = p.department.name
-            else:
-                org_path = record.get("Day", "—")
-            if org_path != filter_value:
-                continue
-
-        final_records.append(record)
-
-    # Sort final_records: ascending by employee_id, then descending by date
-    final_records.sort(key=lambda r: r.get("Employee ID", ""))
+    # Sort descending by date
+    # Raw record date format: DD-MM-YYYY
     from attendance.services.analytics_service import parse_date
-    final_records.sort(key=lambda r: parse_date(r.get("Date")) or date(1970, 1, 1), reverse=True)
+    def get_record_date(r):
+        dt = parse_date(r.get("Date", ""))
+        return dt.date() if dt else datetime.min.date()
 
-    # Map to structured dictionary representation matching dashboard layout
+    raw_records.sort(key=get_record_date, reverse=True)
+
     formatted_records = []
-    for record in final_records:
+    for record in raw_records:
         in_time = record.get("In Time", "").strip()
         if in_time in ("00:00", ""):
             in_time = "—"
@@ -582,53 +468,36 @@ def attendance_drilldown_api(request):
             ot_hrs = "—"
 
         date_str = record.get("Date", "")
-        from attendance.services.analytics_service import parse_date
         date_obj = parse_date(date_str)
         if date_obj:
             date_display = date_obj.strftime("%d/%m/%Y")
             day_name = date_obj.strftime("%A")
             is_weekend = date_obj.weekday() == 6
+            date_val = date_obj.date()
         else:
             date_display = date_str
             day_name = "—"
             is_weekend = False
+            date_val = None
 
         is_holiday = (
-            date_obj.year == 2026 and date_obj.month == 7 and date_obj.day == 1
-            if date_obj
-            else False
+            date_val and date_val.year == 2026 and date_val.month == 7 and date_val.day == 1
         )
-        # Calculate late minutes dynamically using the helper function
-        late_minutes = 0.0
-        if has_in and ":" in in_time:
-            try:
-                h, m = map(int, in_time.split(":"))
-                wt_id = record.get("WT ID") or record.get("WTID")
-                shift_raw = str(record.get("Shift") or "").strip()
-                is_night_shift = "Night" in shift_raw
-                shift_start = get_shift_start_minutes(wt_id, is_night_shift, in_time)
-                if h * 60 + m > shift_start:
-                    late_minutes = float((h * 60 + m) - shift_start)
-            except Exception:
-                pass
-        if late_minutes == 0:
-            try:
-                late_minutes = float(record.get("Late Minutes") or 0.0)
-            except Exception:
-                late_minutes = 0.0
+        is_today = date_val and date_val == datetime.now().date()
 
-        is_today = date_obj and date_obj.date() == datetime.now().date()
-        is_late = late_minutes > 0.0
+        has_in = bool(in_time) and in_time != "—"
+        has_out = bool(out_time) and out_time != "—"
 
         if is_holiday:
             if not has_in and not has_out:
                 status = "Holiday"
             else:
                 status = "Present"
-        elif is_today and has_in and not is_late and not has_out:
-            status = "Present"
         elif (has_in and not has_out) or (has_out and not has_in):
-            status = "Mispunch"
+            if is_today:
+                status = "Present"
+            else:
+                status = "Mispunch"
         elif not has_in and not has_out:
             if is_weekend:
                 status = "Rest Day"
@@ -648,14 +517,58 @@ def attendance_drilldown_api(request):
 
         emp_id = record.get("Employee ID")
         org_path = "—"
-        p = profiles.get(emp_id)
-        if p:
+        from attendance.models import UserProfile
+        try:
+            p = UserProfile.objects.select_related("department", "section").get(user__username=emp_id)
             if p.section:
                 org_path = p.section.name
             elif p.department:
                 org_path = p.department.name
-        else:
+        except UserProfile.DoesNotExist:
             org_path = record.get("Day", "—")
+
+        # Apply target filters here
+        if filter_type == "date":
+            try:
+                target_date = datetime.strptime(filter_value, "%Y-%m-%d").date()
+            except ValueError:
+                target_date = None
+            if date_val != target_date:
+                continue
+
+        elif filter_type == "attendance_status":
+            if filter_value in ("Leaves", "Absent"):
+                if status not in ("Leaves", "Absent"):
+                    continue
+            elif filter_value == "Rest Days":
+                if status not in ("Rest Day", "Holiday"):
+                    continue
+            elif filter_value == "Mispunches":
+                if status != "Mispunch":
+                    continue
+            else:
+                if status != filter_value:
+                    continue
+
+        elif filter_type == "late":
+            try:
+                late_val = float(record.get("Late Minutes") or 0.0)
+            except (ValueError, TypeError):
+                late_val = 0.0
+            if late_val <= 0:
+                continue
+
+        elif filter_type == "leave_type":
+            if record.get("Leave Type") != filter_value:
+                continue
+
+        elif filter_type == "department":
+            if org_path != filter_value:
+                continue
+
+        elif filter_type == "section":
+            if org_path != filter_value:
+                continue
 
         formatted_records.append(
             {
@@ -671,8 +584,11 @@ def attendance_drilldown_api(request):
                 "employee_name": record.get("Employee Name", "—"),
                 "department": org_path,
                 "shift_label": shift_label,
-                "late_minutes": late_minutes,
-                "wt_id": record.get("WT ID") or record.get("WTID"),
+                "Card Punch OT": record.get("Card Punch OT", "0.0"),
+                "Requested OT": record.get("Requested OT", "0.0"),
+                "Weekend OT": record.get("Weekend OT", "0.0"),
+                "Holiday OT": record.get("Holiday OT", "0.0"),
+                "Total OT All": record.get("Total OT All", "0.0"),
             }
         )
 

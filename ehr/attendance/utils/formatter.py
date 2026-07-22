@@ -11,6 +11,7 @@ REQUIRED_COLUMNS = {
     "GO1": "In Time",
     "OUT1": "Out Time",
     "WorkTime1": "Working Hours",
+    "WorkTime": "Work Time",
     "OverTime": "Card Punch OT",
     "OverTime1": "Requested OT",
     "OverTime2": "Weekend OT",

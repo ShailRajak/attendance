@@ -1,0 +1,662 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Leaves Dashboard | EHR Portal{% endblock %}
+
+{% block content %}
+<style>
+    .leaves-stat-card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-left: 4px solid var(--text-muted); /* Fallback */
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+        min-height: 125px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+    .leaves-stat-card:hover {
+        transform: translateY(-3px) scale(1.01);
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+    .leaves-stat-card.card-mispunch {
+        border-left-color: #ef4444 !important;
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.03) 0%, var(--card-bg) 100%);
+    }
+    .leaves-stat-card.card-mispunch:hover {
+        border-color: rgba(239, 68, 68, 0.3);
+        box-shadow: 0 10px 20px -10px rgba(239, 68, 68, 0.25);
+    }
+    .leaves-stat-card.card-absent {
+        border-left-color: #f43f5e !important;
+        background: linear-gradient(135deg, rgba(244, 63, 94, 0.03) 0%, var(--card-bg) 100%);
+    }
+    .leaves-stat-card.card-absent:hover {
+        border-color: rgba(244, 63, 94, 0.3);
+        box-shadow: 0 10px 20px -10px rgba(244, 63, 94, 0.25);
+    }
+    .leaves-stat-card.card-short {
+        border-left-color: #f59e0b !important;
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.03) 0%, var(--card-bg) 100%);
+    }
+    .leaves-stat-card.card-short:hover {
+        border-color: rgba(245, 158, 11, 0.3);
+        box-shadow: 0 10px 20px -10px rgba(245, 158, 11, 0.25);
+    }
+    .leaves-stat-card.card-half {
+        border-left-color: #0ea5e9 !important;
+        background: linear-gradient(135deg, rgba(14, 165, 233, 0.03) 0%, var(--card-bg) 100%);
+    }
+    .leaves-stat-card.card-half:hover {
+        border-color: rgba(14, 165, 233, 0.3);
+        box-shadow: 0 10px 20px -10px rgba(14, 165, 233, 0.25);
+    }
+    .leaves-stat-card.card-full {
+        border-left-color: #10b981 !important;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, var(--card-bg) 100%);
+    }
+    .leaves-stat-card.card-full:hover {
+        border-color: rgba(16, 185, 129, 0.3);
+        box-shadow: 0 10px 20px -10px rgba(16, 185, 129, 0.25);
+    }
+</style>
+
+<!-- Page Header -->
+<div class="row mb-4 align-items-center fade-in-el">
+    <div class="col-12">
+        <h3 class="mb-1 fw-bold text-white">Leaves Analytics</h3>
+        <p class="text-muted small mb-0">Period: {{ start_date }} to {{ end_date }}</p>
+    </div>
+</div>
+
+{% if role != 'own' and role != 'employee' %}
+<!-- Employee Search Collapse -->
+<div class="collapse mb-4" id="empSearchCollapse">
+    <div class="card-custom">
+        <h5 class="fw-semibold mb-3 text-white">Search by Employee ID</h5>
+        <form method="GET" class="row g-3">
+            {% if period %}
+            <input type="hidden" name="period" value="{{ period }}">
+            {% endif %}
+            {% if request.GET.year %}
+            <input type="hidden" name="year" value="{{ request.GET.year }}">
+            {% endif %}
+            {% if request.GET.cycle_num %}
+            <input type="hidden" name="cycle_num" value="{{ request.GET.cycle_num }}">
+            {% endif %}
+            {% if request.GET.week_num %}
+            <input type="hidden" name="week_num" value="{{ request.GET.week_num }}">
+            {% endif %}
+            {% if request.GET.custom_start %}
+            <input type="hidden" name="custom_start" value="{{ request.GET.custom_start }}">
+            {% endif %}
+            {% if request.GET.custom_end %}
+            <input type="hidden" name="custom_end" value="{{ request.GET.custom_end }}">
+            {% endif %}
+            <div class="col-12 col-md-9">
+                <label for="employee_id" class="form-label-custom">Employee ID</label>
+                <input type="text" id="employee_id" name="employee_id" class="form-control form-control-custom w-100" 
+                    value="{{ request.GET.employee_id|default:'' }}" placeholder="Enter employee ID (e.g. S2070030)">
+            </div>
+            <div class="col-12 col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-accent w-100 py-3">Search</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- Period Dropdown CSS -->
+<style>
+    .period-btn {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--card-border);
+        color: var(--text-muted);
+        padding: 0.5rem 1.25rem;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 0.85rem;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        position: relative;
+    }
+
+    .period-btn:hover {
+        color: var(--text-main);
+        background: rgba(255, 255, 255, 0.06);
+    }
+
+    .period-toggle {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 1.5rem;
+        position: relative;
+    }
+
+    .period-btn.active {
+        background: transparent;
+        color: var(--text-main);
+        border-color: var(--text-main);
+        font-weight: 600;
+    }
+
+    .dropdown-toggle::after {
+        content: ' ▼';
+        font-size: 0.7rem;
+        margin-left: 4px;
+    }
+
+    .period-dropdown {
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.03);
+        overflow: visible;
+        height: 38px;
+        border: 1px solid var(--card-border);
+    }
+
+    .period-dropdown.active {
+        border-color: var(--text-main);
+    }
+
+    .period-dropdown-link {
+        font-size: 0.85rem;
+        height: 100%;
+        transition: all 0.2s;
+        border-top-left-radius: 7px;
+        border-bottom-left-radius: 7px;
+        color: var(--text-muted);
+        font-weight: 500;
+        border-right: 1px solid var(--card-border);
+    }
+
+    .period-dropdown-link:hover {
+        background: rgba(255, 255, 255, 0.06) !important;
+    }
+
+    .period-dropdown-link.active {
+        color: var(--text-main);
+        font-weight: 600;
+        border-right-color: var(--text-main);
+    }
+
+    .period-dropdown-toggle {
+        background: none;
+        border: none;
+        height: 100%;
+        font-size: 0.7rem;
+        transition: all 0.2s;
+        border-top-right-radius: 7px;
+        border-bottom-right-radius: 7px;
+        color: var(--text-muted);
+    }
+
+    .period-dropdown-toggle:hover {
+        background: rgba(255, 255, 255, 0.06) !important;
+    }
+
+    .period-dropdown-toggle.active {
+        color: var(--text-main);
+    }
+</style>
+
+<!-- Period Selection Row -->
+<div class="row mb-4 fade-in-el" style="position: relative; z-index: 100;">
+    <div class="col-12">
+        <div class="period-toggle">
+            <!-- Daily button -->
+            <a href="?period=daily{% if request.GET.employee_id %}&employee_id={{ request.GET.employee_id }}{% endif %}"
+                class="period-btn {% if period == 'daily' %}active{% endif %}">
+                📅 Daily
+            </a>
+
+            <!-- Weekly button -->
+            <div
+                class="dropdown d-flex align-items-center period-dropdown{% if period == 'weekly' %} active{% endif %}">
+                <!-- Main link button -->
+                <a href="?period=weekly{% if request.GET.employee_id %}&employee_id={{ request.GET.employee_id }}{% endif %}"
+                    class="px-3 text-decoration-none d-flex align-items-center gap-2 period-dropdown-link{% if period == 'weekly' %} active{% endif %}">
+                    📊 Weekly
+                </a>
+                <!-- Dropdown toggle arrow -->
+                <button
+                    class="px-2 d-flex align-items-center justify-content-center period-dropdown-toggle{% if period == 'weekly' %} active{% endif %}"
+                    type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                    ▼
+                </button>
+                <div class="dropdown-menu custom-dropdown p-3 bg-dark border-secondary"
+                    style="min-width: 320px; z-index: 999999;">
+                    <h6 class="dropdown-header text-white px-0">Select Week</h6>
+                    <form method="GET">
+                        <input type="hidden" name="period" value="weekly">
+                        {% if request.GET.employee_id %}
+                        <input type="hidden" name="employee_id" value="{{ request.GET.employee_id }}">
+                        {% endif %}
+                        <div class="mb-3">
+                            <label class="form-label text-muted small mb-1">Year</label>
+                            <select name="year" class="form-select bg-dark text-white border-secondary">
+                                <option value="{{ current_year }}" selected>{{ current_year }}</option>
+                                <option value="{{ current_year|add:'-1' }}">{{ current_year|add:'-1' }}</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small mb-1">Week</label>
+                            <select name="week_num" class="form-select bg-dark text-white border-secondary"
+                                style="max-height: 200px; overflow-y: auto;">
+                                {% for week in all_weeks %}
+                                <option value="{{ week.week_num }}" {% if selected_week == week.week_num|stringformat:"s" %}selected{% endif %}>{{ week.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Apply Week</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Monthly button -->
+            <div
+                class="dropdown d-flex align-items-center period-dropdown{% if period == 'monthly' %} active{% endif %}">
+                <!-- Main link button -->
+                <a href="?period=monthly{% if request.GET.employee_id %}&employee_id={{ request.GET.employee_id }}{% endif %}"
+                    class="px-3 text-decoration-none d-flex align-items-center gap-2 period-dropdown-link{% if period == 'monthly' %} active{% endif %}">
+                    💰 Monthly Cycle (21-20)
+                </a>
+                <!-- Dropdown toggle arrow -->
+                <button
+                    class="px-2 d-flex align-items-center justify-content-center period-dropdown-toggle{% if period == 'monthly' %} active{% endif %}"
+                    type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                    ▼
+                </button>
+                <div class="dropdown-menu custom-dropdown p-3 bg-dark border-secondary"
+                    style="min-width: 320px; max-height: 80vh; overflow-y: auto; z-index: 999999;">
+                    <h6 class="dropdown-header text-white px-0">Select Billing Cycle (21-20)</h6>
+                    <form method="GET">
+                        <input type="hidden" name="period" value="monthly">
+                        {% if request.GET.employee_id %}
+                        <input type="hidden" name="employee_id" value="{{ request.GET.employee_id }}">
+                        {% endif %}
+                        <div class="mb-3">
+                            <label class="form-label text-muted small mb-1">Year</label>
+                            <select name="year" class="form-select bg-dark text-white border-secondary">
+                                <option value="{{ current_year }}" selected>{{ current_year }}</option>
+                                <option value="{{ current_year|add:'-1' }}">{{ current_year|add:'-1' }}</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small mb-1">Billing Cycle</label>
+                            <select name="cycle_num" class="form-select bg-dark text-white border-secondary"
+                                style="max-height: 200px; overflow-y: auto;">
+                                {% for cycle in all_cycles %}
+                                <option value="{{ cycle.cycle_num }}" {% if selected_cycle == cycle.cycle_num|stringformat:"s" %}selected{% endif %}>{{ cycle.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Apply Cycle</button>
+                    </form>
+                </div>
+            </div>
+            <!-- Custom Range button -->
+            <button type="button" class="period-btn {% if period == 'custom' %}active{% endif %}" data-bs-toggle="collapse" data-bs-target="#customRangeCollapse" aria-expanded="{% if period == 'custom' %}true{% else %}false{% endif %}" aria-controls="customRangeCollapse">
+                📅 Custom Range
+            </button>
+
+            {% if role != 'own' and role != 'employee' %}
+            <!-- Search Employee button -->
+            <button type="button" class="period-btn" data-bs-toggle="collapse" data-bs-target="#empSearchCollapse" aria-expanded="false" aria-controls="empSearchCollapse">
+                🔍 Search Employee
+            </button>
+            {% endif %}
+        </div>
+        
+        <!-- Custom Date Range Picker (Collapsible) -->
+        <div class="collapse {% if period == 'custom' %}show{% endif %} mt-3" id="customRangeCollapse">
+            <div class="card-custom">
+                <h6 class="fw-semibold mb-3 text-white">Custom Date Range</h6>
+                <form method="GET" class="row g-3">
+                    <input type="hidden" name="period" value="custom">
+                    {% if request.GET.employee_id %}
+                    <input type="hidden" name="employee_id" value="{{ request.GET.employee_id }}">
+                    {% endif %}
+                    <div class="col-md-4">
+                        <label for="custom_start" class="form-label-custom">Start Date</label>
+                        <input type="date" id="custom_start" name="custom_start" class="form-control form-control-custom" value="{{ start_date }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="custom_end" class="form-label-custom">End Date</label>
+                        <input type="date" id="custom_end" name="custom_end" class="form-control form-control-custom" value="{{ end_date }}" required>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-accent w-100 py-2">Apply Custom Range</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% if role != 'own' and role != 'employee' %}
+        <!-- Shift and Section Filters -->
+        <div class="d-flex align-items-center gap-3 mt-3 mb-2 flex-wrap">
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+                {% if is_superuser %}
+                <div class="d-flex gap-2 me-2 border-end pe-2 border-secondary" style="border-color: rgba(255,255,255,0.1) !important;">
+                    <button type="button" id="btnS63" class="period-btn">🏢 S63</button>
+                    <button type="button" id="btnC39" class="period-btn">🏢 C39</button>
+                    <button type="button" id="btnBothSections" class="period-btn active">🏢 Both</button>
+                </div>
+                {% endif %}
+                <button type="button" id="btnDayShift" class="period-btn">☀️ Day Shift</button>
+                <button type="button" id="btnNightShift" class="period-btn">🌙 Night Shift</button>
+                <button type="button" id="btnBothShifts" class="period-btn active">☀️🌙 Both</button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Summary Cards Row -->
+<div class="row g-4 mb-5 fade-in-el">
+    <!-- Mispunches -->
+    <div class="col-xl col-md-6">
+        <div class="leaves-stat-card card-mispunch h-100 position-relative overflow-hidden">
+            <div class="position-absolute top-0 end-0 p-3 opacity-25">
+                <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path
+                        d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+            </div>
+            <h6 class="form-label-custom">MISPUNCHES</h6>
+            <h2 class="fw-bold mb-1" style="color: var(--danger-color);" id="kpiMispunches">{{ stats.mispunch }}</h2>
+            <p class="text-muted small mb-0">Missing In/Out Time</p>
+        </div>
+    </div>
+
+    <!-- Leaves -->
+    <div class="col-xl col-md-6">
+        <div class="leaves-stat-card card-absent h-100 position-relative overflow-hidden">
+            <div class="position-absolute top-0 end-0 p-3 opacity-25">
+                <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                </svg>
+            </div>
+            <h6 class="form-label-custom">ABSENT</h6>
+            <h2 class="fw-bold mb-1" style="color: var(--danger-color);" id="kpiAbsent">{{ stats.leave }}</h2>
+            <p class="text-muted small mb-0">Missing Both Punches</p>
+        </div>
+    </div>
+
+    <!-- Short Leaves -->
+    <div class="col-xl col-md-6">
+        <div class="leaves-stat-card card-short h-100 position-relative overflow-hidden">
+            <div class="position-absolute top-0 end-0 p-3 opacity-25">
+                <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                </svg>
+            </div>
+            <h6 class="form-label-custom">SHORT LEAVES</h6>
+            <h2 class="fw-bold mb-1" style="color: var(--warning-color);" id="kpiShort">{{ stats.short_leave }}</h2>
+            <p class="text-muted small mb-0">~2 hours late or early</p>
+        </div>
+    </div>
+
+    <!-- Half Days -->
+    <div class="col-xl col-md-6">
+        <div class="leaves-stat-card card-half h-100 position-relative overflow-hidden">
+            <div class="position-absolute top-0 end-0 p-3 opacity-25">
+                <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 2a10 10 0 0 1 0 20" />
+                </svg>
+            </div>
+            <h6 class="form-label-custom">HALF DAYS</h6>
+            <h2 class="fw-bold mb-1" style="color: var(--secondary-accent);" id="kpiHalf">{{ stats.half_day }}</h2>
+            <p class="text-muted small mb-0">&lt; 8.0 hours working</p>
+        </div>
+    </div>
+
+    <!-- Full Days -->
+    <div class="col-xl col-md-6">
+        <div class="leaves-stat-card card-full h-100 position-relative overflow-hidden">
+            <div class="position-absolute top-0 end-0 p-3 opacity-25">
+                <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+            </div>
+            <h6 class="form-label-custom">FULL DAYS</h6>
+            <h2 class="fw-bold mb-1" style="color: var(--success-color);" id="kpiFull">{{ stats.full_day }}</h2>
+            <p class="text-muted small mb-0">&ge; 8.0 hours working</p>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Data Table -->
+<div class="row fade-in-el">
+    <div class="col-12">
+        <div class="card-custom p-0 overflow-hidden">
+            <div class="p-4 border-bottom d-flex justify-content-between align-items-center"
+                style="border-color: var(--card-border) !important;">
+                <h5 class="mb-0 fw-semibold text-white">Attendance Detail Log</h5>
+                <span class="badge badge-custom"
+                    style="background-color: rgba(255, 255, 255, 0.05); color: var(--text-muted); border: 1px solid var(--card-border);">{{ start_date }} to {{ end_date }}</span>
+            </div>
+            <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
+                <table class="table table-custom mb-0 text-nowrap">
+                    <thead style="position: sticky; top: 0; z-index: 10; background-color: var(--card-bg);">
+                        <tr>
+                            {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
+                            <th class="ps-4">Emp ID</th>
+                            <th>Name</th>
+                            <th>Date</th>
+                            {% else %}
+                            <th class="ps-4">Date</th>
+                            {% endif %}
+                            <th>Day</th>
+                            <th>In Time</th>
+                            <th>Out Time</th>
+                            <th>Work Hours</th>
+                            <th>Classification</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leavesTableBody">
+                        {% for item in records %}
+                        <tr data-shift="{{ item.shift_label }}" data-section="{{ item.section_label }}">
+                            {% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}
+                            <td class="ps-4"><strong class="text-info">{{ item.employee_id }}</strong></td>
+                            <td>{{ item.employee_name }}</td>
+                            <td>{{ item.date }}</td>
+                            {% else %}
+                            <td class="ps-4 fw-medium">{{ item.date }}</td>
+                            {% endif %}
+                            <td>{{ item.day }}</td>
+                            <td class="{% if item.in_time == '—' %}text-danger{% endif %}">{{ item.in_time }}</td>
+                            <td class="{% if item.out_time == '—' %}text-danger{% endif %}">{{ item.out_time }}</td>
+                            <td>{{ item.working_hours }}</td>
+                            <td>
+                                {% if item.category == 'Absent' %}
+                                <span class="badge badge-custom badge-absent"
+                                    style="background-color: rgba(239, 68, 68, 0.12); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2);">{{ item.category }}</span>
+                                {% elif item.category == 'Mispunch' %}
+                                <span class="badge badge-custom badge-absent">{{ item.category }}</span>
+                                {% elif item.category == 'Short Leave' %}
+                                <span class="badge badge-custom"
+                                    style="background-color: rgba(245, 158, 11, 0.12); color: var(--warning-color); border: 1px solid rgba(245, 158, 11, 0.2);">{{ item.category }}</span>
+                                {% elif item.category == 'Half Day' %}
+                                <span class="badge badge-custom"
+                                    style="background-color: rgba(56, 189, 248, 0.12); color: var(--secondary-accent); border: 1px solid rgba(56, 189, 248, 0.2);">{{ item.category }}</span>
+                                {% else %}
+                                <span class="badge badge-custom badge-active">{{ item.category }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="{% if role == 'smt_pd' or role == 'assy_pd' or is_superuser %}8{% else %}6{% endif %}"
+                                class="text-center text-muted py-4">No records found for this period.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <!-- Pagination Controls -->
+            <div id="paginationLeavesTable"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentShift = 'both';
+    let currentSection = 'both';
+
+    function applyFilters() {
+        const tableRows = document.querySelectorAll('#leavesTableBody tr');
+        const btnDayShift = document.getElementById('btnDayShift');
+        const btnS63 = document.getElementById('btnS63');
+
+        if (!btnDayShift) return;
+
+        let count = 0;
+        let countMispunch = 0;
+        let countAbsent = 0;
+        let countShort = 0;
+        let countHalf = 0;
+        let countFull = 0;
+
+        tableRows.forEach(row => {
+            if (row.cells.length === 1 && row.cells[0].classList.contains('text-center')) {
+                return;
+            }
+            const rowShift = row.getAttribute('data-shift');
+            const rowSection = row.getAttribute('data-section');
+
+            const matchesShift = (currentShift === 'both' || rowShift === currentShift);
+            let matchesSection = true;
+            if (btnS63) {
+                matchesSection = (currentSection === 'both' || rowSection === currentSection);
+            }
+            const show = matchesShift && matchesSection;
+
+            if (show) {
+                row.classList.add('matching-filter');
+                count++;
+
+                // Retrieve classification value from classification cell
+                const cells = row.querySelectorAll('td');
+                const categoryCell = cells[cells.length - 1];
+                if (categoryCell) {
+                    const text = categoryCell.textContent.trim();
+                    if (text === 'Mispunch') countMispunch++;
+                    else if (text === 'Absent') countAbsent++;
+                    else if (text === 'Short Leave') countShort++;
+                    else if (text === 'Half Day') countHalf++;
+                    else if (text === 'Full Day') countFull++;
+                }
+            } else {
+                row.classList.remove('matching-filter');
+            }
+        });
+
+        // Update paginator
+        if (window.leavesTablePaginator) {
+            window.leavesTablePaginator.update();
+        }
+
+        // Update counts
+        const elMispunch = document.getElementById('kpiMispunches');
+        const elAbsent = document.getElementById('kpiAbsent');
+        const elShort = document.getElementById('kpiShort');
+        const elHalf = document.getElementById('kpiHalf');
+        const elFull = document.getElementById('kpiFull');
+
+        if (elMispunch) elMispunch.textContent = countMispunch;
+        if (elAbsent) elAbsent.textContent = countAbsent;
+        if (elShort) elShort.textContent = countShort;
+        if (elHalf) elHalf.textContent = countHalf;
+        if (elFull) elFull.textContent = countFull;
+
+        // Update button visual styles
+        const btnNightShift = document.getElementById('btnNightShift');
+        const btnBothShifts = document.getElementById('btnBothShifts');
+        if (btnDayShift && btnNightShift && btnBothShifts) {
+            btnDayShift.className = currentShift === 'day' ? 'period-btn active' : 'period-btn';
+            btnNightShift.className = currentShift === 'night' ? 'period-btn active' : 'period-btn';
+            btnBothShifts.className = currentShift === 'both' ? 'period-btn active' : 'period-btn';
+        }
+
+        const btnC39 = document.getElementById('btnC39');
+        const btnBothSections = document.getElementById('btnBothSections');
+        if (btnS63 && btnC39 && btnBothSections) {
+            btnS63.className = currentSection === 's63' ? 'period-btn active' : 'period-btn';
+            btnC39.className = currentSection === 'c39' ? 'period-btn active' : 'period-btn';
+            btnBothSections.className = currentSection === 'both' ? 'period-btn active' : 'period-btn';
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const tbody = document.getElementById('leavesTableBody');
+        const pagination = document.getElementById('paginationLeavesTable');
+        if (tbody && pagination) {
+            window.leavesTablePaginator = new TablePaginator(tbody, pagination, 10);
+        }
+
+        // Bind global filter buttons
+        const btnDayShift = document.getElementById('btnDayShift');
+        const btnNightShift = document.getElementById('btnNightShift');
+        const btnS63 = document.getElementById('btnS63');
+        const btnC39 = document.getElementById('btnC39');
+
+        if (btnDayShift) {
+            btnDayShift.addEventListener('click', function () {
+                currentShift = 'day';
+                applyFilters();
+            });
+        }
+        if (btnNightShift) {
+            btnNightShift.addEventListener('click', function () {
+                currentShift = 'night';
+                applyFilters();
+            });
+        }
+        const btnBothShifts = document.getElementById('btnBothShifts');
+        if (btnBothShifts) {
+            btnBothShifts.addEventListener('click', function () {
+                currentShift = 'both';
+                applyFilters();
+            });
+        }
+        if (btnS63) {
+            btnS63.addEventListener('click', function () {
+                currentSection = 's63';
+                applyFilters();
+            });
+        }
+        if (btnC39) {
+            btnC39.addEventListener('click', function () {
+                currentSection = 'c39';
+                applyFilters();
+            });
+        }
+        const btnBothSections = document.getElementById('btnBothSections');
+        if (btnBothSections) {
+            btnBothSections.addEventListener('click', function () {
+                currentSection = 'both';
+                applyFilters();
+            });
+        }
+
+        // Apply filters on load
+        applyFilters();
+    });
+</script>
+{% endblock %}

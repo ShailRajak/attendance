@@ -1,0 +1,136 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}
+    {% if user.is_superuser %}Employee Feedbacks{% else %}Submit Feedback{% endif %} | EHR Portal
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="row mb-4 align-items-center fade-in-el">
+    <div class="col-md-6">
+        {% if user.is_superuser %}
+        <h3 class="mb-1 fw-bold text-white">Employee Feedbacks</h3>
+        <p class="text-muted small mb-0">Viewing all submitted feedback across the enterprise</p>
+        {% else %}
+        <h3 class="mb-1 fw-bold text-white">Share Your Feedback</h3>
+        <p class="text-muted small mb-0">Help us improve your workspace experience</p>
+        {% endif %}
+    </div>
+</div>
+
+{% if user.is_superuser %}
+<!-- Superuser view: List all feedbacks -->
+<div class="row fade-in-el">
+    <div class="col-12">
+        <div class="card-custom p-4">
+            <h4 class="text-white fw-semibold mb-4 d-flex align-items-center gap-2">
+                <span>💬</span> Feedback Messages ({{ feedbacks.count }})
+            </h4>
+
+            {% if feedbacks %}
+            <div class="table-responsive">
+                <table class="table table-custom align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 15%">Employee ID</th>
+                            <th style="width: 20%">Plant Location</th>
+                            <th style="width: 45%">Feedback Details</th>
+                            <th style="width: 20%">Submitted Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="feedbackTableBody">
+                        {% for f in feedbacks %}
+                        <tr>
+                            <td>
+                                <strong class="text-info">{{ f.employee_id }}</strong>
+                            </td>
+                            <td>
+                                {% if f.plant == 'S63' %}
+                                <span class="badge-custom" style="background-color: rgba(56, 189, 248, 0.12); color: var(--secondary-accent); border: 1px solid rgba(56, 189, 248, 0.2);">Sector 63 (S63)</span>
+                                {% elif f.plant == 'C39' %}
+                                <span class="badge-custom" style="background-color: rgba(99, 102, 241, 0.12); color: var(--primary-accent); border: 1px solid rgba(99, 102, 241, 0.2);">Phase 2 (C39)</span>
+                                {% else %}
+                                <span class="badge-custom bg-secondary text-white">{{ f.plant }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                 <div style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.5;">{{ f.feedback }}</div>
+                            </td>
+                            <td class="text-muted small">
+                                {{ f.date|date:"d/m/Y H:i" }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div id="paginationFeedbackTable"></div>
+            {% else %}
+            <div class="text-center py-5">
+                <span class="fs-1">📭</span>
+                <p class="text-muted mt-3">No feedback submissions found yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- Employee view: Submit feedback form -->
+<div class="row justify-content-center fade-in-el">
+    <div class="col-12 col-md-8 col-lg-6">
+        <div class="card-custom p-4 p-md-5">
+            <h4 class="text-white fw-semibold mb-4 d-flex align-items-center gap-2">
+                <span>💬</span> Submit Feedback
+            </h4>
+
+            <form method="POST" action="{% url 'feedback' %}">
+                {% csrf_token %}
+
+                <!-- Employee ID (Disabled) -->
+                <div class="mb-4">
+                    <label class="form-label text-muted small fw-semibold uppercase mb-2" style="font-size: 0.75rem; letter-spacing: 0.5px;">Employee ID</label>
+                    <input type="text" class="form-control-custom w-100" value="{{ employee_id }}" disabled readonly style="background: rgba(255, 255, 255, 0.02); opacity: 0.7; border-color: rgba(255, 255, 255, 0.08);">
+                    <div class="form-text text-muted small mt-1" style="font-size: 0.7rem; opacity: 0.8;">Submitted under your unique ID.</div>
+                </div>
+
+                <!-- Plant Selection -->
+                <div class="mb-4">
+                    <label for="plant" class="form-label text-muted small fw-semibold uppercase mb-2" style="font-size: 0.75rem; letter-spacing: 0.5px;">Plant Location</label>
+                    <select id="plant" name="plant" class="form-select form-control-custom w-100" style="background-color: rgba(21, 28, 44, 0.7); border: 1.5px solid var(--card-border); color: var(--text-main); height: 45px; border-radius: 8px;">
+                        <option value="S63" {% if default_plant == 'S63' %}selected{% endif %}>Sector 63 (S63)</option>
+                        <option value="C39" {% if default_plant == 'C39' %}selected{% endif %}>Phase 2 (C39)</option>
+                    </select>
+                </div>
+
+                <!-- Feedback Text -->
+                <div class="mb-4">
+                    <label for="feedback" class="form-label text-muted small fw-semibold uppercase mb-2" style="font-size: 0.75rem; letter-spacing: 0.5px;">Feedback / Suggestions</label>
+                    <textarea id="feedback" name="feedback" rows="6" class="form-control-custom w-100" placeholder="Type your feedback here..." required style="border-radius: 8px;"></textarea>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-flex align-items-center justify-content-end gap-3 mt-5">
+                    <a href="{% url 'home' %}" class="btn btn-outline-secondary px-4 py-2" style="border-radius: 8px; border: 1.5px solid var(--card-border); color: var(--text-muted);">Cancel</a>
+                    <button type="submit" class="btn btn-primary px-4 py-2" style="background-color: var(--primary-accent); border: none; border-radius: 8px; font-weight: 500;">
+                        Submit Feedback
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if user.is_superuser %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const tbody = document.getElementById('feedbackTableBody');
+        const pagination = document.getElementById('paginationFeedbackTable');
+        if (tbody && pagination) {
+            new TablePaginator(tbody, pagination, 10);
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

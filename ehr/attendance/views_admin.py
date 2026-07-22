@@ -8,13 +8,9 @@ from django.http import JsonResponse
 from django.db import transaction
 
 from attendance.models import Role, Section, Permission, UserProfile, Company, Plant, Department, Team, AuditLog
-from attendance.services.rbac_service import RBACService
-from attendance.services.role_service import RoleService
-from attendance.services.section_service import SectionService
-from attendance.services.user_service import UserService
-from attendance.services.permission_service import PermissionService
-from attendance.services.audit_service import AuditService
-from attendance.services.import_service import ImportService
+from attendance.services.auth_service import RBACService, RoleService, UserService, PermissionService, AuditService
+from attendance.services.organization_service import SectionService, ImportService
+
 
 
 def admin_permission_required(perm_code=None):

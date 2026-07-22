@@ -1,5 +1,5 @@
 from django import template
-from attendance.services.rbac_service import RBACService
+from attendance.services.auth_service import RBACService
 
 register = template.Library()
 

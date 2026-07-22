@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
 from attendance.models import Role, Section, Permission, RolePermission, UserProfile
-from attendance.services.rbac_service import RBACService
+from attendance.services.auth_service import RBACService
 
 
 class RBACSystemTests(TestCase):
@@ -359,10 +359,31 @@ class AttendanceSyncTests(TestCase):
 
 
 class AttendanceDrilldownTests(TestCase):
+    def mock_fetch_attendance(self, employee_id, start_date, end_date):
+        from attendance.models import AttendanceRecord
+        from datetime import datetime, date
+        if isinstance(start_date, str):
+            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+        elif isinstance(start_date, datetime):
+            start_date = start_date.date()
+        if isinstance(end_date, str):
+            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+        elif isinstance(end_date, datetime):
+            end_date = end_date.date()
+
+        qs = AttendanceRecord.objects.filter(attendance_date__range=(start_date, end_date))
+        if employee_id:
+            qs = qs.filter(employee_id=employee_id)
+        return [r.to_dict() for r in qs]
+
     def setUp(self):
         from django.contrib.auth.models import User
         from attendance.models import Role, UserProfile, Section, AttendanceRecord
         from datetime import date
+        from unittest.mock import patch
+
+        self.fetch_patcher = patch("attendance.services.attendance_service.fetch_attendance", side_effect=self.mock_fetch_attendance)
+        self.mock_fetch = self.fetch_patcher.start()
 
         # Setup standard roles/sections
         self.role_employee = Role.objects.get(code="employee")
@@ -409,16 +430,14 @@ class AttendanceDrilldownTests(TestCase):
             day="Sector 63 - SMT PD"
         )
 
+    def tearDown(self):
+        self.fetch_patcher.stop()
+
     def test_unauthenticated_user_denied(self):
         response = self.client.get("/api/attendance/chart-drilldown/")
         self.assertEqual(response.status_code, 302)
 
-    @patch("attendance.services.attendance_service.get_attendance")
-    def test_employee_cannot_see_other_data(self, mock_get_attendance):
-        from attendance.models import AttendanceRecord
-        mock_get_attendance.return_value = [
-            r.to_dict() for r in AttendanceRecord.objects.filter(employee_id="emp456")
-        ]
+    def test_employee_cannot_see_other_data(self):
         self.client.login(username="emp456", password="password")
         
         response = self.client.get("/api/attendance/chart-drilldown/", {
@@ -457,12 +476,7 @@ class AttendanceDrilldownTests(TestCase):
         self.assertEqual(data["count"], 1)
         self.assertEqual(data["records"][0]["employee_id"], "sup456")
 
-    @patch("attendance.services.attendance_service.get_attendance")
-    def test_drilldown_filtering_date(self, mock_get_attendance):
-        from attendance.models import AttendanceRecord
-        mock_get_attendance.return_value = [
-            r.to_dict() for r in AttendanceRecord.objects.filter(employee_id="emp456")
-        ]
+    def test_drilldown_filtering_date(self):
         self.client.login(username="emp456", password="password")
         
         response = self.client.get("/api/attendance/chart-drilldown/", {

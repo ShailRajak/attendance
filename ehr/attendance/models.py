@@ -146,64 +146,7 @@ class AuditLog(models.Model):
 
 
 
-class LeaveRequest(models.Model):
-    CATEGORY_CHOICES = [
-        ("casual", "Casual Leave"),
-        ("sick", "Sick Leave"),
-        ("earned", "Earned Leave"),
-    ]
-    STATUS_CHOICES = [
-        ("pending", "Pending"),
-        ("approved", "Approved"),
-        ("rejected", "Rejected"),
-    ]
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="leaves")
-    category = models.CharField(
-        max_length=20, choices=CATEGORY_CHOICES, default="casual"
-    )
-    start_date = models.DateField()
-    end_date = models.DateField()
-    reason = models.TextField(blank=True, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
-    created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"{self.user.username} - {self.category} ({self.start_date} to {self.end_date}) - {self.status}"
-
-
-class OvertimeRequest(models.Model):
-    STATUS_CHOICES = [
-        ("pending", "Pending"),
-        ("approved", "Approved"),
-        ("rejected", "Rejected"),
-    ]
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="overtimes")
-    date = models.DateField()
-    hours = models.DecimalField(max_digits=4, decimal_places=1)
-    reason = models.TextField(blank=True, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.user.username} - {self.date} ({self.hours}h) - {self.status}"
-
-
-class CorrectionRequest(models.Model):
-    STATUS_CHOICES = [
-        ("pending", "Pending"),
-        ("approved", "Approved"),
-        ("rejected", "Rejected"),
-    ]
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="corrections")
-    date = models.DateField()
-    correct_in_time = models.CharField(max_length=5)  # format: "HH:MM"
-    correct_out_time = models.CharField(max_length=5)  # format: "HH:MM"
-    reason = models.TextField(blank=True, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.user.username} - {self.date} ({self.correct_in_time} - {self.correct_out_time}) - {self.status}"
 
 
 class AttendanceAPIConfig(models.Model):
@@ -290,6 +233,7 @@ class AttendanceRecord(models.Model):
     in_time = models.CharField(max_length=10, blank=True, default="")
     out_time = models.CharField(max_length=10, blank=True, default="")
     working_hours = models.FloatField(default=0.0, null=True, blank=True)
+    work_time = models.FloatField(default=0.0, null=True, blank=True)
 
     card_punch_ot = models.FloatField(default=0.0, null=True, blank=True)
     requested_ot = models.FloatField(default=0.0, null=True, blank=True)
@@ -318,11 +262,6 @@ class AttendanceRecord(models.Model):
     class Meta:
         unique_together = ("employee_id", "attendance_date")
         ordering = ["-attendance_date", "employee_id"]
-        indexes = [
-            models.Index(fields=["attendance_date", "employee_id"]),
-            models.Index(fields=["attendance_date", "day"]),
-            models.Index(fields=["employee_id", "attendance_date"]),
-        ]
 
     def __str__(self):
         return f"{self.employee_id} - {self.attendance_date} - {self.attendance_status}"
@@ -346,6 +285,7 @@ class AttendanceRecord(models.Model):
             "In Time": self.in_time,
             "Out Time": self.out_time,
             "Working Hours": format_float(self.working_hours),
+            "Work Time": format_float(self.work_time),
             "Card Punch OT": format_float(self.card_punch_ot),
             "Requested OT": format_float(self.requested_ot),
             "Weekend OT": format_float(self.weekend_ot),

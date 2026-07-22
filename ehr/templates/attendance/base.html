@@ -1,0 +1,959 @@
+{% load static rbac_tags %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script>
+        (function () {
+            var savedTheme = localStorage.getItem('theme');
+            if (!savedTheme) savedTheme = 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0b0f19">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="EHR Attendance">
+    <link rel="apple-touch-icon" href="/static/attendance/icons/icon-192x192.png">
+    <title>{% block title %}Attendance Management System{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="{% static 'attendance/css/modern-ui.css' %}">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --bg-gradient: linear-gradient(135deg, #0b0f19 0%, #111827 100%);
+            --sidebar-bg: #0d121f;
+            --card-bg: rgba(21, 28, 44, 0.7);
+            --card-border: rgba(255, 255, 255, 0.06);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary-accent: #6366f1;
+            --primary-accent-hover: #4f46e5;
+            --secondary-accent: #38bdf8;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+        }
+
+        [data-theme="light"] {
+            --bg-color: #f8fafc;
+            --bg-gradient: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            --sidebar-bg: #ffffff;
+            --card-bg: #ffffff;
+            --card-border: rgba(0, 0, 0, 0.1);
+            --text-main: #020617;
+            --text-muted: #334155;
+        }
+
+        [data-theme="light"] .bg-dark {
+            background-color: var(--card-bg) !important;
+            border-color: var(--card-border) !important;
+        }
+
+        [data-theme="light"] .text-white {
+            color: var(--text-main) !important;
+        }
+
+        [data-theme="light"] .border-secondary {
+            border-color: var(--card-border) !important;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        .portal-wrapper {
+            display: flex;
+            min-height: 100vh;
+            width: 100%;
+            overflow-x: hidden;
+        }
+
+        .sidebar-container {
+            width: 260px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--card-border);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-header {
+            padding: 1.75rem 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .sidebar-brand {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: var(--text-main) !important;
+            text-decoration: none;
+            line-height: 1.3;
+        }
+
+        .sidebar-brand span {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--secondary-accent);
+            font-weight: 500;
+            margin-top: 2px;
+        }
+
+        .sidebar-menu {
+            padding: 1.5rem 1rem;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0.75rem 1rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 500;
+            margin-bottom: 0.4rem;
+            transition: all 0.2s ease;
+        }
+
+        .sidebar-link:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .sidebar-link.active {
+            color: var(--text-main);
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.18) 0%, rgba(99, 102, 241, 0.04) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            font-weight: 600;
+        }
+
+        .content-section {
+            width: calc(100% - 260px);
+            margin-left: 260px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            transition: all 0.3s ease;
+            overflow-x: hidden;
+        }
+
+        .top-navbar {
+            background: rgba(11, 15, 25, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--card-border);
+            padding: 0.95rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 99;
+        }
+
+        .top-navbar-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin: 0;
+            color: var(--text-main);
+        }
+
+        .top-navbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .notification-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .notification-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .notification-badge {
+            width: 8px;
+            height: 8px;
+            background: var(--danger-color);
+            border-radius: 50%;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+
+        .profile-dropdown-btn {
+            background: #5850ec;
+            border: none;
+            color: white;
+            padding: 0.5rem 1.1rem;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(88, 80, 236, 0.25);
+        }
+
+        .profile-dropdown-btn:hover {
+            background: #4f46e5;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(88, 80, 236, 0.35);
+        }
+
+        .profile-avatar-sm {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-custom {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card-custom:hover {
+            box-shadow: 0 15px 35px rgba(99, 102, 241, 0.08);
+            border-color: rgba(99, 102, 241, 0.2);
+        }
+
+        .btn-accent {
+            background: linear-gradient(135deg, var(--primary-accent) 0%, var(--primary-accent-hover) 100%);
+            color: white !important;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-accent:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(99, 102, 241, 0.45);
+        }
+
+        .btn-outline-custom {
+            border: 1.5px solid var(--card-border);
+            color: var(--text-main) !important;
+            background: transparent;
+            border-radius: 10px;
+            font-weight: 500;
+            padding: 0.7rem 1.4rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-outline-custom:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--text-muted);
+            transform: translateY(-1px);
+        }
+
+        .form-control-custom {
+            background: rgba(11, 15, 25, 0.5);
+            border: 1.5px solid var(--card-border);
+            border-radius: 10px;
+            color: var(--text-main);
+            padding: 0.65rem 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .form-control-custom:focus {
+            background: rgba(11, 15, 25, 0.8);
+            border-color: var(--primary-accent);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+            color: var(--text-main);
+            outline: none;
+        }
+
+        .form-control-custom::placeholder {
+            color: var(--text-muted);
+            opacity: 0.5;
+        }
+
+        .form-label-custom {
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.4rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .alert-custom {
+            background: rgba(21, 28, 44, 0.9);
+            border-left: 4px solid var(--primary-accent);
+            color: var(--text-main);
+            border-radius: 10px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .alert-danger-custom {
+            border-left-color: var(--danger-color);
+        }
+
+        .alert-success-custom {
+            border-left-color: var(--success-color);
+        }
+
+        .alert-info-custom {
+            border-left-color: var(--secondary-accent);
+        }
+
+        .table-custom {
+            color: var(--text-main) !important;
+            background: transparent !important;
+            border-collapse: separate;
+            border-spacing: 0 8px;
+        }
+
+        .table-custom th {
+            background: rgba(11, 15, 25, 0.4) !important;
+            border: none !important;
+            color: var(--text-muted) !important;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.5px;
+            padding: 8px 12px;
+        }
+
+        .table-custom tbody tr {
+            background: var(--card-bg) !important;
+            transition: transform 0.2s ease, background-color 0.2s ease;
+        }
+
+        .table-custom tbody tr:hover {
+            background: rgba(255, 255, 255, 0.04) !important;
+            transform: scale(1.002);
+        }
+
+        .table-custom td {
+            color: var(--text-main) !important;
+            background: transparent !important;
+            border: none !important;
+            padding: 10px 12px;
+            vertical-align: middle;
+            font-size: 0.82rem;
+        }
+
+        .table-custom td:first-child,
+        .table-custom th:first-child {
+            border-top-left-radius: 10px;
+            border-bottom-left-radius: 10px;
+        }
+
+        .table-custom td:last-child,
+        .table-custom th:last-child {
+            border-top-right-radius: 10px;
+            border-bottom-right-radius: 10px;
+        }
+
+        .badge-custom {
+            padding: 0.45em 0.85em;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+
+        .badge-active {
+            background-color: rgba(16, 185, 129, 0.12);
+            color: var(--success-color);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .badge-absent {
+            background-color: rgba(239, 68, 68, 0.12);
+            color: var(--danger-color);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .main-container {
+            flex: 1 0 auto;
+            padding: 2rem;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        footer {
+            flex-shrink: 0;
+            background: var(--sidebar-bg);
+            border-top: 1px solid var(--card-border);
+            padding: 1.25rem 0;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in-el {
+            animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        .auth-wrapper {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .auth-center-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+
+        @media (max-width: 991px) {
+            .content-section {
+                width: 100%;
+                margin-left: 0;
+                overflow-x: hidden;
+            }
+
+            .top-navbar {
+                padding: 0.95rem 1.25rem;
+            }
+
+            .main-container {
+                padding: 1.25rem;
+            }
+
+            .profile-username-text {
+                display: none !important;
+            }
+
+            .profile-dropdown-btn {
+                padding: 0 !important;
+                width: 38px !important;
+                height: 38px !important;
+                border-radius: 50% !important;
+                justify-content: center !important;
+                gap: 0 !important;
+            }
+
+            .profile-dropdown-btn::after {
+                display: none !important;
+            }
+        }
+
+        /* Premium Pagination Styles */
+        .pagination .page-link {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            color: var(--text-muted);
+            padding: 0.4rem 0.8rem;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+        .pagination .page-link:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+        .pagination .page-item.active .page-link {
+            background: linear-gradient(135deg, var(--primary-accent) 0%, var(--primary-accent-hover) 100%);
+            border-color: transparent;
+            color: white;
+            box-shadow: 0 4px 10px rgba(99, 102, 241, 0.25);
+        }
+        .pagination .page-item.disabled .page-link {
+            background: rgba(255, 255, 255, 0.01);
+            border-color: var(--card-border);
+            color: rgba(255, 255, 255, 0.15);
+            cursor: not-allowed;
+        }
+        [data-theme="light"] .pagination .page-link {
+            background: #ffffff;
+            border-color: rgba(0, 0, 0, 0.08);
+            color: #334155;
+        }
+        [data-theme="light"] .pagination .page-link:hover {
+            background: #f1f5f9;
+            color: #020617;
+        }
+        [data-theme="light"] .pagination .page-item.disabled .page-link {
+            background: #f8fafc;
+            color: #cbd5e1;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+    {% if user.is_authenticated %}
+    <div class="portal-wrapper">
+        <aside class="sidebar-container d-none d-lg-flex">
+            <div class="sidebar-header">
+                <a href="/" class="sidebar-brand d-flex align-items-center gap-2">
+                    <span class="fs-4 text-white">⚡</span>
+                    <div><strong class="text-white">IIPL Enterprise</strong><span>eHR</span></div>
+                </a>
+            </div>
+            <nav class="sidebar-menu">
+                <a href="/?tab=dashboard"
+                    class="sidebar-link{% if active_tab == 'dashboard' or not active_tab %} active{% endif %}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 6v6l4 2" />
+                    </svg>Dashboard
+                </a>
+                <a href="{% url 'overtime' %}"
+                    class="sidebar-link{% if request.resolver_match.url_name == 'overtime' %} active{% endif %}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>Overtime
+                </a>
+                <a href="{% url 'leaves' %}"
+                    class="sidebar-link{% if request.resolver_match.url_name == 'leaves' or active_tab == 'leaves' %} active{% endif %}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path
+                            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>Leaves
+                </a>
+                <a href="{% url 'feedback' %}"
+                    class="sidebar-link{% if request.resolver_match.url_name == 'feedback' %} active{% endif %}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>Feedback
+                </a>
+                {% if user.is_superuser or user|has_permission:"role.manage" or user|has_permission:"section.manage" or user|has_permission:"user.manage" %}
+                <a href="{% url 'admin_dashboard' %}"
+                    class="sidebar-link{% if active_tab == 'admin' %} active{% endif %}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path
+                            d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                        <circle cx="12" cy="12" r="3" />
+                    </svg>Administration
+                </a>
+                {% endif %}
+            </nav>
+        </aside>
+        <div class="offcanvas offcanvas-start bg-dark text-white border-end border-secondary" tabindex="-1"
+            id="mobileSidebar" aria-labelledby="mobileSidebarLabel"
+            style="max-width: 280px; background-color: var(--sidebar-bg) !important;">
+            <div class="offcanvas-header border-bottom border-secondary py-3 px-4">
+                <a href="/" class="sidebar-brand d-flex align-items-center gap-2"><span class="fs-4 text-white">⚡</span>
+                    <div><strong class="text-white">IIPL Enterprise</strong><span>eHR</span></div>
+                </a>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"
+                    aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body p-3">
+                <nav class="sidebar-menu p-0">
+                    <a href="/?tab=dashboard"
+                        class="sidebar-link{% if active_tab == 'dashboard' or not active_tab %} active{% endif %}"
+                        onclick="bootstrap.Offcanvas.getInstance(document.getElementById('mobileSidebar')).hide();">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M12 6v6l4 2" />
+                        </svg>Dashboard
+                    </a>
+                    <a href="{% url 'overtime' %}"
+                        class="sidebar-link{% if request.resolver_match.url_name == 'overtime' %} active{% endif %}"
+                        onclick="bootstrap.Offcanvas.getInstance(document.getElementById('mobileSidebar')).hide();">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>Overtime
+                    </a>
+                    <a href="{% url 'leaves' %}"
+                        class="sidebar-link{% if request.resolver_match.url_name == 'leaves' or active_tab == 'leaves' %} active{% endif %}"
+                        onclick="bootstrap.Offcanvas.getInstance(document.getElementById('mobileSidebar')).hide();">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path
+                                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>Leaves
+                    </a>
+                    <a href="{% url 'feedback' %}"
+                        class="sidebar-link{% if request.resolver_match.url_name == 'feedback' %} active{% endif %}"
+                        onclick="bootstrap.Offcanvas.getInstance(document.getElementById('mobileSidebar')).hide();">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>Feedback
+                    </a>
+                    {% if user.is_superuser or user|has_permission:"role.manage" or user|has_permission:"section.manage" or user|has_permission:"user.manage" %}
+                    <a href="{% url 'admin_dashboard' %}"
+                        class="sidebar-link{% if active_tab == 'admin' %} active{% endif %}"
+                        onclick="bootstrap.Offcanvas.getInstance(document.getElementById('mobileSidebar')).hide();">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path
+                                d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>Administration
+                    </a>
+                    {% endif %}
+                </nav>
+            </div>
+        </div>
+        <main class="content-section">
+            <header class="top-navbar">
+                <div class="d-flex align-items-center gap-3">
+                    <button class="btn btn-outline-custom d-lg-none py-1.5 px-2.5 border-0 text-white" type="button"
+                        data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <line x1="3" y1="12" x2="21" y2="12" />
+                            <line x1="3" y1="6" x2="21" y2="6" />
+                            <line x1="3" y1="18" x2="21" y2="18" />
+                        </svg>
+                    </button>
+                    <h2 class="top-navbar-title">Enterprise HR Portal</h2>
+                </div>
+                <div class="top-navbar-actions">
+                    <div class="notification-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Theme">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24" id="themeIcon">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                        </svg>
+                    </div>
+                    <div class="notification-btn"><svg width="18" height="18" fill="none" stroke="currentColor"
+                            stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                        </svg><span class="notification-badge"></span></div>
+                    <div class="dropdown">
+                        <button class="profile-dropdown-btn dropdown-toggle" type="button" id="userProfileDropdown"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="profile-avatar-sm">{{ user.username|slice:":1"|upper }}</span>
+                            <span class="profile-username-text">{{ user.username }}</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary mt-2 shadow-lg"
+                            aria-labelledby="userProfileDropdown">
+                            <li>
+                                <div class="dropdown-header text-muted small">Role: {{ user.profile.role.name|default:"User" }}</div>
+                            </li>
+                            <li>
+                                <hr class="dropdown-divider border-secondary">
+                            </li>
+                            <li><a class="dropdown-item text-white py-2" href="{% url 'logout' %}">🚪 Logout</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </header>
+            <div class="container-fluid main-container fade-in-el px-lg-4 px-xl-5">
+                {% if messages %}
+                <div class="row justify-content-center">
+                    <div class="col-12">
+                        {% for message in messages %}
+                        {% if "Logged in as" not in message|stringformat:"s" and "Welcome back" not in message|stringformat:"s" %}
+                        <div class="alert alert-custom{% if message.tags == 'error' %} alert-danger-custom{% elif message.tags == 'success' %} alert-success-custom{% else %} alert-info-custom{% endif %} alert-dismissible fade show"
+                            role="alert">
+                            {{ message }}<button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"
+                                aria-label="Close"></button>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                {% block content %}{% endblock %}
+            </div>
+            <footer class="text-center mt-auto">
+                <div class="container">
+                    <p class="mb-0">&copy; 2026 EHR Attendance Portal. All rights reserved.</p>
+                </div>
+            </footer>
+        </main>
+    </div>
+    {% else %}
+    <div class="auth-wrapper">
+        <nav class="navbar navbar-expand-lg top-navbar">
+            <div class="container">
+                <a class="sidebar-brand d-flex align-items-center gap-2" href="{% url 'login' %}"><span
+                        class="fs-4 text-white">⚡</span><strong class="text-white">EHR Attendance</strong></a>
+                <button class="navbar-toggler border-0 text-white" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false"
+                    aria-label="Toggle navigation"><span class="navbar-toggler-icon"
+                        style="filter: invert(1);"></span></button>
+                <div class="collapse navbar-collapse" id="navbarContent">
+                    <ul class="navbar-nav ms-auto align-items-center gap-2">
+                        {% if request.resolver_match.url_name == 'signup' %}<li class="nav-item"><a
+                                href="{% url 'login' %}" class="btn btn-accent btn-sm py-2">Login</a></li>{% else %}<li
+                            class="nav-item"><a href="{% url 'signup' %}" class="btn btn-accent btn-sm py-2">Sign Up</a>
+                        </li>{% endif %}
+                    </ul>
+                </div>
+            </div>
+        </nav>
+        <div class="container main-container fade-in-el flex-grow-1 d-flex flex-column justify-content-center">
+            {% if messages %}
+            <div class="row justify-content-center">
+                <div class="col-12 col-md-6 col-lg-5 col-xl-4">
+                    {% for message in messages %}
+                    <div class="alert alert-custom{% if message.tags == 'error' %} alert-danger-custom{% elif message.tags == 'success' %} alert-success-custom{% else %} alert-info-custom{% endif %} alert-dismissible fade show"
+                        role="alert">
+                        {{ message }}<button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"
+                            aria-label="Close"></button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% block auth_content %}{% endblock %}
+        </div>
+        <footer class="text-center mt-auto">
+            <div class="container">
+                <p class="mb-0">&copy; 2026 EHR Attendance Portal. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+    {% endif %}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        class TablePaginator {
+            constructor(tableBody, controlsContainer, rowsPerPage = 10) {
+                this.tableBody = tableBody;
+                this.controlsContainer = controlsContainer;
+                this.rowsPerPage = rowsPerPage;
+                this.currentPage = 1;
+                this.rows = Array.from(tableBody.querySelectorAll('tr'));
+                this.update();
+            }
+
+            updateRows() {
+                this.rows = Array.from(this.tableBody.querySelectorAll('tr'));
+                this.update();
+            }
+
+            update() {
+                let targetRows = this.rows.filter(row => {
+                    if (row.cells.length === 1 && row.cells[0].classList.contains('text-center')) {
+                        return false;
+                    }
+                    return true;
+                });
+
+                const hasFilterClass = this.rows.some(r => r.classList.contains('matching-filter'));
+                if (hasFilterClass) {
+                    targetRows = targetRows.filter(r => r.classList.contains('matching-filter'));
+                }
+
+                // Hide all rows initially
+                this.rows.forEach(r => r.style.display = 'none');
+
+                if (targetRows.length === 0) {
+                    const emptyRow = this.rows.find(row => row.cells.length === 1 && row.cells[0].classList.contains('text-center'));
+                    if (emptyRow) {
+                        emptyRow.style.display = '';
+                    }
+                    this.controlsContainer.innerHTML = '';
+                    return;
+                }
+
+                const totalPages = Math.ceil(targetRows.length / this.rowsPerPage);
+                if (this.currentPage > totalPages) {
+                    this.currentPage = totalPages;
+                }
+                if (this.currentPage < 1) {
+                    this.currentPage = 1;
+                }
+
+                const startIndex = (this.currentPage - 1) * this.rowsPerPage;
+                const endIndex = startIndex + this.rowsPerPage;
+
+                targetRows.forEach((row, index) => {
+                    if (index >= startIndex && index < endIndex) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+
+                this.renderControls(totalPages, targetRows.length);
+            }
+
+            renderControls(totalPages, totalRows) {
+                if (totalPages <= 1) {
+                    this.controlsContainer.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center w-100 mt-3 px-3 text-muted small">
+                            <div>Showing all ${totalRows} entries</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const startIdx = (this.currentPage - 1) * this.rowsPerPage + 1;
+                const endIdx = Math.min(this.currentPage * this.rowsPerPage, totalRows);
+
+                let paginationHtml = `
+                    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center w-100 gap-3 mt-3 px-3">
+                        <div class="text-muted small">
+                            Showing ${startIdx} to ${endIdx} of ${totalRows} entries
+                        </div>
+                        <nav>
+                            <ul class="pagination pagination-sm mb-0 align-items-center gap-1">
+                `;
+
+                paginationHtml += `
+                    <li class="page-item ${this.currentPage === 1 ? 'disabled' : ''}">
+                        <button class="page-link" data-page="${this.currentPage - 1}" style="border-radius: 6px; cursor: pointer;">&laquo;</button>
+                    </li>
+                `;
+
+                const maxVisible = 5;
+                let startPage = Math.max(1, this.currentPage - Math.floor(maxVisible / 2));
+                let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+                if (endPage - startPage + 1 < maxVisible) {
+                    startPage = Math.max(1, endPage - maxVisible + 1);
+                }
+
+                if (startPage > 1) {
+                    paginationHtml += `
+                        <li class="page-item">
+                            <button class="page-link" data-page="1">1</button>
+                        </li>
+                    `;
+                    if (startPage > 2) {
+                        paginationHtml += `<li class="page-item disabled"><span class="page-link" style="border: none; background: transparent;">...</span></li>`;
+                    }
+                }
+
+                for (let i = startPage; i <= endPage; i++) {
+                    paginationHtml += `
+                        <li class="page-item ${this.currentPage === i ? 'active' : ''}">
+                            <button class="page-link" data-page="${i}">${i}</button>
+                        </li>
+                    `;
+                }
+
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) {
+                        paginationHtml += `<li class="page-item disabled"><span class="page-link" style="border: none; background: transparent;">...</span></li>`;
+                    }
+                    paginationHtml += `
+                        <li class="page-item">
+                            <button class="page-link" data-page="${totalPages}">${totalPages}</button>
+                        </li>
+                    `;
+                }
+
+                paginationHtml += `
+                    <li class="page-item ${this.currentPage === totalPages ? 'disabled' : ''}">
+                        <button class="page-link" data-page="${this.currentPage + 1}" style="border-radius: 6px; cursor: pointer;">&raquo;</button>
+                    </li>
+                `;
+
+                paginationHtml += `
+                            </ul>
+                        </nav>
+                    </div>
+                `;
+
+                this.controlsContainer.innerHTML = paginationHtml;
+
+                const buttons = this.controlsContainer.querySelectorAll('.page-link');
+                buttons.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const page = parseInt(btn.getAttribute('data-page'));
+                        if (page && page >= 1 && page <= totalPages) {
+                            this.currentPage = page;
+                            this.update();
+                        }
+                    });
+                });
+            }
+        }
+
+        function toggleTheme() {
+            var currentTheme = document.documentElement.getAttribute('data-theme');
+            var newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+            window.dispatchEvent(new CustomEvent('themeChanged', { detail: newTheme }));
+        }
+        function updateThemeIcon(theme) {
+            var icon = document.getElementById('themeIcon');
+            if (!icon) return;
+            if (theme === 'light') {
+                icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+            } else {
+                icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+            }
+        }
+        (function () {
+            var initialTheme = localStorage.getItem('theme');
+            if (!initialTheme) initialTheme = 'dark';
+            document.documentElement.setAttribute('data-theme', initialTheme);
+            updateThemeIcon(initialTheme);
+        })();
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/sw.js').then(function (reg) { console.log('Service Worker registered:', reg.scope); }).catch(function (err) { console.error('Service Worker registration failed:', err); });
+            });
+        }
+    </script>
+</body>
+
+</html>
