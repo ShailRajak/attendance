@@ -432,11 +432,6 @@ def calculate_section_dashboard_stats(
         sector = role_display
 
     if username:
-        for r in attendance_records:
-            if r.get("Employee ID") == username:
-                name = r.get("Employee Name", name)
-                break
-
         if username == "19105540":
             sector = "Phase 2 - Marketing"
         elif username == "19105639":
