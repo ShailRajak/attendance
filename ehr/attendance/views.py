@@ -1,4 +1,4 @@
-# Reload trigger for chart status breakdown and KPI leaves alignment fix
+# Reload trigger for 10-minute check-out relaxation policy implementation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse

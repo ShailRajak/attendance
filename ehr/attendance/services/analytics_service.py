@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 from django.contrib.auth.models import User
 from attendance.models import UserProfile
 from attendance.services.auth_service import resolve_user_role_and_section, get_expected_dtname4, RBACService
-from attendance.utils.formatter import calculate_validated_ot
+from attendance.utils.formatter import calculate_validated_ot, is_full_day_present
 
 
 def parse_date(date_str):
@@ -325,7 +325,7 @@ def calculate_dashboard_stats(
                     if is_mispunch:
                         pass
                     elif is_weekend:
-                        if work_time >= 8.0 or is_today:
+                        if is_full_day_present(work_time, record.get("Out Time"), record.get("Shift"), is_today):
                             working_days += 1
                             days_present += 1.0
                             status_present += 1.0
@@ -335,7 +335,7 @@ def calculate_dashboard_stats(
                             total_work_time += work_time
                     else:
                         working_days += 1
-                        if work_time >= 8.0 or is_today:
+                        if is_full_day_present(work_time, record.get("Out Time"), record.get("Shift"), is_today):
                             days_present += 1.0
                             status_present += 1.0
                             total_work_time += work_time
@@ -587,14 +587,14 @@ def calculate_section_dashboard_stats(
             if is_mispunch:
                 pass
             elif is_weekend:
-                if work_time >= 8.0:
+                if is_full_day_present(work_time, r.get("Out Time"), r.get("Shift"), is_today):
                     total_present += 1
                     status_present += 1
                     date_aggregates[dt]["present"] += 1
                 else:
                     status_rest += 1
             else:
-                if work_time >= 8.0:
+                if is_full_day_present(work_time, r.get("Out Time"), r.get("Shift"), is_today):
                     total_present += 1
                     status_present += 1
                     date_aggregates[dt]["present"] += 1

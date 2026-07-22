@@ -129,6 +129,47 @@ def calculate_validated_ot(out_time, shift_name="", raw_ot=0.0):
             return 0.0
 
 
+def is_full_day_present(work_time, out_time="", shift_name="", is_today=False):
+    """
+    Checks if an attendance record qualifies for full-day Present status with 10-minute relaxation.
+    - Day Shift (09:00 - 18:00):
+      Relaxed check-out threshold is 17:50 (5:50 PM).
+      If check-out >= 17:50 (or work_time >= 7.8 hours), it counts as full day Present.
+    - Night Shift (20:00 - 08:00):
+      Relaxed check-out threshold is 07:50 AM.
+      If check-out >= 07:50 AM (or work_time >= 11.8 hours), it counts as full day Present.
+    - Minimum working hours threshold with 10-minute relaxation: 7.8 hours (7h 50m).
+    """
+    if is_today:
+        return True
+
+    try:
+        wt = float(work_time or 0.0)
+    except (ValueError, TypeError):
+        wt = 0.0
+
+    if wt >= 7.8:
+        return True
+
+    if out_time and str(out_time).strip() not in ("00:00", "—", "", "None"):
+        out_str = str(out_time).strip()
+        if ":" in out_str:
+            try:
+                parts = out_str.split(":")
+                out_mins = int(parts[0]) * 60 + int(parts[1])
+                is_night = "Night" in str(shift_name or "")
+                if is_night:
+                    if 470 <= out_mins < 12 * 60:
+                        return True
+                else:
+                    if out_mins >= 1070:
+                        return True
+            except (ValueError, TypeError):
+                pass
+
+    return False
+
+
 # ==========================================================
 # MAIN FORMATTER
 # ==========================================================

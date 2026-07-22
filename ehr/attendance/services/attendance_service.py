@@ -4,7 +4,7 @@ import requests
 from concurrent.futures import ThreadPoolExecutor
 from django.core.cache import cache
 from attendance.models import UserProfile
-from attendance.utils.formatter import filter_attendance_data, calculate_validated_ot
+from attendance.utils.formatter import filter_attendance_data, calculate_validated_ot, is_full_day_present
 from attendance.utils.date_helpers import get_attendance_date_range
 from attendance.services.auth_service import resolve_user_role_and_section, get_expected_dtname4, RBACService
 from attendance.services.analytics_service import (
@@ -540,7 +540,7 @@ def compute_kpi_cards(attendance_records):
             if not is_today and not is_holiday:
                 is_mispunch = True
 
-        is_present = bool(has_check_in and work_time >= 8.0 and not is_mispunch)
+        is_present = bool(has_check_in and is_full_day_present(work_time, out_time, shift, is_today) and not is_mispunch)
         is_absent = bool(not has_check_in and not is_weekend and not leave_type)
         has_leave = bool(leave_type) and leave_type not in ("", "—", "None", "0")
 
@@ -1033,7 +1033,7 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
             else:
                 status = "Absent"
         else:
-            if work_time >= 8.0:
+            if is_full_day_present(work_time, out_time, shift_raw, is_today):
                 status = "Present"
             else:
                 status = "CL(0.5d)"
