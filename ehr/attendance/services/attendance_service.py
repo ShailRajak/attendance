@@ -735,6 +735,10 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
                 else:
                     start_dt, end_dt = get_cycle_bounds(today)
 
+            # Cap monthly end date at today for Admin & Management roles (no future dates)
+            if not is_employee_role and end_dt > today:
+                end_dt = today
+
     start_date = start_dt.strftime("%Y-%m-%d")
     end_date = end_dt.strftime("%Y-%m-%d")
 

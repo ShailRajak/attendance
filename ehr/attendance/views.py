@@ -1,4 +1,4 @@
-# Reload trigger for Modern Filter Control Panel Glassmorphic Redesign
+# Reload trigger for Monthly Date Capping at Today for Admin and Management roles
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse

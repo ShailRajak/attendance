@@ -1293,6 +1293,9 @@ def get_overtime_dashboard_data(user, get_params):
                 else:
                     start_date, end_date = get_cycle_bounds(today)
 
+            if not is_employee_role and end_date > today:
+                end_date = today
+
     start_date_str = start_date.strftime("%Y-%m-%d")
     end_date_str = end_date.strftime("%Y-%m-%d")
 
@@ -1528,6 +1531,9 @@ def get_leaves_dashboard_data(
                     cycle_num = str(matching_cycle["cycle_num"])
                 else:
                     start_date, end_date = get_cycle_bounds(today)
+
+            if not is_employee_role and end_date > today:
+                end_date = today
 
     start_str = start_date.strftime("%Y-%m-%d")
     end_str = end_date.strftime("%Y-%m-%d")
