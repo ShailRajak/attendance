@@ -1,4 +1,4 @@
-# Reload trigger for Admin Section View name override fix
+# Reload trigger for Present count classification fix on single-punch records
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse

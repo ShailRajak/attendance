@@ -540,7 +540,7 @@ def compute_kpi_cards(attendance_records):
             if not is_today and not is_holiday:
                 is_mispunch = True
 
-        is_present = bool(has_check_in and is_full_day_present(work_time, out_time, shift, is_today) and not is_mispunch)
+        is_present = bool(has_check_in)
         is_absent = bool(not has_check_in and not is_weekend and not leave_type)
         has_leave = bool(leave_type) and leave_type not in ("", "—", "None", "0")
 

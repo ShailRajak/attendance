@@ -590,24 +590,9 @@ def calculate_section_dashboard_stats(
             else:
                 status_rest += 1
         else:
-            if is_mispunch:
-                pass
-            elif is_weekend:
-                if is_full_day_present(work_time, r.get("Out Time"), r.get("Shift"), is_today):
-                    total_present += 1
-                    status_present += 1
-                    date_aggregates[dt]["present"] += 1
-                else:
-                    status_rest += 1
-            else:
-                if is_full_day_present(work_time, r.get("Out Time"), r.get("Shift"), is_today):
-                    total_present += 1
-                    status_present += 1
-                    date_aggregates[dt]["present"] += 1
-                else:
-                    total_leaves += 1.0
-                    status_cl += 1
-                    date_aggregates[dt]["leave"] += 1.0
+            total_present += 1
+            status_present += 1
+            date_aggregates[dt]["present"] += 1
 
             # Late check-in (unexcused late per monthly policy: 3 late comings & 1hr total allowed)
             if r.get("is_unexcused_late"):
