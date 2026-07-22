@@ -1,4 +1,4 @@
-# Reload trigger for Ultra-Modern Glassmorphic Control Bar UI upgrade
+# Reload trigger for Modern Filter Control Panel Glassmorphic Redesign
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
