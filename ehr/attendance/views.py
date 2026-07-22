@@ -1,4 +1,4 @@
-# Reload trigger for Custom Date Range absolute priority and aggregation fix
+# Reload trigger for Weekly OT aggregation implementation for Admin and Management roles
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse

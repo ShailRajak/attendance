@@ -1010,9 +1010,12 @@ def get_scope_overtime_summary(accessible_usernames, start_date, end_date, expec
                 pass
 
         try:
-            cp_ot = float(record.get("Card Punch OT", 0) or 0)
+            raw_ot = float(record.get("Card Punch OT", 0) or 0)
         except (ValueError, TypeError):
-            cp_ot = 0.0
+            raw_ot = 0.0
+        out_t = str(record.get("Out Time") or "").strip()
+        sh_t = str(record.get("Shift") or "")
+        cp_ot = calculate_validated_ot(out_t, sh_t, raw_ot)
 
         try:
             req_ot = float(record.get("Requested OT", 0) or 0)
@@ -1125,9 +1128,12 @@ def get_scope_overtime_summary(accessible_usernames, start_date, end_date, expec
                 is_holiday = True
 
         try:
-            cp_ot = float(record.get("Card Punch OT", 0) or 0)
+            raw_ot = float(record.get("Card Punch OT", 0) or 0)
         except (ValueError, TypeError):
-            cp_ot = 0.0
+            raw_ot = 0.0
+        out_t = str(record.get("Out Time") or "").strip()
+        sh_t = str(record.get("Shift") or "")
+        cp_ot = calculate_validated_ot(out_t, sh_t, raw_ot)
 
         try:
             req_ot = float(record.get("Requested OT", 0) or 0)
