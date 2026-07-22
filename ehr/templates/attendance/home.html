@@ -1391,7 +1391,7 @@
                     const isPresent = (status === 'Present');
                     const isAbsent = (status === 'Absent');
                     const isLeave = status.includes('CL') || status === 'Leave';
-                    const isLate = record.late_minutes && parseFloat(record.late_minutes) > 0;
+                    const isLate = record.is_unexcused_late || (record.late_minutes && parseFloat(record.late_minutes) > 0);
                     const isMispunch = (status === 'Mispunch');
 
                     if (isPresent) {

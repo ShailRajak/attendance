@@ -395,9 +395,80 @@ def resolve_department_key(day_field):
     return "OTHER"
 
 
+def evaluate_monthly_late_policy(attendance_records):
+    """
+    Applies the monthly late coming allowance policy across attendance records:
+    - Each employee gets up to 3 allowed late check-ins per monthly cycle (21st to 20th).
+    - Cumulative late time for allowed check-ins must NOT exceed 60.0 minutes (1 hour) per monthly cycle.
+    - If a late arrival falls within quota (< 3 occurrences AND cumulative <= 60 mins), it is marked as excused.
+    - If a late arrival exceeds quota (>= 3 occurrences OR cumulative > 60 mins), it is marked as unexcused late.
+    """
+    if not attendance_records:
+        return attendance_records
+
+    emp_groups = {}
+    for r in attendance_records:
+        emp_id = str(r.get("Employee ID") or r.get("employee_id") or "").strip()
+        if not emp_id:
+            continue
+        if emp_id not in emp_groups:
+            emp_groups[emp_id] = []
+        emp_groups[emp_id].append(r)
+
+    for emp_id, logs in emp_groups.items():
+        sorted_logs = sorted(
+            logs,
+            key=lambda x: parse_date(x.get("Date") or x.get("date") or "") or datetime.min
+        )
+
+        allowed_count = 0
+        allowed_mins = 0.0
+
+        for r in sorted_logs:
+            in_time = r.get("In Time") or r.get("in_time") or ""
+            in_time_str = str(in_time).strip()
+            shift_raw = str(r.get("Shift") or r.get("shift") or "").strip()
+            late_min_val = 0.0
+            try:
+                late_min_val = float(r.get("Late Minutes") or r.get("late_minutes") or 0.0)
+            except (ValueError, TypeError):
+                late_min_val = 0.0
+
+            late_by_time = 0.0
+            if in_time_str and ":" in in_time_str and in_time_str not in ("00:00", "—"):
+                try:
+                    h, m = map(int, in_time_str.split(":"))
+                    shift_start = 20 * 60 if "Night" in shift_raw else 9 * 60
+                    if h * 60 + m > shift_start:
+                        late_by_time = float((h * 60 + m) - shift_start)
+                except (ValueError, TypeError):
+                    pass
+
+            raw_late_minutes = max(late_min_val, late_by_time)
+            r["raw_late_minutes"] = raw_late_minutes
+
+            if raw_late_minutes > 0.0:
+                if allowed_count < 3 and (allowed_mins + raw_late_minutes) <= 60.0:
+                    allowed_count += 1
+                    allowed_mins += raw_late_minutes
+                    r["is_unexcused_late"] = False
+                    r["late_excused"] = True
+                    r["effective_late_minutes"] = 0.0
+                else:
+                    r["is_unexcused_late"] = True
+                    r["late_excused"] = False
+                    r["effective_late_minutes"] = raw_late_minutes
+            else:
+                r["is_unexcused_late"] = False
+                r["late_excused"] = False
+                r["effective_late_minutes"] = 0.0
+
+    return attendance_records
+
+
 def compute_kpi_cards(attendance_records):
     """
-    Computes 8 enterprise HRMS KPI values from the attendance dataset.
+    Calculate summary HRMS KPI metrics from raw attendance records.
     """
     if not attendance_records:
         return {
@@ -411,6 +482,8 @@ def compute_kpi_cards(attendance_records):
             "kpi_late_punch": 0,
         }
 
+    attendance_records = evaluate_monthly_late_policy(attendance_records)
+
     # Shift names that qualify as "Day Shift"
     DAY_SHIFT_NAMES = {"General Day Shift", "Day Shift", "Morning Shift", "General Day"}
 
@@ -423,6 +496,7 @@ def compute_kpi_cards(attendance_records):
     absent_ids = set()
     on_leave_ids = set()
     late_punch_ids = set()
+
 
     for record in attendance_records:
         emp_id = str(record.get("Employee ID") or "").strip()
@@ -485,25 +559,8 @@ def compute_kpi_cards(attendance_records):
         if has_leave:
             on_leave_ids.add(emp_id)
 
-        # --- Late Punch (no grace period, shift-aware) ---
-        late_min_val = 0.0
-        try:
-            late_min_val = float(late_min_value)
-        except (ValueError, TypeError):
-            late_min_val = 0.0
-
-        late_by_time = 0.0
-        if has_check_in and ":" in in_time:
-            try:
-                h, m = map(int, in_time.split(":"))
-                shift_start = 20 * 60 if is_night_shift else 9 * 60
-                if h * 60 + m > shift_start:
-                    late_by_time = float((h * 60 + m) - shift_start)
-            except (ValueError, TypeError):
-                pass
-
-        late_minutes = max(late_min_val, late_by_time)
-        if late_minutes > 0.0:
+        # --- Late Punch (unexcused late per monthly policy: 3 late comings & 1hr total allowed) ---
+        if record.get("is_unexcused_late"):
             late_punch_ids.add(emp_id)
 
     return {
@@ -893,7 +950,7 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
             if r_dt and r_dt.date() > today_date:
                 continue
             filtered_logs.append(r)
-        sorted_for_table = filtered_logs
+    sorted_for_table = evaluate_monthly_late_policy(sorted_for_table)
 
     for record in sorted_for_table:
         in_time = record.get("In Time", "").strip()
@@ -904,21 +961,9 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
         is_night_shift = bool(shift_raw) and "Night" in shift_raw
         
         has_in = bool(in_time) and in_time not in ("00:00", "—", "")
-        late_minutes = 0.0
-        if has_in and ":" in in_time:
-            try:
-                h, m = map(int, in_time.split(":"))
-                shift_start = 20 * 60 if is_night_shift else 9 * 60
-                if h * 60 + m > shift_start:
-                    late_minutes = float((h * 60 + m) - shift_start)
-            except (ValueError, TypeError):
-                pass
-        
-        if late_minutes == 0:
-            try:
-                late_minutes = float(record.get("Late Minutes") or 0.0)
-            except (ValueError, TypeError):
-                late_minutes = 0.0
+        is_unexcused_late = record.get("is_unexcused_late", False)
+        late_excused = record.get("late_excused", False)
+        late_minutes = record.get("effective_late_minutes", 0.0)
 
         out_time = record.get("Out Time", "").strip()
         if out_time in ("00:00", ""):
@@ -1026,6 +1071,8 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
                 "shift_label": shift_label,
                 "dept_key": resolve_department_key(org_path),
                 "late_minutes": late_minutes,
+                "is_unexcused_late": is_unexcused_late,
+                "late_excused": late_excused,
             }
         )
 

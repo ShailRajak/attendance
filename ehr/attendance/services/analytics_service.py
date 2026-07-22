@@ -217,6 +217,9 @@ def calculate_dashboard_stats(
     status_mispunch = 0.0
     status_cl = 0.0
 
+    from attendance.services.attendance_service import evaluate_monthly_late_policy
+    attendance_records = evaluate_monthly_late_policy(attendance_records)
+
     record_map = {}
     for r in attendance_records:
         d = parse_date(r.get("Date"))
@@ -353,22 +356,11 @@ def calculate_dashboard_stats(
                             else:
                                 shift_start_minutes = 9 * 60
 
-                            # Also check raw late minutes if present
-                            late_min_val = 0.0
-                            try:
-                                late_min_val = float(record.get("Late Minutes") or 0.0)
-                            except (ValueError, TypeError):
-                                late_min_val = 0.0
-
-                            late_by_time = 0.0
-                            if check_in_minutes > shift_start_minutes:
-                                late_by_time = float(check_in_minutes - shift_start_minutes)
-
-                            late_minutes = max(late_min_val, late_by_time)
-                            if late_minutes > 0.0:
+                            if record.get("is_unexcused_late"):
                                 late_arrivals += 1
-                                if late_minutes > max_late_minutes:
-                                    max_late_minutes = int(late_minutes)
+                                eff_late = float(record.get("effective_late_minutes") or 0.0)
+                                if eff_late > max_late_minutes:
+                                    max_late_minutes = int(eff_late)
                                     max_late_date = chart_date
                         except (ValueError, TypeError):
                             # Ignore invalid check-in time formats
@@ -505,6 +497,9 @@ def calculate_section_dashboard_stats(
     unique_dates = set(r.get("Date") for r in attendance_records if r.get("Date"))
     working_days = len(unique_dates)
 
+    from attendance.services.attendance_service import evaluate_monthly_late_policy
+    attendance_records = evaluate_monthly_late_policy(attendance_records)
+
     total_present = 0
     total_leaves = 0.0
     total_late = 0
@@ -608,26 +603,8 @@ def calculate_section_dashboard_stats(
                     status_cl += 1
                     date_aggregates[dt]["leave"] += 1.0
 
-            # Late check-in
-            late_min_val = 0.0
-            try:
-                late_min_val = float(r.get("Late Minutes") or 0.0)
-            except (ValueError, TypeError):
-                late_min_val = 0.0
-
-            late_by_time = 0.0
-            if in_time_str and ":" in in_time_str:
-                try:
-                    h, m = map(int, in_time_str.split(":"))
-                    shift_name = r.get("Shift", "")
-                    shift_start_minutes = 20 * 60 if "Night" in shift_name else 9 * 60
-                    if h * 60 + m > shift_start_minutes:
-                        late_by_time = float((h * 60 + m) - shift_start_minutes)
-                except (ValueError, TypeError):
-                    pass
-
-            is_late = late_min_val > 0.0 or late_by_time > 0.0
-            if is_late:
+            # Late check-in (unexcused late per monthly policy: 3 late comings & 1hr total allowed)
+            if r.get("is_unexcused_late"):
                 total_late += 1
                 date_aggregates[dt]["late"] += 1
 
