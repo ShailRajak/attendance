@@ -298,6 +298,16 @@ class Command(BaseCommand):
                 wt_type_no = row.get("WT Type No", "")
                 attendance_source = row.get("Attendance Source", "")
                 day = row.get("Day", "")
+                if not day or day == "AD":
+                    known_day = (
+                        AttendanceRecord.objects.filter(employee_id=emp_id)
+                        .exclude(day="")
+                        .exclude(day="AD")
+                        .values_list("day", flat=True)
+                        .first()
+                    )
+                    if known_day:
+                        day = known_day
                 attendance_status = row.get("Attendance Status", "")
                 shift = row.get("Shift", "")
                 mobile = row.get("Mobile", "")

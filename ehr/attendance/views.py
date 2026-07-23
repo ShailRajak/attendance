@@ -1,4 +1,4 @@
-# Reload trigger for Shift & Location Filter Buttons Fix across Admin and Management
+# Reload trigger for Department Label Update on Registration Page
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
@@ -63,15 +63,17 @@ def home(request):
 
 def signup_view(request):
     """
-    Employee Signup View
+    Employee / Management Signup View
     """
     from attendance.models import Role, Company, Plant, Department, Section, Team
 
     if request.user.is_authenticated:
         return redirect("home")
 
-    # Exclude roles with 'ALL' data scope to prevent administrative self-promotion
-    roles = Role.objects.filter(is_active=True).exclude(data_scope="ALL").order_by("name")
+    # Fetch ONLY Employee and Management roles for the registration page
+    roles = Role.objects.filter(is_active=True, code__in=["employee", "management"]).order_by("id")
+    sections = Section.objects.filter(is_active=True).order_by("name")
+    plants = Plant.objects.filter(is_active=True).order_by("name")
 
     if request.method == "POST":
         employee_id = request.POST.get("employee_id", "").strip()
@@ -82,7 +84,7 @@ def signup_view(request):
         plant = request.POST.get("plant", "").strip()
         department = ""
         section = request.POST.get("section", "").strip()
-        team = request.POST.get("team", "").strip()
+        team = ""
 
         # Validate using Auth Service
         is_valid, error_msg = validate_signup(
@@ -98,10 +100,10 @@ def signup_view(request):
                     "role": role,
                     "company": company,
                     "plant": plant,
-                    "department": department,
                     "section": section,
-                    "team": team,
                     "roles": roles,
+                    "sections": sections,
+                    "plants": plants,
                 },
             )
 
@@ -117,10 +119,10 @@ def signup_view(request):
                     "role": role,
                     "company": company,
                     "plant": plant,
-                    "department": department,
                     "section": section,
-                    "team": team,
                     "roles": roles,
+                    "sections": sections,
+                    "plants": plants,
                 },
             )
 
@@ -134,7 +136,11 @@ def signup_view(request):
     return render(
         request,
         "attendance/signup.html",
-        {"roles": roles},
+        {
+            "roles": roles,
+            "sections": sections,
+            "plants": plants,
+        },
     )
 
 

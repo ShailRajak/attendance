@@ -29,36 +29,30 @@
                     <select id="role" name="role" class="form-select form-control-custom w-100" required>
                         <option value="" disabled {% if not role %}selected{% endif %}>Select Role</option>
                         {% for r in roles %}
-                        <option value="{{ r.code }}" data-scope="{{ r.data_scope }}" {% if role == r.code %}selected{% endif %}>{{ r.name }}</option>
+                        <option value="{{ r.code }}" data-code="{{ r.code }}" {% if role == r.code %}selected{% endif %}>{{ r.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
 
-
+                <!-- Department Selector (Dynamic: Shown only when Role = Management) -->
+                <div class="mb-2 text-start" id="section-group" style="display: none; transition: all 0.3s ease;">
+                    <label for="section" class="form-label-custom">Department</label>
+                    <select id="section" name="section" class="form-select form-control-custom w-100">
+                        <option value="" disabled {% if not section %}selected{% endif %}>Select Department</option>
+                        {% for s in sections %}
+                        <option value="{{ s.code }}" {% if section == s.code %}selected{% endif %}>{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
 
                 <!-- Plant Selector -->
                 <div class="mb-2 text-start">
                     <label for="plant" class="form-label-custom">Plant / Location</label>
                     <select id="plant" name="plant" class="form-select form-control-custom w-100" required>
-                        <option value="" disabled selected>Select Plant</option>
-                    </select>
-                </div>
-
-
-
-                <!-- Section Selector -->
-                <div class="mb-2 text-start" id="section-group" style="display: none;">
-                    <label for="section" class="form-label-custom">Section</label>
-                    <select id="section" name="section" class="form-select form-control-custom w-100">
-                        <option value="" disabled selected>Select Section</option>
-                    </select>
-                </div>
-
-                <!-- Team Selector -->
-                <div class="mb-3 text-start" id="team-group" style="display: none;">
-                    <label for="team" class="form-label-custom">Team (Optional)</label>
-                    <select id="team" name="team" class="form-select form-control-custom w-100">
-                        <option value="" disabled selected>Select Team</option>
+                        <option value="" disabled {% if not plant %}selected{% endif %}>Select Plant</option>
+                        {% for p in plants %}
+                        <option value="{{ p.code }}" {% if plant == p.code %}selected{% endif %}>{{ p.name }}</option>
+                        {% endfor %}
                     </select>
                 </div>
 
@@ -98,102 +92,61 @@
                     const plantSelect = document.getElementById('plant');
                     const sectionGroup = document.getElementById('section-group');
                     const sectionSelect = document.getElementById('section');
-                    const teamGroup = document.getElementById('team-group');
-                    const teamSelect = document.getElementById('team');
 
-                    function toggleScopes() {
+                    function toggleRoleFields() {
                         const selectedOption = roleSelect.options[roleSelect.selectedIndex];
-                        const scope = selectedOption ? selectedOption.getAttribute('data-scope') : '';
+                        const roleCode = selectedOption ? (selectedOption.getAttribute('data-code') || selectedOption.value) : '';
                         
-                        if (scope === 'SECTION') {
+                        if (roleCode === 'management') {
                             sectionGroup.style.display = 'block';
                             sectionSelect.setAttribute('required', 'required');
                         } else {
                             sectionGroup.style.display = 'none';
                             sectionSelect.removeAttribute('required');
-                        }
-                        
-                        if (scope === 'TEAM') {
-                            sectionGroup.style.display = 'block';
-                            sectionSelect.setAttribute('required', 'required');
-                            teamGroup.style.display = 'block';
-                            teamSelect.setAttribute('required', 'required');
-                        } else {
-                            teamGroup.style.display = 'none';
-                            teamSelect.removeAttribute('required');
+                            sectionSelect.value = '';
                         }
                     }
 
-                    function clearSelect(select, defaultText) {
-                        select.innerHTML = `<option value="" disabled selected>${defaultText}</option>`;
+                    // Fallback to fetch plants via API if plants dropdown has only default option
+                    if (plantSelect.options.length <= 1) {
+                        fetch(`/api/org-nodes/?type=plants&company_code=ismartu`)
+                            .then(r => r.json())
+                            .then(res => {
+                                if (res.success && res.data) {
+                                    res.data.forEach(item => {
+                                        const opt = document.createElement('option');
+                                        opt.value = item.code;
+                                        opt.textContent = item.name;
+                                        plantSelect.appendChild(opt);
+                                    });
+                                }
+                            })
+                            .catch(e => console.error(e));
                     }
 
-                    // Load plants for fixed company (ismartu) on load
-                    fetch(`/api/org-nodes/?type=plants&company_code=ismartu`)
-                        .then(r => r.json())
-                        .then(res => {
-                            if (res.success) {
-                                res.data.forEach(item => {
-                                    plantSelect.innerHTML += `<option value="${item.code}">${item.name}</option>`;
-                                });
-                            }
-                        });
-
-                    plantSelect.addEventListener('change', function() {
-                        const code = this.value;
-                        clearSelect(sectionSelect, 'Select Section');
-                        clearSelect(teamSelect, 'Select Team');
-
-                        if (!code) return;
-
-                        // Fetch sections directly under the selected plant
-                        fetch(`/api/org-nodes/?type=sections&plant_code=${code}`)
-                            .then(r => r.json())
-                            .then(res => {
-                                if (res.success) {
-                                    res.data.forEach(item => {
-                                        sectionSelect.innerHTML += `<option value="${item.code}">${item.name}</option>`;
-                                    });
-                                }
-                            });
-                    });
-
-                    sectionSelect.addEventListener('change', function() {
-                        const code = this.value;
-                        clearSelect(teamSelect, 'Select Team');
-
-                        if (!code) return;
-
-                        fetch(`/api/org-nodes/?type=teams&section_code=${code}`)
-                            .then(r => r.json())
-                            .then(res => {
-                                if (res.success) {
-                                    res.data.forEach(item => {
-                                        teamSelect.innerHTML += `<option value="${item.code}">${item.name}</option>`;
-                                    });
-                                }
-                            });
-                    });
-
-                    roleSelect.addEventListener('change', toggleScopes);
-                    toggleScopes(); // Run on load
+                    roleSelect.addEventListener('change', toggleRoleFields);
+                    toggleRoleFields(); // Run on page load
 
                     // Password Toggle Logic
                     const togglePassword = document.getElementById('togglePassword');
                     const password = document.getElementById('password');
-                    togglePassword.addEventListener('click', function () {
-                        const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
-                        password.setAttribute('type', type);
-                        this.textContent = type === 'password' ? '👁️' : '🙈';
-                    });
+                    if (togglePassword && password) {
+                        togglePassword.addEventListener('click', function () {
+                            const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+                            password.setAttribute('type', type);
+                            this.textContent = type === 'password' ? '👁️' : '🙈';
+                        });
+                    }
 
                     const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
                     const confirmPassword = document.getElementById('confirm_password');
-                    toggleConfirmPassword.addEventListener('click', function () {
-                        const type = confirmPassword.getAttribute('type') === 'password' ? 'text' : 'password';
-                        confirmPassword.setAttribute('type', type);
-                        this.textContent = type === 'password' ? '👁️' : '🙈';
-                    });
+                    if (toggleConfirmPassword && confirmPassword) {
+                        toggleConfirmPassword.addEventListener('click', function () {
+                            const type = confirmPassword.getAttribute('type') === 'password' ? 'text' : 'password';
+                            confirmPassword.setAttribute('type', type);
+                            this.textContent = type === 'password' ? '👁️' : '🙈';
+                        });
+                    }
                 });
             </script>
 

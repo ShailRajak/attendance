@@ -190,6 +190,10 @@ def fetch_attendance_from_db(employee_id, start_date, end_date, day=None, employ
     elif isinstance(end_date, datetime):
         end_date = end_date.date()
 
+    today_date = date.today()
+    if end_date > today_date:
+        end_date = today_date
+
     cache_key = generate_db_cache_key(employee_id, start_date, end_date, day, employee_ids)
     cached_data = cache.get(cache_key)
 
@@ -268,6 +272,11 @@ def fetch_attendance(employee_id, start_date, end_date):
         end_date = datetime.strptime(end_date, "%Y-%m-%d")
     elif isinstance(end_date, date) and not isinstance(end_date, datetime):
         end_date = datetime.combine(end_date, datetime.min.time())
+
+    # Cap end_date at today to prevent unnecessary API calls for future dates!
+    today_dt = datetime.combine(date.today(), datetime.min.time())
+    if end_date > today_dt:
+        end_date = today_dt
 
     cache_key = generate_attendance_cache_key(employee_id, start_date, end_date)
     cached_data = get_attendance_cache(cache_key)
@@ -813,8 +822,8 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
                 else:
                     start_dt, end_dt = get_cycle_bounds(today)
 
-            # Cap monthly end date at today for Admin & Management roles (no future dates)
-            if not is_employee_role and end_dt > today:
+            # Cap monthly end date at today for all roles (no future dates)
+            if end_dt > today:
                 end_dt = today
 
     start_date = start_dt.strftime("%Y-%m-%d")

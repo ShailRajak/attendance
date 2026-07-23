@@ -11,6 +11,9 @@ def validate_signup(employee_id, password, confirm_password, role, company, plan
     Validates user signup parameters.
     Returns (is_valid, error_message).
     """
+    from attendance.models import Role, Section, User
+    from django.db.models import Q
+
     if not employee_id or not password:
         return False, "Employee ID and password are required."
     
@@ -28,12 +31,15 @@ def validate_signup(employee_id, password, confirm_password, role, company, plan
     if not plant:
         return False, "Plant assignment is required."
 
-    if role_obj.data_scope == "SECTION" and not section:
-        return False, f"Section is required for role '{role_obj.name}'."
+    if role_obj.code == "management":
+        if not section:
+            return False, "Department is required for Management role."
+        sec_exists = Section.objects.filter(is_active=True).filter(
+            Q(code=section) | Q(id=int(section) if str(section).isdigit() else -1)
+        ).exists()
+        if not sec_exists:
+            return False, "Selected department does not exist."
 
-    if role_obj.data_scope == "TEAM" and not team:
-        return False, f"Team is required for role '{role_obj.name}'."
-        
     if User.objects.filter(username=employee_id).exists():
         return False, "An account with this Employee ID already exists."
         
@@ -52,17 +58,19 @@ def register_user(employee_id, password, role, company, plant, department, secti
             user = User.objects.create_user(username=employee_id, password=password)
             role_obj = Role.objects.get(code=role, is_active=True)
             
-            comp_obj = Company.objects.get(code=company, is_active=True) if company else None
-            plant_obj = Plant.objects.get(code=plant, is_active=True) if plant else None
-            dept_obj = Department.objects.get(code=department, is_active=True) if department else None
-            sec_obj = Section.objects.get(code=section, is_active=True) if section else None
-            team_obj = Team.objects.get(code=team, is_active=True) if team else None
+            comp_obj = Company.objects.filter(code=company, is_active=True).first() if company else None
+            plant_obj = Plant.objects.filter(code=plant, is_active=True).first() if plant else None
+            if not plant_obj and plant:
+                plant_obj = Plant.objects.filter(id=int(plant) if str(plant).isdigit() else -1, is_active=True).first()
 
-            # Auto-resolve parent nodes if child node was selected
-            if team_obj and not sec_obj:
-                sec_obj = team_obj.section
-            if sec_obj and not dept_obj:
-                dept_obj = sec_obj.department
+            sec_obj = None
+            dept_obj = None
+            if role_obj.code == "management" and section:
+                sec_obj = Section.objects.filter(code=section, is_active=True).first()
+                if not sec_obj and str(section).isdigit():
+                    sec_obj = Section.objects.filter(id=int(section), is_active=True).first()
+                if sec_obj and sec_obj.department:
+                    dept_obj = sec_obj.department
 
             UserProfile.objects.create(
                 user=user,
@@ -71,7 +79,7 @@ def register_user(employee_id, password, role, company, plant, department, secti
                 plant=plant_obj,
                 department=dept_obj,
                 section=sec_obj,
-                team=team_obj,
+                team=None,
             )
             return user, None
     except Exception as e:
