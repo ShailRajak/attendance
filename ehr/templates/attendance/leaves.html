@@ -380,7 +380,7 @@
                 {% endif %}
 
                 <!-- Shift Segment Filter Group -->
-                <div class="d-flex align-items-center gap-2 ms-auto">
+                <div class="d-flex align-items-center gap-2 {% if is_admin or is_superuser or role == 'admin' %}ms-auto{% endif %}">
                     <span class="text-muted small fw-semibold text-uppercase me-1" style="font-size: 0.72rem; letter-spacing: 0.5px;">Shift:</span>
                     <div class="filter-segment-group">
                         <button type="button" id="btnDayShift" class="period-btn">☀️ Day Shift</button>
@@ -650,18 +650,23 @@
 
             if (show) {
                 row.classList.add('matching-filter');
-                count++;
 
-                // Retrieve classification value from classification cell
-                const cells = row.querySelectorAll('td');
-                const categoryCell = cells[cells.length - 1];
-                if (categoryCell) {
-                    const text = categoryCell.textContent.trim();
-                    if (text === 'Mispunch') countMispunch++;
-                    else if (text === 'Absent') countAbsent++;
-                    else if (text === 'Short Leave') countShort++;
-                    else if (text === 'Half Day') countHalf++;
-                    else if (text === 'Full Day') countFull++;
+                // Count KPIs only from unique records (either flat table or 'All' panel in accordion)
+                const isAllPanelRow = !row.closest('.dept-table-body') || row.closest('.dept-table-body').getAttribute('data-panel') === 'All';
+                if (isAllPanelRow) {
+                    count++;
+
+                    // Retrieve classification value from classification cell
+                    const cells = row.querySelectorAll('td');
+                    const categoryCell = cells[cells.length - 1];
+                    if (categoryCell) {
+                        const text = categoryCell.textContent.trim();
+                        if (text === 'Mispunch') countMispunch++;
+                        else if (text === 'Absent') countAbsent++;
+                        else if (text === 'Short Leave') countShort++;
+                        else if (text === 'Half Day') countHalf++;
+                        else if (text === 'Full Day') countFull++;
+                    }
                 }
             } else {
                 row.classList.remove('matching-filter');

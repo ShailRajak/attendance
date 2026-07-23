@@ -617,7 +617,7 @@
                 {% endif %}
 
                 <!-- Shift Segment Filter Group -->
-                <div class="d-flex align-items-center gap-2 ms-auto">
+                <div class="d-flex align-items-center gap-2 {% if is_admin or is_superuser or role == 'admin' %}ms-auto{% endif %}">
                     <span class="text-muted small fw-semibold text-uppercase me-1" style="font-size: 0.72rem; letter-spacing: 0.5px;">Shift:</span>
                     <div class="filter-segment-group">
                         <button type="button" id="btnDayShift" class="period-btn">☀️ Day Shift</button>
@@ -1003,18 +1003,23 @@
 
                 if (show) {
                     row.classList.add('matching-filter');
-                    count++;
 
-                    const cells = row.querySelectorAll('td');
-                    // Column order: 0=emp_id, 1=name, 2=work_time,
-                    //   3=card_punch_ot, 4=requested_ot, 5=weekend_ot,
-                    //   6=holiday_ot, 7=total_ot
-                    if (cells.length >= 8) {
-                        sumCardPunch += parseFloat(cells[3].textContent.replace('h', '')) || 0;
-                        sumRequested += parseFloat(cells[4].textContent.replace('h', '')) || 0;
-                        sumWeekend   += parseFloat(cells[5].textContent.replace('h', '')) || 0;
-                        sumHoliday   += parseFloat(cells[6].textContent.replace('h', '')) || 0;
-                        sumTotal     += parseFloat(cells[7].textContent.replace('h', '')) || 0;
+                    // Count totals only from unique records (either flat table or 'All' panel in accordion)
+                    const isAllPanelRow = !row.closest('.dept-table-body') || row.closest('.dept-table-body').getAttribute('data-panel') === 'All';
+                    if (isAllPanelRow) {
+                        count++;
+
+                        const cells = row.querySelectorAll('td');
+                        // Column order: 0=emp_id, 1=name, 2=work_time,
+                        //   3=card_punch_ot, 4=requested_ot, 5=weekend_ot,
+                        //   6=holiday_ot, 7=total_ot
+                        if (cells.length >= 8) {
+                            sumCardPunch += parseFloat(cells[3].textContent.replace('h', '')) || 0;
+                            sumRequested += parseFloat(cells[4].textContent.replace('h', '')) || 0;
+                            sumWeekend   += parseFloat(cells[5].textContent.replace('h', '')) || 0;
+                            sumHoliday   += parseFloat(cells[6].textContent.replace('h', '')) || 0;
+                            sumTotal     += parseFloat(cells[7].textContent.replace('h', '')) || 0;
+                        }
                     }
                 } else {
                     row.classList.remove('matching-filter');

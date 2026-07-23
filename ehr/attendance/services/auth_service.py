@@ -140,8 +140,20 @@ def get_expected_dtname4(
 ) -> Optional[str]:
     """
     Resolves the expected dtName4 (Day column in attendance records)
-    corresponding to a section. Preserves backward compatibility.
+    corresponding to a section and plant. Preserves backward compatibility.
     """
+    if username:
+        try:
+            u = User.objects.filter(username=username).first()
+            if u and hasattr(u, "profile") and u.profile and u.profile.section:
+                plant_name = u.profile.plant.name if u.profile.plant else ""
+                sec_name = u.profile.section.name.replace("_", " ")
+                if plant_name:
+                    return f"{plant_name} - {sec_name}"
+                return sec_name
+        except Exception:
+            pass
+
     if not section:
         # Fallback username checks (safety net - these users now have proper section records)
         if username == "19105540":
@@ -154,21 +166,34 @@ def get_expected_dtname4(
 
     # Try resolving from the Section model name
     try:
-        sec_obj = Section.objects.get(code=section)
-        return sec_obj.name
-    except Section.DoesNotExist:
-        # Fallback to old hardcoded names
-        if role == "smt_pd":
-            if section == "s63":
-                return "Sector 63 - SMT PD"
-            elif section == "c39":
-                return "Phase 2 - SMT PD"
-        elif role == "assy_pd":
-            if section == "s63":
-                return "Sector 63 - ASSY PD"
-            elif section == "c39":
-                return "Phase 2 - ASSY PD"
-        return None
+        sec_obj = Section.objects.filter(code=section).first()
+        if not sec_obj and str(section).isdigit():
+            sec_obj = Section.objects.filter(id=int(section)).first()
+        if not sec_obj:
+            sec_obj = Section.objects.filter(name=section).first()
+
+        if sec_obj:
+            sec_name = sec_obj.name.replace("_", " ")
+            if role in ("s63", "sector 63"):
+                return f"Sector 63 - {sec_name}"
+            elif role in ("c39", "phase 2"):
+                return f"Phase 2 - {sec_name}"
+            return sec_name
+    except Exception:
+        pass
+
+    # Fallback to old hardcoded names
+    if role == "smt_pd":
+        if section == "s63":
+            return "Sector 63 - SMT PD"
+        elif section == "c39" or section == "smt_pd":
+            return "Phase 2 - SMT PD"
+    elif role == "assy_pd":
+        if section == "s63":
+            return "Sector 63 - ASSY PD"
+        elif section == "c39" or section == "assy_pd":
+            return "Phase 2 - ASSY PD"
+    return None
 
 
 class RoleService:
@@ -338,8 +363,12 @@ class RBACService:
         """
         if not user or not user.is_authenticated or user.is_superuser:
             return None
-        if hasattr(user, "profile") and user.profile.section:
-            return user.profile.section.name
+        if hasattr(user, "profile") and user.profile and user.profile.section:
+            plant_name = user.profile.plant.name if user.profile.plant else ""
+            sec_name = user.profile.section.name.replace("_", " ")
+            if plant_name:
+                return f"{plant_name} - {sec_name}"
+            return sec_name
         return None
 
 

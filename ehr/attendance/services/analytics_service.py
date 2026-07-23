@@ -4,12 +4,12 @@ from dateutil.relativedelta import relativedelta
 from django.contrib.auth.models import User
 from attendance.models import UserProfile
 from attendance.services.auth_service import resolve_user_role_and_section, get_expected_dtname4, RBACService
-from attendance.utils.formatter import calculate_validated_ot, is_full_day_present
+from attendance.utils.formatter import calculate_validated_ot, is_full_day_present, classify_attendance, is_present_status, AttendanceStatus
 
 
 def parse_date(date_str):
     """
-    Tries to parse date string in multiple potential formats.
+    Tries to parse date string in multiple potential formats with fast-path string checks.
     """
     if not date_str:
         return None
@@ -19,6 +19,23 @@ def parse_date(date_str):
         return datetime(date_str.year, date_str.month, date_str.day)
 
     date_str = str(date_str).strip()
+    if not date_str or date_str in ("—", "None"):
+        return None
+
+    # Fast path for common YYYY-MM-DD format
+    if len(date_str) == 10 and date_str[4] == "-" and date_str[7] == "-":
+        try:
+            return datetime(int(date_str[:4]), int(date_str[5:7]), int(date_str[8:10]))
+        except ValueError:
+            pass
+
+    # Fast path for common DD-MM-YYYY format
+    if len(date_str) == 10 and date_str[2] == "-" and date_str[5] == "-":
+        try:
+            return datetime(int(date_str[6:10]), int(date_str[3:5]), int(date_str[:2]))
+        except ValueError:
+            pass
+
     for fmt in ("%d-%m-%Y", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
         try:
             return datetime.strptime(date_str, fmt)
@@ -305,45 +322,26 @@ def calculate_dashboard_stats(
                 is_today = (
                     (date_obj.date() == datetime.now().date()) if date_obj else False
                 )
-                is_mispunch = False
-                if (has_check_in and not has_check_out) or (
-                    has_check_out and not has_check_in
-                ):
-                    if not is_holiday:
-                        mispunches += 1
-                        status_mispunch += 1.0
-                        is_mispunch = True
+                status = record.get("status") or classify_attendance(record)
+                if is_present_status(status):
+                    working_days += 1
+                    days_present += 1.0
+                    status_present += 1.0
+                    total_work_time += work_time
+                elif status == AttendanceStatus.APPROVED_LEAVE:
+                    working_days += 1
+                    leaves_taken += 1.0
+                    status_leave += 1.0
+                elif status == AttendanceStatus.ABSENT:
+                    working_days += 1
+                    leaves_taken += 1.0
+                    status_cl += 1.0
+                elif status in (AttendanceStatus.HOLIDAY, AttendanceStatus.WEEKLY_OFF, AttendanceStatus.REST_DAY):
+                    status_rest += 1
 
-                if not has_check_in:
-                    if is_weekend or is_holiday:
-                        status_rest += 1
-                    else:
-                        working_days += 1
-                        leaves_taken += 1.0
-                        status_leave += 1.0
-                else:
-                    if is_mispunch:
-                        pass
-                    elif is_weekend:
-                        if is_full_day_present(work_time, record.get("Out Time"), record.get("Shift"), is_today):
-                            working_days += 1
-                            days_present += 1.0
-                            status_present += 1.0
-                            total_work_time += work_time
-                        else:
-                            status_rest += 1
-                            total_work_time += work_time
-                    else:
-                        working_days += 1
-                        if is_full_day_present(work_time, record.get("Out Time"), record.get("Shift"), is_today):
-                            days_present += 1.0
-                            status_present += 1.0
-                            total_work_time += work_time
-                        else:
-                            days_present += 0.5
-                            leaves_taken += 0.5
-                            status_cl += 1.0
-                            total_work_time += work_time
+                if status == AttendanceStatus.MISPUNCH:
+                    mispunches += 1
+                    status_mispunch += 1.0
 
                     if in_time_str and ":" in in_time_str:
                         try:
@@ -582,33 +580,30 @@ def calculate_section_dashboard_stats(
             else False
         )
         is_today = date_obj and date_obj.date() == today_curr
-        is_mispunch = False
-        if (has_in and not has_out) or (has_out and not has_in):
-            if not is_holiday:
-                total_mispunches += 1
-                status_mispunch += 1
-                is_mispunch = True
+        status = r.get("status") or classify_attendance(r)
 
-        is_weekend = False
-        if date_obj and date_obj.weekday() == 6:
-            is_weekend = True
-
-        if not has_in:
-            if not is_weekend and not is_holiday:
-                total_leaves += 1.0
-                status_leave += 1
-                date_aggregates[dt]["leave"] += 1.0
-            else:
-                status_rest += 1
-        else:
+        if is_present_status(status):
             total_present += 1
             status_present += 1
             date_aggregates[dt]["present"] += 1
+        elif status == AttendanceStatus.APPROVED_LEAVE:
+            total_leaves += 1.0
+            status_leave += 1
+            date_aggregates[dt]["leave"] += 1.0
+        elif status == AttendanceStatus.ABSENT:
+            total_leaves += 1.0
+            status_cl += 1.0
+            date_aggregates[dt]["leave"] += 1.0
+        elif status in (AttendanceStatus.HOLIDAY, AttendanceStatus.WEEKLY_OFF, AttendanceStatus.REST_DAY):
+            status_rest += 1
 
-            # Late check-in (unexcused late per monthly policy: 3 late comings & 1hr total allowed)
-            if r.get("is_unexcused_late"):
-                total_late += 1
-                date_aggregates[dt]["late"] += 1
+        if status == AttendanceStatus.MISPUNCH:
+            total_mispunches += 1
+            status_mispunch += 1
+
+        if r.get("is_unexcused_late"):
+            total_late += 1
+            date_aggregates[dt]["late"] += 1
 
     avg_work_time = (
         round(total_work_time / work_time_records_count, 1)
@@ -978,27 +973,16 @@ def get_scope_overtime_summary(accessible_usernames, start_date, end_date, expec
         weekday = record.get("Weekday", "")
         raw_date = record.get("Date", "")
 
+        dt_parsed = parse_date(raw_date)
         is_sunday = False
         try:
             if int(weekday) == 1:
                 is_sunday = True
         except (ValueError, TypeError):
-            if raw_date:
-                try:
-                    dt_parsed = datetime.strptime(raw_date.split("T")[0], "%Y-%m-%d")
-                    if dt_parsed.weekday() == 6:
-                        is_sunday = True
-                except (ValueError, TypeError):
-                    pass
+            if dt_parsed and dt_parsed.weekday() == 6:
+                is_sunday = True
 
-        is_holiday = False
-        if raw_date:
-            try:
-                dt_parsed = datetime.strptime(raw_date.split("T")[0], "%Y-%m-%d")
-                if dt_parsed.year == 2026 and dt_parsed.month == 7 and dt_parsed.day == 1:
-                    is_holiday = True
-            except (ValueError, TypeError):
-                pass
+        is_holiday = bool(dt_parsed and dt_parsed.year == 2026 and dt_parsed.month == 7 and dt_parsed.day == 1)
 
         try:
             raw_ot = float(record.get("Card Punch OT", 0) or 0)
@@ -1632,8 +1616,23 @@ def get_leaves_dashboard_data(
             else:
                 attendance = [r for r in attendance if r.get("Employee ID") in accessible_users]
 
+    # Ensure each employee is counted only once per date (Employee + Date unique grouping)
+    seen_emp_dates = set()
+    deduped_attendance = []
+    for r in attendance:
+        emp_id = r.get("Employee ID")
+        d_str = r.get("Date")
+        if emp_id and d_str:
+            key = (emp_id, d_str)
+            if key in seen_emp_dates:
+                continue
+            seen_emp_dates.add(key)
+        deduped_attendance.append(r)
+    attendance = deduped_attendance
+
     stats = {"mispunch": 0, "leave": 0, "short_leave": 0, "half_day": 0, "full_day": 0}
     records = []
+    shift_cache = {}
 
     for record in attendance:
         go1 = record.get("In Time", "").strip()
@@ -1662,54 +1661,18 @@ def get_leaves_dashboard_data(
             else False
         )
 
-        if not go1 and not out1:
-            if not is_sunday and not is_holiday and not record.get("Leave Type"):
-                category = "Absent"
-                stats["leave"] += 1
-        elif not go1 or not out1:
-            if not is_sunday and not is_holiday and not record.get("Leave Type"):
-                if is_today:
-                    category = "Present"
-                else:
-                    category = "Mispunch"
-                    stats["mispunch"] += 1
-        else:
-            # Check shift timings to validate short leave
-            shift_str = str(record.get("Shift") or "")
+        category = classify_attendance(record)
 
-            # Default to 09:00 - 18:00 if no match
-            shift_in, shift_out = 9 * 60, 18 * 60
-            match = re.search(r"(\d{2}):(\d{2})\s*-\s*(\d{2}):(\d{2})", shift_str)
-            if match:
-                sh, sm, eh, em = map(int, match.groups())
-                shift_in = sh * 60 + sm
-                shift_out = eh * 60 + em
-
-            def to_mins(t_str):
-                try:
-                    h, m = map(int, t_str.split(":"))
-                    return h * 60 + m
-                except (ValueError, TypeError, AttributeError):
-                    return 0
-
-            actual_in = to_mins(go1)
-            actual_out = to_mins(out1)
-
-            late_mins = actual_in - shift_in if actual_in >= shift_in else 0
-            early_mins = shift_out - actual_out if shift_out >= actual_out else 0
-
-            # Validate short leave: missing ~2 hours at start OR ~2 hours at end (90 to 180 mins)
-            is_valid_short_leave = (90 <= late_mins <= 180) or (90 <= early_mins <= 180)
-
-            if work_hrs >= 8.0:
-                category = "Full Day"
-                stats["full_day"] += 1
-            elif work_hrs >= 5.5 and is_valid_short_leave:
-                category = "Short Leave"
-                stats["short_leave"] += 1
-            else:
-                category = "Half Day"
-                stats["half_day"] += 1
+        if category == "Absent":
+            stats["leave"] += 1
+        elif category == "Mispunch":
+            stats["mispunch"] += 1
+        elif category == "Full Day":
+            stats["full_day"] += 1
+        elif category == "Short Leave":
+            stats["short_leave"] += 1
+        elif category == "Half Day":
+            stats["half_day"] += 1
 
         if category:
             shift_str = str(record.get("Shift") or "").lower()

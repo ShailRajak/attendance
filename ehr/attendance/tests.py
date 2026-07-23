@@ -500,3 +500,91 @@ class AttendanceDrilldownTests(TestCase):
             "filter_value": "SomeValue"
         })
         self.assertEqual(response.status_code, 400)
+
+
+from attendance.utils.formatter import classify_attendance, AttendanceStatus, is_present_status
+
+class ClassificationEngineTests(TestCase):
+    def test_full_day_valid(self):
+        rec = {"In Time": "09:00", "Out Time": "18:00", "Working Hours": "9.0", "Shift": "Day Shift (09:00-18:00)"}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.FULL_DAY)
+
+    def test_full_day_relaxation(self):
+        rec = {"In Time": "09:00", "Out Time": "17:50", "Working Hours": "8.8", "Shift": "Day Shift (09:00-18:00)"}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.FULL_DAY)
+
+    def test_1st_late_login_full_day(self):
+        rec = {"In Time": "09:10", "Out Time": "17:50", "Working Hours": "8.6", "Shift": "Day Shift (09:00-18:00)", "monthly_late_count": 1}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.FULL_DAY)
+
+    def test_2nd_late_login_full_day(self):
+        rec = {"In Time": "09:25", "Out Time": "17:55", "Working Hours": "8.5", "Shift": "Day Shift (09:00-18:00)", "monthly_late_count": 2}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.FULL_DAY)
+
+    def test_3rd_late_login_full_day(self):
+        rec = {"In Time": "09:40", "Out Time": "18:00", "Working Hours": "8.3", "Shift": "Day Shift (09:00-18:00)", "monthly_late_count": 3}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.FULL_DAY)
+
+    def test_4th_late_login_becomes_half_day(self):
+        rec = {"In Time": "09:30", "Out Time": "17:55", "Working Hours": "8.4", "Shift": "Day Shift (09:00-18:00)", "monthly_late_count": 4}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.HALF_DAY)
+
+    def test_late_login_over_60_mins(self):
+        rec = {"In Time": "10:30", "Out Time": "18:30", "Working Hours": "8.0", "Shift": "Day Shift (09:00-18:00)", "monthly_late_count": 1}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.SHORT_LEAVE)
+
+    def test_short_leave_late(self):
+        rec = {"In Time": "11:00", "Out Time": "17:50", "Working Hours": "6.8", "Shift": "Day Shift (09:00-18:00)"}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.SHORT_LEAVE)
+
+    def test_short_leave_early(self):
+        rec = {"In Time": "09:00", "Out Time": "16:00", "Working Hours": "7.0", "Shift": "Day Shift (09:00-18:00)"}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.SHORT_LEAVE)
+
+    def test_more_than_2h_late(self):
+        rec = {"In Time": "12:00", "Out Time": "18:00", "Working Hours": "6.0", "Shift": "Day Shift (09:00-18:00)"}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.HALF_DAY)
+
+    def test_more_than_2h_early_departure(self):
+        rec = {"In Time": "09:00", "Out Time": "15:00", "Working Hours": "6.0", "Shift": "Day Shift (09:00-18:00)"}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.HALF_DAY)
+
+    def test_half_day_morning(self):
+        rec = {"In Time": "09:00", "Out Time": "13:00", "Working Hours": "4.0", "Shift": "Day Shift (09:00-18:00)"}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.HALF_DAY)
+
+    def test_half_day_evening(self):
+        rec = {"In Time": "14:00", "Out Time": "18:00", "Working Hours": "4.0", "Shift": "Day Shift (09:00-18:00)"}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.HALF_DAY)
+
+    def test_mispunch_missing_out(self):
+        rec = {"In Time": "09:00", "Out Time": "", "Working Hours": "0", "Shift": "Day Shift (09:00-18:00)"}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.MISPUNCH)
+
+    def test_mispunch_missing_in(self):
+        rec = {"In Time": "", "Out Time": "18:00", "Working Hours": "0", "Shift": "Day Shift (09:00-18:00)"}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.MISPUNCH)
+
+    def test_absent_both_missing(self):
+        rec = {"In Time": "", "Out Time": "", "Working Hours": "0", "Date": "2026-07-22"}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.ABSENT)
+
+    def test_approved_leave(self):
+        rec = {"In Time": "", "Out Time": "", "Leave Type": "CL", "Date": "2026-07-22"}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.APPROVED_LEAVE)
+
+    def test_night_shift_full_day(self):
+        rec = {"In Time": "20:00", "Out Time": "07:50", "Working Hours": "11.8", "Shift": "Night Shift (20:00-08:00)"}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.FULL_DAY)
+
+    def test_rotational_shift_full_day(self):
+        rec = {"In Time": "08:00", "Out Time": "16:50", "Working Hours": "8.8", "Shift": "General Shift (08:00-17:00)"}
+        self.assertEqual(classify_attendance(rec), AttendanceStatus.FULL_DAY)
+
+    def test_present_formula(self):
+        self.assertTrue(is_present_status(AttendanceStatus.FULL_DAY))
+        self.assertTrue(is_present_status(AttendanceStatus.HALF_DAY))
+        self.assertTrue(is_present_status(AttendanceStatus.SHORT_LEAVE))
+        self.assertTrue(is_present_status(AttendanceStatus.MISPUNCH))
+        self.assertFalse(is_present_status(AttendanceStatus.ABSENT))
+        self.assertFalse(is_present_status(AttendanceStatus.APPROVED_LEAVE))

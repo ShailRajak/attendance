@@ -1,7 +1,7 @@
 # Reload trigger for Department Label Update on Registration Page
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 
 from attendance.services.auth_service import (
@@ -513,34 +513,8 @@ def attendance_drilldown_api(request):
             is_weekend = False
             date_val = None
 
-        is_holiday = (
-            date_val and date_val.year == 2026 and date_val.month == 7 and date_val.day == 1
-        )
-        is_today = date_val and date_val == datetime.now().date()
-
-        has_in = bool(in_time) and in_time != "—"
-        has_out = bool(out_time) and out_time != "—"
-
-        if is_holiday:
-            if not has_in and not has_out:
-                status = "Holiday"
-            else:
-                status = "Present"
-        elif (has_in and not has_out) or (has_out and not has_in):
-            if is_today:
-                status = "Present"
-            else:
-                status = "Mispunch"
-        elif not has_in and not has_out:
-            if is_weekend:
-                status = "Rest Day"
-            else:
-                status = "Absent"
-        else:
-            if work_time >= 8.0:
-                status = "Present"
-            else:
-                status = "CL(0.5d)"
+        from attendance.utils.formatter import classify_attendance, is_present_status
+        status = classify_attendance(record)
 
         # Determine shift label for filtering
         shift_raw = str(record.get("Shift") or "").strip()
@@ -570,11 +544,14 @@ def attendance_drilldown_api(request):
                 continue
 
         elif filter_type == "attendance_status":
-            if filter_value in ("Leaves", "Absent"):
-                if status not in ("Leaves", "Absent"):
+            if filter_value == "Present":
+                if not is_present_status(status):
+                    continue
+            elif filter_value in ("Leaves", "Absent"):
+                if status not in ("Approved Leave", "Absent"):
                     continue
             elif filter_value == "Rest Days":
-                if status not in ("Rest Day", "Holiday"):
+                if status not in ("Rest Day", "Holiday", "Weekly Off"):
                     continue
             elif filter_value == "Mispunches":
                 if status != "Mispunch":

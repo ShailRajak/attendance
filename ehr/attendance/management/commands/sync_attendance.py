@@ -78,17 +78,10 @@ def fetch_single_date_with_status(date_obj):
 
                 if isinstance(data, list):
                     return True, data
-            else:
-                print(
-                    f"API Error ({date_str}) (Attempt {attempt+1}/{retries}) : "
-                    f"{result.get('Message', 'Unknown Error')}"
-                )
-        except requests.exceptions.RequestException as e:
-            print(f"Request Error ({date_str}) (Attempt {attempt+1}/{retries}) : {e}")
+        except requests.exceptions.RequestException:
             if attempt < retries - 1:
                 time.sleep(0.5)
-        except Exception as e:
-            print(f"Unexpected Error ({date_str}) (Attempt {attempt+1}/{retries}) : {e}")
+        except Exception:
             break
 
     return False, []

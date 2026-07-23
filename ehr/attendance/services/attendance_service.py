@@ -4,7 +4,7 @@ import requests
 from concurrent.futures import ThreadPoolExecutor
 from django.core.cache import cache
 from attendance.models import UserProfile
-from attendance.utils.formatter import filter_attendance_data, calculate_validated_ot, is_full_day_present
+from attendance.utils.formatter import filter_attendance_data, calculate_validated_ot, is_full_day_present, classify_attendance, is_present_status, AttendanceStatus
 from attendance.utils.date_helpers import get_attendance_date_range
 from attendance.services.auth_service import resolve_user_role_and_section, get_expected_dtname4, RBACService
 from attendance.services.analytics_service import (
@@ -72,7 +72,7 @@ def generate_db_cache_key(employee_id, start_date, end_date, day=None, employee_
         end_date = datetime.combine(end_date, datetime.min.time())
 
     emp = employee_id if employee_id else "ALL"
-    day_str = f"_{day}" if day else ""
+    day_str = f"_{str(day).replace(' ', '_')}" if day else ""
     
     # Hash employee_ids set/list for a consistent cache string segment
     emp_ids_str = ""
@@ -110,7 +110,6 @@ def _fetch_single_date(date_obj, employee_id):
     Helper function to fetch attendance records for a single date.
     """
     date_str = date_obj.strftime("%Y%m%d")
-    print(f"Fetching : {date_str}")
 
     data_payload = {"YYMMDD": date_str}
 
@@ -152,23 +151,14 @@ def _fetch_single_date(date_obj, employee_id):
 
                 if isinstance(data, list):
                     return data
-            else:
-                print(
-                    f"API Error ({date_str}) (Attempt {attempt+1}/{retries}) : "
-                    f"{result.get('Message', 'Unknown Error')}"
-                )
 
-        except requests.exceptions.RequestException as e:
-            print(f"Request Error ({date_str}) (Attempt {attempt+1}/{retries}) : {e}")
+        except requests.exceptions.RequestException:
             if attempt < retries - 1:
                 import time
 
                 time.sleep(0.5)
 
-        except Exception as e:
-            print(
-                f"Unexpected Error ({date_str}) (Attempt {attempt+1}/{retries}) : {e}"
-            )
+        except Exception:
             break
 
     return []
@@ -289,20 +279,7 @@ def fetch_attendance(employee_id, start_date, end_date):
         db_count = qs.count()
 
         if db_count == 0 or len(cached_data) == db_count:
-            print("=" * 60)
-            print("Loaded attendance from CACHE")
-            print(f"Cache Key : {cache_key}")
-            print("=" * 60)
             return cached_data
-        else:
-            print("=" * 60)
-            print(f"Cache row count mismatch with DB (cached: {len(cached_data)}, db: {db_count}). Reloading from API...")
-            print("=" * 60)
-
-    print("=" * 60)
-    print("Cache MISS")
-    print("Fetching attendance from API...")
-    print("=" * 60)
 
     dates = []
     current_date = start_date
@@ -322,19 +299,12 @@ def fetch_attendance(employee_id, start_date, end_date):
                 try:
                     records = future.result()
                     all_records.extend(records)
-                except Exception as exc:
-                    print(f"Concurrent fetching generated an exception: {exc}")
-
-    print(f"\nTotal Records : {len(all_records)}")
+                except Exception:
+                    pass
 
     filtered_data = filter_attendance_data(all_records)
 
     set_attendance_cache(cache_key, filtered_data, timeout=CACHE_TIMEOUT)
-
-    print("=" * 60)
-    print("Attendance cached successfully")
-    print(f"Cache Key : {cache_key}")
-    print("=" * 60)
 
     return filtered_data
 
@@ -484,7 +454,11 @@ def evaluate_monthly_late_policy(attendance_records):
     """
     Applies the monthly late coming allowance policy across attendance records.
     """
-    if not attendance_records or getattr(attendance_records, "_policy_evaluated", False):
+    if not attendance_records:
+        return attendance_records
+    if getattr(attendance_records, "_policy_evaluated", False):
+        return attendance_records
+    if isinstance(attendance_records, list) and len(attendance_records) > 0 and isinstance(attendance_records[0], dict) and attendance_records[0].get("_policy_evaluated"):
         return attendance_records
 
     emp_groups = {}
@@ -544,6 +518,9 @@ def evaluate_monthly_late_policy(attendance_records):
                 r["late_excused"] = False
                 r["effective_late_minutes"] = 0.0
 
+    for r in attendance_records:
+        if isinstance(r, dict):
+            r["_policy_evaluated"] = True
     try:
         setattr(attendance_records, "_policy_evaluated", True)
     except Exception:
@@ -553,7 +530,8 @@ def evaluate_monthly_late_policy(attendance_records):
 
 def compute_kpi_cards(attendance_records, skip_policy=False):
     """
-    Calculate summary HRMS KPI metrics from raw attendance records.
+    Calculate summary HRMS KPI metrics from attendance records (raw or formatted).
+    Uses centralized Attendance Classification Engine.
     """
     if not attendance_records:
         return {
@@ -570,10 +548,6 @@ def compute_kpi_cards(attendance_records, skip_policy=False):
     if not skip_policy:
         attendance_records = evaluate_monthly_late_policy(attendance_records)
 
-    # Shift names that qualify as "Day Shift"
-    DAY_SHIFT_NAMES = {"General Day Shift", "Day Shift", "Morning Shift", "General Day"}
-
-    # Set of employee IDs with their computed attributes
     total_employees_ids = set()
     day_shift_ids = set()
     night_shift_ids = set()
@@ -584,51 +558,38 @@ def compute_kpi_cards(attendance_records, skip_policy=False):
     late_punch_ids = set()
 
     for record in attendance_records:
-        emp_id = str(record.get("Employee ID") or "").strip()
-        if not emp_id:
+        emp_id = str(record.get("employee_id") or record.get("Employee ID") or "").strip()
+        if not emp_id or emp_id in ("—", "None", "0"):
             continue
 
         total_employees_ids.add(emp_id)
 
-        shift = str(record.get("Shift") or "").strip()
-        in_time = str(record.get("In Time") or "").strip()
-        leave_type = str(record.get("Leave Type") or "").strip()
+        shift_raw = str(record.get("shift_label") or record.get("Shift") or record.get("WTTypeName") or "").strip().lower()
+        is_night_shift = "night" in shift_raw or "ns" in shift_raw
+        is_day_shift = not is_night_shift
 
-        # Determine shift type
-        is_day_shift = shift in DAY_SHIFT_NAMES
-        is_night_shift = bool(shift) and "Night" in shift
-
-        # --- Day / Night Shift counts (per record's shift) ---
         if is_day_shift:
             day_shift_ids.add(emp_id)
-        if is_night_shift:
+        else:
             night_shift_ids.add(emp_id)
 
-        # Determine Present / Absent based on In Time and Work Hours
-        out_time = str(record.get("Out Time") or "").strip()
-        has_check_in = bool(in_time) and in_time not in ("00:00", "—", "")
+        status = record.get("status") or classify_attendance(record)
+        is_present = is_present_status(status)
+        is_absent = (status == AttendanceStatus.ABSENT)
+        leave_val = str(record.get("Leave Type") or record.get("leave_type") or "").strip()
+        is_leave = (status == AttendanceStatus.APPROVED_LEAVE) or bool(leave_val and leave_val not in ("—", "None", "0", ""))
 
-        is_present = bool(has_check_in)
-        is_absent = bool(not has_check_in and leave_type not in ("", "—", "None", "0"))
-        has_leave = bool(leave_type) and leave_type not in ("", "—", "None", "0")
-
-        # --- Present counts (per record's shift) ---
         if is_present:
             if is_day_shift:
                 present_day_ids.add(emp_id)
-            if is_night_shift:
+            else:
                 present_night_ids.add(emp_id)
-
-        # --- Absent (no check-in, no leave) ---
-        if is_absent:
+        elif is_leave:
+            on_leave_ids.add(emp_id)
+        elif is_absent:
             absent_ids.add(emp_id)
 
-        # --- On Leave (any approved leave type) ---
-        if has_leave:
-            on_leave_ids.add(emp_id)
-
-        # --- Late Punch (unexcused late per monthly policy) ---
-        if record.get("is_unexcused_late"):
+        if record.get("is_unexcused_late") or record.get("late_minutes", 0) > 15:
             late_punch_ids.add(emp_id)
 
     return {
@@ -889,15 +850,24 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
     else:
         # Supervisor/Manager scope: filter by section name (dtName4 / Day)
         if expected_dtname4:
+            sec_name_clean = expected_dtname4.split(" - ")[-1] if " - " in expected_dtname4 else expected_dtname4
             if query_employee_id:
                 # Specific employee: fetch their record and verify they belong to our section
                 attendance = [
                     r for r in attendance 
-                    if r.get("Employee ID") == query_employee_id and r.get("Day") == expected_dtname4
+                    if r.get("Employee ID") == query_employee_id and (
+                        r.get("Day") == expected_dtname4 or 
+                        (r.get("Day") and sec_name_clean in r.get("Day"))
+                    )
                 ]
             else:
                 # Group view: show all records in our section
-                attendance = [r for r in attendance if r.get("Day") == expected_dtname4]
+                attendance = [
+                    r for r in attendance 
+                    if r.get("Day") == expected_dtname4 or (
+                        r.get("Day") and sec_name_clean in r.get("Day")
+                    )
+                ]
         else:
             # Fallback to accessible users if no expected section name is resolved
             accessible_users = set(
@@ -1139,29 +1109,11 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
         )
         is_today = date_obj and date_obj.date() == datetime.now().date()
 
-        has_in = bool(in_time) and in_time != "—"
-        has_out = bool(out_time) and out_time != "—"
-
-        if is_holiday:
-            if not has_in and not has_out:
-                status = "Holiday"
-            else:
-                status = "Present"
-        elif (has_in and not has_out) or (has_out and not has_in):
-            if is_today:
-                status = "Present"
-            else:
-                status = "Mispunch"
-        elif not has_in and not has_out:
-            if is_weekend:
-                status = "Rest Day"
-            else:
-                status = "Absent"
-        else:
-            if is_full_day_present(work_time, out_time, shift_raw, is_today):
-                status = "Present"
-            else:
-                status = "CL(0.5d)"
+        # Centralized Attendance Classification Engine
+        status = classify_attendance(record)
+        if status in ("Full Day", "Short Leave", "Half Day") and (has_in or has_out):
+            # Maintain backward compatible Present status string for legacy views
+            pass
 
         # Determine shift label for filtering (case-insensitive)
         shift_raw = str(record.get("Shift") or "").strip().lower()
@@ -1327,6 +1279,7 @@ def get_home_dashboard_data(user, start_date, end_date, query_employee_id, activ
         "employee_id_value": query_employee_id,
         "is_superuser": is_superuser,
         "is_admin": is_admin,
+        "is_management": is_management,
         "role": role,
         "section": section,
         "role_display": role_display,

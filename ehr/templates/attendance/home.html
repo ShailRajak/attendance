@@ -407,27 +407,45 @@
     }
 
     .calendar-present {
-        background-color: rgba(16, 185, 129, 0.12) !important;
-        border-color: rgba(16, 185, 129, 0.3) !important;
+        background-color: rgba(16, 185, 129, 0.15) !important;
+        border-color: rgba(16, 185, 129, 0.4) !important;
         color: #10b981 !important;
     }
 
-    .calendar-late {
-        background-color: rgba(239, 68, 68, 0.1) !important;
-        border-color: rgba(239, 68, 68, 0.3) !important;
+    .calendar-half-day {
+        background-color: rgba(59, 130, 246, 0.15) !important;
+        border-color: rgba(59, 130, 246, 0.4) !important;
+        color: #3b82f6 !important;
+    }
+
+    .calendar-short-leave {
+        background-color: rgba(14, 165, 233, 0.15) !important;
+        border-color: rgba(14, 165, 233, 0.4) !important;
+        color: #0ea5e9 !important;
+    }
+
+    .calendar-mispunch {
+        background-color: rgba(249, 115, 22, 0.15) !important;
+        border-color: rgba(249, 115, 22, 0.4) !important;
+        color: #f97316 !important;
+    }
+
+    .calendar-absent {
+        background-color: rgba(239, 68, 68, 0.15) !important;
+        border-color: rgba(239, 68, 68, 0.4) !important;
         color: #ef4444 !important;
     }
 
-    .calendar-leave,
-    .calendar-weekend {
-        background-color: rgba(245, 158, 11, 0.12) !important;
-        border-color: rgba(245, 158, 11, 0.3) !important;
+    .calendar-approved-leave {
+        background-color: rgba(245, 158, 11, 0.15) !important;
+        border-color: rgba(245, 158, 11, 0.4) !important;
         color: #f59e0b !important;
     }
 
-    [data-theme="light"] .calendar-weekend {
-        background-color: rgba(148, 163, 184, 0.05) !important;
-        color: var(--text-muted) !important;
+    .calendar-weekend {
+        background-color: rgba(148, 163, 184, 0.08) !important;
+        border-color: rgba(148, 163, 184, 0.2) !important;
+        color: #94a3b8 !important;
     }
 
     .calendar-day-num {
@@ -853,7 +871,7 @@
                 {% endif %}
 
                 <!-- Shift Segment Filter Group -->
-                <div class="d-flex align-items-center gap-2 ms-auto">
+                <div class="d-flex align-items-center gap-2 {% if is_admin or is_superuser or role == 'admin' %}ms-auto{% endif %}">
                     <span class="text-muted small fw-semibold text-uppercase me-1" style="font-size: 0.72rem; letter-spacing: 0.5px;">Shift:</span>
                     <div class="filter-segment-group">
                         <button type="button" id="btnDayShift" class="period-btn">☀️ Day Shift</button>
@@ -1155,17 +1173,20 @@
                                             <td>{{ row.work_hrs }}</td>
                                             <td>{{ row.ot_hrs }}</td>
                                             <td>
-                                                {% if row.status == "Present" %}
-                                                <span class="badge badge-custom badge-active">Present</span>
+                                                {% if row.status == "Full Day" or row.status == "Present" %}
+                                                <span class="badge badge-custom badge-active">Full Day</span>
+                                                {% elif row.status == "Short Leave" %}
+                                                <span class="badge badge-custom" style="background-color: rgba(59, 130, 246, 0.12); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2);">Short Leave</span>
+                                                {% elif row.status == "Half Day" %}
+                                                <span class="badge badge-custom" style="background-color: rgba(168, 85, 247, 0.12); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.2);">Half Day</span>
                                                 {% elif row.status == "Absent" %}
                                                 <span class="badge badge-custom badge-absent">Absent</span>
                                                 {% elif row.status == "Mispunch" %}
                                                 <span class="badge badge-custom badge-absent"
                                                     style="background-color: rgba(239, 68, 68, 0.12); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2);">Mispunch</span>
-                                                {% elif row.status == "Rest Day" %}
+                                                {% elif row.status == "Rest Day" or row.status == "Weekly Off" %}
                                                 <span class="badge badge-custom"
-                                                    style="background-color: rgba(148, 163, 184, 0.12); color: var(--text-muted); border: 1px solid rgba(148, 163, 184, 0.2);">Rest
-                                                    Day</span>
+                                                    style="background-color: rgba(148, 163, 184, 0.12); color: var(--text-muted); border: 1px solid rgba(148, 163, 184, 0.2);">{{ row.status }}</span>
                                                 {% else %}
                                                 <span class="badge badge-custom"
                                                     style="background-color: rgba(245, 158, 11, 0.12); color: var(--warning-color); border: 1px solid rgba(245, 158, 11, 0.2);">{{ row.status }}</span>
@@ -1196,12 +1217,18 @@
                     <table class="table table-custom" style="white-space: nowrap;">
                         <thead>
                             <tr>
-                                {% if role == 'smt_pd' or role == 'assy_pd' or is_admin %}
+                                {% if is_admin or is_superuser or role == 'admin' %}
                                 <th>Emp ID</th>
                                 <th>Name</th>
-                                {% endif %}
                                 <th>Date</th>
                                 <th>Day</th>
+                                {% elif is_management or is_section_view or role == 'management' or role == 'smt_pd' or role == 'assy_pd' or role == 'dept_head' or role == 'manager' %}
+                                <th>Date</th>
+                                <th>Name</th>
+                                {% else %}
+                                <th>Date</th>
+                                <th>Day</th>
+                                {% endif %}
                                 <th>Check-in</th>
                                 <th>Check-out</th>
                                 <th>Work hrs</th>
@@ -1213,28 +1240,37 @@
                             {% for row in attendance %}
                             <tr data-shift="{{ row.shift_label|lower }}"
                                 data-section="{{ row.location_label|default:'s63' }}">
-                                {% if role == 'smt_pd' or role == 'assy_pd' or is_admin %}
+                                {% if is_admin or is_superuser or role == 'admin' %}
                                 <td><strong class="text-info">{{ row.employee_id }}</strong></td>
                                 <td>{{ row.employee_name }}</td>
-                                {% endif %}
                                 <td><strong>{{ row.date }}</strong></td>
                                 <td class="fw-semibold">{{ row.day }}</td>
+                                {% elif is_management or is_section_view or role == 'management' or role == 'smt_pd' or role == 'assy_pd' or role == 'dept_head' or role == 'manager' %}
+                                <td><strong>{{ row.date }}</strong></td>
+                                <td class="fw-semibold">{{ row.employee_name }}</td>
+                                {% else %}
+                                <td><strong>{{ row.date }}</strong></td>
+                                <td class="fw-semibold">{{ row.day }}</td>
+                                {% endif %}
                                 <td>{{ row.in_time }}</td>
                                 <td>{{ row.out_time }}</td>
                                 <td>{{ row.work_hrs }}</td>
                                 <td>{{ row.ot_hrs }}</td>
                                 <td>
-                                    {% if row.status == "Present" %}
-                                    <span class="badge badge-custom badge-active">Present</span>
+                                    {% if row.status == "Full Day" or row.status == "Present" %}
+                                    <span class="badge badge-custom badge-active">Full Day</span>
+                                    {% elif row.status == "Short Leave" %}
+                                    <span class="badge badge-custom" style="background-color: rgba(59, 130, 246, 0.12); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2);">Short Leave</span>
+                                    {% elif row.status == "Half Day" %}
+                                    <span class="badge badge-custom" style="background-color: rgba(168, 85, 247, 0.12); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.2);">Half Day</span>
                                     {% elif row.status == "Absent" %}
                                     <span class="badge badge-custom badge-absent">Absent</span>
                                     {% elif row.status == "Mispunch" %}
                                     <span class="badge badge-custom badge-absent"
                                         style="background-color: rgba(239, 68, 68, 0.12); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2);">Mispunch</span>
-                                    {% elif row.status == "Rest Day" %}
+                                    {% elif row.status == "Rest Day" or row.status == "Weekly Off" %}
                                     <span class="badge badge-custom"
-                                        style="background-color: rgba(148, 163, 184, 0.12); color: var(--text-muted); border: 1px solid rgba(148, 163, 184, 0.2);">Rest
-                                        Day</span>
+                                        style="background-color: rgba(148, 163, 184, 0.12); color: var(--text-muted); border: 1px solid rgba(148, 163, 184, 0.2);">{{ row.status }}</span>
                                     {% else %}
                                     <span class="badge badge-custom"
                                         style="background-color: rgba(245, 158, 11, 0.12); color: var(--warning-color); border: 1px solid rgba(245, 158, 11, 0.2);">{{ row.status }}</span>
@@ -1441,10 +1477,12 @@
                     const isDay = (shiftLabel === 'day');
                     const isNight = (shiftLabel === 'night');
 
-                    const status = record.status;
-                    const isPresent = (status === 'Present');
+                    const status = record.status || '';
+                    const isPresent = (status === 'Full Day' || status === 'Half Day' || status === 'Short Leave' || status === 'Mispunch' || status === 'Present');
                     const isAbsent = (status === 'Absent');
-                    const isLeave = status.includes('CL') || status === 'Leave';
+                    const rawLeaveVal = String(record.leave_type || record['Leave Type'] || '').trim();
+                    const isApprovedLeaveType = rawLeaveVal && rawLeaveVal !== '—' && rawLeaveVal !== 'None' && rawLeaveVal !== '0';
+                    const isLeave = (status === 'Approved Leave') || (status !== 'Short Leave' && status !== 'Half Day' && status !== 'Mispunch' && isApprovedLeaveType);
                     const isLate = record.is_unexcused_late || (record.late_minutes && parseFloat(record.late_minutes) > 0);
                     const isMispunch = (status === 'Mispunch');
 
@@ -1814,14 +1852,18 @@
                         let rowsHtml = '';
                         data.records.forEach(row => {
                             let badgeHtml = '';
-                            if (row.status === "Present") {
-                                badgeHtml = '<span class="badge badge-custom badge-active">Present</span>';
+                            if (row.status === "Full Day" || row.status === "Present") {
+                                badgeHtml = '<span class="badge badge-custom badge-active">Full Day</span>';
+                            } else if (row.status === "Short Leave") {
+                                badgeHtml = '<span class="badge badge-custom" style="background-color: rgba(59, 130, 246, 0.12); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2);">Short Leave</span>';
+                            } else if (row.status === "Half Day") {
+                                badgeHtml = '<span class="badge badge-custom" style="background-color: rgba(168, 85, 247, 0.12); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.2);">Half Day</span>';
                             } else if (row.status === "Absent") {
                                 badgeHtml = '<span class="badge badge-custom badge-absent">Absent</span>';
                             } else if (row.status === "Mispunch") {
                                 badgeHtml = '<span class="badge badge-custom badge-absent" style="background-color: rgba(239, 68, 68, 0.12); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2);">Mispunch</span>';
-                            } else if (row.status === "Rest Day") {
-                                badgeHtml = '<span class="badge badge-custom" style="background-color: rgba(148, 163, 184, 0.12); color: var(--text-muted); border: 1px solid rgba(148, 163, 184, 0.2);">Rest Day</span>';
+                            } else if (row.status === "Rest Day" || row.status === "Weekly Off") {
+                                badgeHtml = `<span class="badge badge-custom" style="background-color: rgba(148, 163, 184, 0.12); color: var(--text-muted); border: 1px solid rgba(148, 163, 184, 0.2);">${row.status}</span>`;
                             } else {
                                 badgeHtml = `<span class="badge badge-custom" style="background-color: rgba(245, 158, 11, 0.12); color: var(--warning-color);">${row.status}</span>`;
                             }
@@ -2036,14 +2078,24 @@
 
             const recordMap = {};
             records.forEach(r => {
-                if (r.raw_date) {
-                    let dStr = r.raw_date.split('T')[0];
-                    let parts = dStr.includes('-') ? dStr.split('-') : dStr.split('/');
+                let dateStr = r.raw_date || r.date || r.YYMMDD || '';
+                if (dateStr) {
+                    dateStr = String(dateStr).split('T')[0].trim();
+                    let parts = dateStr.includes('-') ? dateStr.split('-') : dateStr.split('/');
                     if (parts.length === 3) {
-                        let day = parts[0].length === 4 ? parseInt(parts[2]) : parseInt(parts[0]);
-                        let month = parts[0].length === 4 ? parseInt(parts[1]) : parseInt(parts[1]);
-                        let year = parts[0].length === 4 ? parseInt(parts[0]) : parseInt(parts[2]);
-                        recordMap[`${day}-${month}-${year}`] = r;
+                        let day, month, year;
+                        if (parts[0].length === 4) {
+                            year = parseInt(parts[0]);
+                            month = parseInt(parts[1]);
+                            day = parseInt(parts[2]);
+                        } else if (parts[2].length === 4) {
+                            day = parseInt(parts[0]);
+                            month = parseInt(parts[1]);
+                            year = parseInt(parts[2]);
+                        }
+                        if (day && month && year) {
+                            recordMap[`${day}-${month}-${year}`] = r;
+                        }
                     }
                 }
             });
@@ -2081,41 +2133,66 @@
                 const isWeekend = (dayOfWeek === 0);
 
                 if (record) {
-                    if (record.status === 'Present') {
-                        const inTime = record.in_time;
-                        let isLate = false;
-                        if (record.late_minutes && parseFloat(record.late_minutes) > 0) {
-                            isLate = true;
-                        } else if (inTime && inTime !== '—') {
-                            const parts = inTime.split(':');
-                            if (parts.length === 2) {
-                                const checkInMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
-                                const shiftStartMin = (record.shift_label === 'night') ? 20 * 60 : 9 * 60;
-                                if (checkInMin > shiftStartMin) {
-                                    isLate = true;
-                                }
-                            }
-                        }
-                        cell.classList.add(isLate ? 'calendar-late' : 'calendar-present');
-                        timeEl.innerHTML = `<div class="calendar-time-range">${record.in_time} - ${record.out_time}</div><div class="calendar-work-hrs fw-semibold mt-1">${record.work_hrs}</div>`;
-                    } else if (record.status.includes('CL')) {
-                        cell.classList.add('calendar-leave');
-                        timeEl.innerHTML = `<div class="calendar-time-range">${record.in_time !== '—' ? record.in_time : '—'}</div><div class="calendar-work-hrs fw-semibold mt-1">CL</div>`;
-                    } else if (record.status === 'Absent') {
-                        cell.classList.add('calendar-leave');
-                        timeEl.innerHTML = `<div class="calendar-time-range">—</div><div class="calendar-work-hrs fw-semibold mt-1">Absent</div>`;
-                    } else if (record.status === 'Mispunch') {
-                        cell.classList.add('calendar-late');
-                        const inTime = record.in_time !== '—' ? record.in_time : '—';
-                        const outTime = record.out_time !== '—' ? record.out_time : '—';
-                        timeEl.innerHTML = `<div class="calendar-time-range">${inTime} - ${outTime}</div><div class="calendar-work-hrs fw-semibold mt-1">Mispunch</div>`;
+                    const status = record.status || 'Absent';
+                    const inTime = (record.in_time && record.in_time !== '—' && record.in_time !== '00:00') ? record.in_time : '—';
+                    const outTime = (record.out_time && record.out_time !== '—' && record.out_time !== '00:00') ? record.out_time : '—';
+                    let workHrs = (record.work_hrs && record.work_hrs !== '—') ? record.work_hrs : '0.0h';
+                    if (!String(workHrs).includes('h')) {
+                        workHrs = `${workHrs}h`;
+                    }
+
+                    if (status === 'Full Day' || status === 'Present') {
+                        cell.classList.add('calendar-present');
+                        timeEl.innerHTML = `
+                            <div class="fw-bold text-success" style="font-size: 0.72rem;">Full Day</div>
+                            <div class="calendar-time-range">${inTime} - ${outTime}</div>
+                            <div class="calendar-work-hrs fw-semibold mt-1">Work: ${workHrs}</div>
+                        `;
+                    } else if (status === 'Half Day') {
+                        cell.classList.add('calendar-half-day');
+                        timeEl.innerHTML = `
+                            <div class="fw-bold text-primary" style="font-size: 0.72rem;">Half Day</div>
+                            <div class="calendar-time-range">${inTime} - ${outTime}</div>
+                            <div class="calendar-work-hrs fw-semibold mt-1">Work: ${workHrs}</div>
+                        `;
+                    } else if (status === 'Short Leave') {
+                        cell.classList.add('calendar-short-leave');
+                        timeEl.innerHTML = `
+                            <div class="fw-bold" style="font-size: 0.72rem; color: #0ea5e9;">Short Leave</div>
+                            <div class="calendar-time-range">${inTime} - ${outTime}</div>
+                            <div class="calendar-work-hrs fw-semibold mt-1">Work: ${workHrs}</div>
+                        `;
+                    } else if (status === 'Mispunch') {
+                        cell.classList.add('calendar-mispunch');
+                        timeEl.innerHTML = `
+                            <div class="fw-bold" style="font-size: 0.72rem; color: #f97316;">Mispunch</div>
+                            <div class="calendar-time-range">${inTime} - ${outTime}</div>
+                            <div class="calendar-work-hrs fw-semibold mt-1">Work: ${workHrs}</div>
+                        `;
+                    } else if (status === 'Approved Leave' || status.includes('CL') || status.includes('Leave')) {
+                        cell.classList.add('calendar-approved-leave');
+                        timeEl.innerHTML = `
+                            <div class="fw-bold text-warning" style="font-size: 0.72rem;">${status}</div>
+                            <div class="calendar-time-range">${inTime !== '—' ? inTime : '—'}</div>
+                            <div class="calendar-work-hrs fw-semibold mt-1">${record.leave_type || status}</div>
+                        `;
+                    } else if (status === 'Absent') {
+                        cell.classList.add('calendar-absent');
+                        timeEl.innerHTML = `
+                            <div class="fw-bold text-danger" style="font-size: 0.72rem;">Absent</div>
+                            <div class="calendar-time-range">${inTime !== '—' ? inTime : '—'}</div>
+                            <div class="calendar-work-hrs fw-semibold mt-1">Absent</div>
+                        `;
                     } else {
                         cell.classList.add('calendar-weekend');
-                        timeEl.innerHTML = `<div class="calendar-time-range">—</div>`;
+                        timeEl.innerHTML = `
+                            <div class="fw-bold text-muted" style="font-size: 0.72rem;">${status}</div>
+                            <div class="calendar-time-range">${inTime !== '—' ? inTime + ' - ' + outTime : '—'}</div>
+                        `;
                     }
                 } else {
-                    cell.classList.add(isWeekend ? 'calendar-weekend' : 'calendar-leave');
-                    timeEl.innerHTML = `<div class="calendar-time-range">—</div><div class="calendar-work-hrs fw-semibold mt-1">${isWeekend ? '' : 'CL'}</div>`;
+                    cell.classList.add(isWeekend ? 'calendar-weekend' : 'calendar-weekend');
+                    timeEl.innerHTML = `<div class="calendar-time-range">—</div><div class="calendar-work-hrs fw-semibold mt-1">${isWeekend ? 'Weekend' : 'Off'}</div>`;
                 }
 
                 cell.appendChild(timeEl);
